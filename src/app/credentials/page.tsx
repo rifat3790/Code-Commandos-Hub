@@ -111,10 +111,19 @@ export default function CredentialsPage() {
     return ['All', ...Array.from(set).sort()];
   }, [credentials]);
 
+  const normalizeProfileName = (name?: string) => {
+    if (!name) return undefined;
+    const lower = name.toLowerCase();
+    if (lower.includes('manir')) return 'Shopify Manir';
+    // Clean up basic formatting for others
+    return name.trim();
+  };
+
   const profiles = useMemo(() => {
     const set = new Set<string>();
     credentials.forEach(c => {
-      if (c.profileName) set.add(c.profileName);
+      const norm = normalizeProfileName(c.profileName);
+      if (norm) set.add(norm);
     });
     return ['All', ...Array.from(set).sort()];
   }, [credentials]);
@@ -123,7 +132,7 @@ export default function CredentialsPage() {
   const filteredCredentials = useMemo(() => {
     return credentials.filter(c => {
       const matchesCategory = activeCategory === 'All' || c.category === activeCategory;
-      const matchesProfile = activeProfile === 'All' || c.profileName === activeProfile;
+      const matchesProfile = activeProfile === 'All' || normalizeProfileName(c.profileName) === activeProfile;
       const matchesSearch = 
         c.link.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (c.password && c.password.toLowerCase().includes(searchQuery.toLowerCase())) ||
@@ -162,7 +171,7 @@ export default function CredentialsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl lg:text-3xl font-extrabold tracking-tight text-white uppercase">Store Credentials & Client Directory</h1>
+          <h1 className="text-2xl lg:text-3xl font-extrabold tracking-tight text-white uppercase">Projects Directory</h1>
           <p className="text-gray-400 text-sm font-medium">
             Manage passwords, domains, special notes, client details, and assignee profiles for 290+ Shopify projects.
           </p>
@@ -173,7 +182,7 @@ export default function CredentialsPage() {
           className="px-4 py-2.5 rounded-lg bg-green-500 hover:bg-green-600 text-black font-bold text-xs uppercase tracking-wider transition-colors flex items-center gap-1.5 glow-green shrink-0 self-start sm:self-auto"
         >
           <Plus className="w-4 h-4" />
-          <span>Add Credentials</span>
+          <span>Add Project</span>
         </button>
       </div>
 
@@ -201,7 +210,7 @@ export default function CredentialsPage() {
 
         <div className="p-4 rounded-xl border border-glass-border bg-gray-950/20 flex items-center justify-between">
           <div>
-            <span className="text-gray-500 text-[10px] block uppercase font-bold tracking-wider">Custom Credentials</span>
+            <span className="text-gray-500 text-[10px] block uppercase font-bold tracking-wider">Custom Projects</span>
             <span className="text-2xl font-black text-white mt-1 block">{stats.custom}</span>
           </div>
           <div className="p-3 bg-purple-500/10 text-purple-400 rounded-lg">
@@ -362,7 +371,7 @@ export default function CredentialsPage() {
                   <div>
                     <span className="text-gray-500 block uppercase font-bold tracking-wider text-[8px]">Assignee (Profile)</span>
                     <span className="text-gray-300 font-semibold truncate block mt-0.5">
-                      {cred.profileName || '—'}
+                      {normalizeProfileName(cred.profileName) || '—'}
                     </span>
                   </div>
                   <div>
@@ -383,7 +392,9 @@ export default function CredentialsPage() {
             ))
           ) : (
             <div className="col-span-full py-16 text-center border border-dashed border-glass-border rounded-xl text-gray-500 text-xs">
-              No store credentials found matching your criteria.
+              <p className="text-sm text-gray-500 font-medium max-w-sm mx-auto">
+                No projects found matching your criteria.
+              </p>
             </div>
           )}
         </div>
@@ -449,7 +460,7 @@ export default function CredentialsPage() {
                       <td className="p-3 text-gray-400 italic max-w-[200px] truncate">
                         {cred.specialNote || '—'}
                       </td>
-                      <td className="p-3 text-gray-300 font-semibold">{cred.profileName || '—'}</td>
+                      <td className="p-3 text-gray-300 font-semibold">{normalizeProfileName(cred.profileName) || '-'}</td>
                       <td className="p-3 text-gray-300 font-semibold">
                         {cred.clientName ? `@${cred.clientName}` : '—'}
                       </td>
@@ -487,10 +498,10 @@ export default function CredentialsPage() {
             <div className="bg-gray-900 border border-glass-border p-6 rounded-xl w-full max-w-lg relative z-10 space-y-4 text-left shadow-2xl">
               <div>
                 <h3 className="text-base font-bold text-white flex items-center gap-2">
-                  <PlusCircle className="w-5 h-5 text-green-400" />
-                  <span>Add Store Credentials</span>
+                  <Database className="w-5 h-5 text-purple-400" />
+                  <span>Add Project</span>
                 </h3>
-                <p className="text-xs text-gray-500">Record a new Shopify project deployment credentials block.</p>
+                <p className="text-xs text-gray-500">Record a new project.</p>
               </div>
 
               <form onSubmit={handleCreateCredential} className="space-y-4">
@@ -586,7 +597,7 @@ export default function CredentialsPage() {
                     type="submit"
                     className="px-4 py-2 rounded-lg bg-green-500 hover:bg-green-600 text-xs font-semibold text-black"
                   >
-                    Record Credentials
+                    Record Project
                   </button>
                 </div>
               </form>

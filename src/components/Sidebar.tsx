@@ -65,7 +65,7 @@ export default function Sidebar({ isMobileOpen = false, onCloseMobile }: Sidebar
     { name: 'Templates', path: '/templates', icon: FileCode2 },
     { name: 'Schema Builder', path: '/schema', icon: Layers },
     { name: 'Audit Suite', path: '/audit', icon: Gauge },
-    { name: 'Credentials', path: '/credentials', icon: Database },
+    { name: 'Projects', path: '/credentials', icon: Database },
     { name: 'Mockup Studio', path: '/mockup', icon: Trophy },
     { name: 'AI Assistant', path: '/chat', icon: MessageSquare },
     { name: 'Team Notes', path: '/notes', icon: StickyNote },

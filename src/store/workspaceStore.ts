@@ -120,7 +120,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   downloads: [],
   credentials: [],
   memberProfile: defaultProfile,
-  settings: { enabledMenus: ['Home', 'Workspace', 'Message Helper', 'Templates', 'Schema Builder', 'Audit Suite', 'Credentials', 'Mockup Studio', 'AI Assistant', 'Team Notes', 'Downloads', 'Member Profile', 'Settings'] },
+  settings: { enabledMenus: ['Home', 'Workspace', 'Message Helper', 'Templates', 'Schema Builder', 'Audit Suite', 'Projects', 'Mockup Studio', 'AI Assistant', 'Team Notes', 'Downloads', 'Member Profile', 'Settings'] },
   isHydrated: false,
   pendingModal: { isOpen: false, message: '' },
 
@@ -139,14 +139,21 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       const data = await res.json();
       if (data.success) {
         set({
-          templates: data.data.templates || [],
+          templates: (data.data.templates || []).map((t: any) => {
+            let favs: string[] = [];
+            try { favs = JSON.parse(localStorage.getItem('cc_favorite_templates') || '[]'); } catch(e) {}
+            return { ...t, isFavorite: favs.includes(t.id) ? true : t.isFavorite };
+          }),
           notes: data.data.notes || [],
           chatSessions: data.data.chatSessions || [],
           stickyNotes: data.data.stickyNotes || [],
-          downloads: data.data.downloads || [],
+          downloads: (() => {
+            try { return JSON.parse(localStorage.getItem('cc_downloads_history') || '[]'); }
+            catch(e) { return []; }
+          })(),
           credentials: data.data.credentials || [],
           recentActivities: data.data.recentActivities || [],
-          settings: data.data.settings || { enabledMenus: ['Home', 'Workspace', 'Message Helper', 'Templates', 'Schema Builder', 'Audit Suite', 'Credentials', 'Mockup Studio', 'AI Assistant', 'Team Notes', 'Downloads', 'Member Profile', 'Settings'] },
+          settings: data.data.settings || { enabledMenus: ['Home', 'Workspace', 'Message Helper', 'Templates', 'Schema Builder', 'Audit Suite', 'Projects', 'Mockup Studio', 'AI Assistant', 'Team Notes', 'Downloads', 'Member Profile', 'Settings'] },
           isHydrated: true
         });
       }
@@ -185,12 +192,16 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const template = get().templates.find((t) => t.id === id);
     if (!template) return;
     const updated = { ...template, isFavorite: !template.isFavorite };
-    const applied = await pushToDatabase('update', 'templates', updated, id);
-    if (applied) {
-      set((state) => ({
-        templates: state.templates.map((t) => t.id === id ? updated : t)
-      }));
-    }
+    
+    set((state) => ({
+      templates: state.templates.map((t) => t.id === id ? updated : t)
+    }));
+
+    let favs: string[] = [];
+    try { favs = JSON.parse(localStorage.getItem('cc_favorite_templates') || '[]'); } catch(e) {}
+    if (updated.isFavorite && !favs.includes(id)) favs.push(id);
+    else if (!updated.isFavorite) favs = favs.filter(f => f !== id);
+    localStorage.setItem('cc_favorite_templates', JSON.stringify(favs));
   },
 
   addNote: async (note) => {
@@ -306,19 +317,19 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       id: Math.random().toString(36).substring(2),
       date: new Date().toLocaleDateString()
     };
-    const applied = await pushToDatabase('create', 'downloads', newItem);
-    if (applied) {
-      set((state) => ({ downloads: [newItem, ...state.downloads] }));
-    }
+    set((state) => {
+      const newDownloads = [newItem, ...state.downloads];
+      localStorage.setItem('cc_downloads_history', JSON.stringify(newDownloads));
+      return { downloads: newDownloads };
+    });
   },
 
   deleteDownload: async (id) => {
-    const applied = await pushToDatabase('delete', 'downloads', {}, id);
-    if (applied) {
-      set((state) => ({
-        downloads: state.downloads.filter((d) => d.id !== id)
-      }));
-    }
+    set((state) => {
+      const newDownloads = state.downloads.filter((d) => d.id !== id);
+      localStorage.setItem('cc_downloads_history', JSON.stringify(newDownloads));
+      return { downloads: newDownloads };
+    });
   },
 
   addCredential: async (credential) => {

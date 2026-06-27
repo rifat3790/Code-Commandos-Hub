@@ -131,7 +131,7 @@ export default function AdminDashboard() {
 
   const allAvailableMenus = [
     'Home', 'Workspace', 'Message Helper', 'Templates', 'Schema Builder', 
-    'Audit Suite', 'Credentials', 'Mockup Studio', 'AI Assistant', 
+    'Audit Suite', 'Projects', 'Mockup Studio', 'AI Assistant', 
     'Team Notes', 'Downloads', 'Member Profile', 'Settings'
   ];
 
