@@ -21,25 +21,25 @@ import { useWorkspaceStore } from '@/store/workspaceStore';
 const getDynamicReplacement = (word: string): string => {
   const clean = word.toLowerCase();
   const variations: Record<string, string[]> = {
-    payment: ['p-ayment', 'p_ayment', 'pay-ment', 'pay_ment', 'pa_yment'],
-    payments: ['p-ayments', 'p_ayments', 'pay-ments', 'pay_ments', 'pa_yments'],
-    pay: ['p-ay', 'p_ay', 'pa_y'],
-    contact: ['con-tact', 'con_tact', 'cont-act'],
-    fiverr: ['Fiv-err', 'Fiv_err', 'F_iverr'],
-    whatsapp: ['what-sapp', 'what_sapp', 'wh-atsapp'],
-    skype: ['sky-pe', 'sky_pe', 's_kype'],
-    zoom: ['z-oom', 'z_oom', 'video call', 'video-call'],
-    email: ['e-mail', 'e_mail', 'em-ail'],
-    address: ['add-ress', 'add_ress', 'a_ddress'],
-    phone: ['ph-one', 'ph_one', 'p_hone'],
-    number: ['num-ber', 'num_ber', 'n-umber'],
-    bank: ['ban-k', 'ban_k', 'b_ank'],
-    paypal: ['pay-pal', 'pay_pal', 'p_aypal'],
-    stripe: ['st-ripe', 'st_ripe', 's_tripe'],
-    rating: ['rat-ing', 'rat_ing', 'r_ating'],
-    ratings: ['rat-ings', 'rat_ings', 'r_atings'],
-    review: ['rev-iew', 'rev_iew', 'r_eview'],
-    reviews: ['rev-iews', 'rev_iews', 'r_eviews']
+    payment: ['p-ayment', 'p_ayment'],
+    payments: ['p-ayments', 'p_ayments'],
+    pay: ['p-ay', 'p_ay'],
+    contact: ['c-ontact', 'c_ontact'],
+    fiverr: ['F-iverr', 'F_iverr'],
+    whatsapp: ['w-hatsapp', 'w_hatsapp'],
+    skype: ['s-kype', 's_kype'],
+    zoom: ['z-oom', 'z_oom'],
+    email: ['e-mail', 'e_mail'],
+    address: ['a-ddress', 'a_ddress'],
+    phone: ['p-hone', 'p_hone'],
+    number: ['n-umber', 'n_umber'],
+    bank: ['b-ank', 'b_ank'],
+    paypal: ['p-aypal', 'p_aypal'],
+    stripe: ['s-tripe', 's_tripe'],
+    rating: ['r-ating', 'r_ating'],
+    ratings: ['r-atings', 'r_atings'],
+    review: ['r-eview', 'r_eview'],
+    reviews: ['r-eviews', 'r_eviews']
   };
 
   const list = variations[clean];
@@ -219,7 +219,7 @@ export default function MessageHelperPage() {
       if (stealthLevel === 'medium' && match.length > 2) {
         const separators = ['_', '-', ' '];
         const sep = separators[Math.floor(Math.random() * separators.length)];
-        const insertPos = Math.floor(Math.random() * (match.length - 2)) + 1; // 1 to length-1
+        const insertPos = 1; // Always insert exactly after the first character
         return match.slice(0, insertPos) + sep + match.slice(insertPos);
       }
       return getObfuscatedWord(lowerMatch, stealthLevel);
