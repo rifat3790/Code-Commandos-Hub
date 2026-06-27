@@ -6,10 +6,10 @@ const TemplateSchema = new Schema({
   title: { type: String, required: true },
   description: { type: String },
   category: { type: String },
-  code: { type: String },
+  content: { type: String },
+  variables: [String],
   isCustom: { type: Boolean, default: false },
   isFavorite: { type: Boolean, default: false },
-  tags: [String],
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
 });

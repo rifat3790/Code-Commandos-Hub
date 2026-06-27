@@ -21,25 +21,25 @@ import { useWorkspaceStore } from '@/store/workspaceStore';
 const getDynamicReplacement = (word: string): string => {
   const clean = word.toLowerCase();
   const variations: Record<string, string[]> = {
-    payment: ['p-ayment', 'p_ayment', 'p_ay_ment', 'pa_ym_ent', 'pay-ment', 'pay_ment'],
-    payments: ['p-ayments', 'p_ayments', 'p_ay_ments', 'pa_ym_ents', 'pay-ments', 'pay_ments'],
-    pay: ['p-ay', 'p_ay', 'pa_y', 'p_a_y'],
-    contact: ['con-tact', 'con_tact', 'c_ontact', 'co_nt_act', 'cont-act'],
-    fiverr: ['Fiv-err', 'Fiv_err', 'F_iverr', 'Fiv_e_rr'],
-    whatsapp: ['what-sapp', 'what_sapp', 'w_hatsapp', 'wha_ts_app', 'wh-atsapp'],
-    skype: ['sky-pe', 'sky_pe', 's_kype', 'sky_p_e'],
-    zoom: ['z-oom', 'z_oom', 'z_o_o_m', 'v-ideo call', 'video_call'],
-    email: ['e-mail', 'e_mail', 'e_ma-il', 'em_a_il', 'em-ail', 'e_m_a_i_l'],
-    address: ['add-ress', 'add_ress', 'a_ddress', 'addr_ess'],
-    phone: ['ph-one', 'ph_one', 'p_hone', 'ph_o_ne'],
-    number: ['num-ber', 'num_ber', 'n-umber', 'n_umber', 'n_u_m_b_e_r'],
-    bank: ['ban-k', 'ban_k', 'b_ank', 'ba_n_k'],
-    paypal: ['pay-pal', 'pay_pal', 'pa_ypal', 'p_aypal', 'p_a_y_p_a_l'],
-    stripe: ['st-ripe', 'st_ripe', 's_tripe', 'str_ipe', 'st_r_i_pe'],
-    rating: ['rat-ing', 'rat_ing', 'r_ating', 'ra_ti_ng', 'ra_t_i_n_g'],
-    ratings: ['rat-ings', 'rat_ings', 'r_atings', 'ra_ti_ngs'],
-    review: ['rev-iew', 'rev_iew', 'r_eview', 're_vi_ew', 're_v_i_e_w'],
-    reviews: ['rev-iews', 'rev_iews', 'r_eviews', 're_vi_ews']
+    payment: ['p-ayment', 'p_ayment', 'pay-ment', 'pay_ment', 'pa_yment'],
+    payments: ['p-ayments', 'p_ayments', 'pay-ments', 'pay_ments', 'pa_yments'],
+    pay: ['p-ay', 'p_ay', 'pa_y'],
+    contact: ['con-tact', 'con_tact', 'cont-act'],
+    fiverr: ['Fiv-err', 'Fiv_err', 'F_iverr'],
+    whatsapp: ['what-sapp', 'what_sapp', 'wh-atsapp'],
+    skype: ['sky-pe', 'sky_pe', 's_kype'],
+    zoom: ['z-oom', 'z_oom', 'video call', 'video-call'],
+    email: ['e-mail', 'e_mail', 'em-ail'],
+    address: ['add-ress', 'add_ress', 'a_ddress'],
+    phone: ['ph-one', 'ph_one', 'p_hone'],
+    number: ['num-ber', 'num_ber', 'n-umber'],
+    bank: ['ban-k', 'ban_k', 'b_ank'],
+    paypal: ['pay-pal', 'pay_pal', 'p_aypal'],
+    stripe: ['st-ripe', 'st_ripe', 's_tripe'],
+    rating: ['rat-ing', 'rat_ing', 'r_ating'],
+    ratings: ['rat-ings', 'rat_ings', 'r_atings'],
+    review: ['rev-iew', 'rev_iew', 'r_eview'],
+    reviews: ['rev-iews', 'rev_iews', 'r_eviews']
   };
 
   const list = variations[clean];
@@ -134,12 +134,13 @@ export default function MessageHelperPage() {
   const [inputText, setInputText] = useState('');
   const [detectedWords, setDetectedWords] = useState<string[]>([]);
   const [stealthLevel, setStealthLevel] = useState<'low' | 'medium' | 'high' | 'homoglyph'>('low');
-  const [activeTab, setActiveTab] = useState<'original' | 'professional' | 'short' | 'formal' | 'friendly' | 'grammar' | 'clean'>('original');
+  const [activeTab, setActiveTab] = useState<'original' | 'professional' | 'short' | 'formal' | 'friendly' | 'grammar' | 'clean'>('clean');
   const [compareMode, setCompareMode] = useState(false);
   const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [newTemplateTitle, setNewTemplateTitle] = useState('');
   const [newTemplateDesc, setNewTemplateDesc] = useState('');
   const [historyList, setHistoryList] = useState<{ id: string; text: string; date: string }[]>([]);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     store.hydrate();
@@ -187,12 +188,15 @@ export default function MessageHelperPage() {
   const handleClear = () => {
     setInputText('');
     setDetectedWords([]);
-    setActiveTab('original');
+    setActiveTab('clean');
   };
 
   const handleCopy = (text: string) => {
+    if (!text) return;
     navigator.clipboard.writeText(text);
     store.logActivity('Message Copied', 'chat', 'Copy to clipboard.');
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   // Tone Rewrite Generators (Static formulas matching requested templates style rules)
@@ -201,14 +205,30 @@ export default function MessageHelperPage() {
     
     // Compute clean text on the fly matching current stealth level
     let cleanText = inputText;
-    RESTRICTED_WORDS_MAP.forEach(item => {
-      cleanText = cleanText.replace(item.pattern, () => getObfuscatedWord(item.word, stealthLevel));
+    let profRewrite = inputText;
+
+    // We build a single regex to prevent cascading replacements (e.g. 'payment' -> 'pay-ment' -> 'p_ay-ment')
+    const combinedPattern = new RegExp(
+      '\\b(' + RESTRICTED_WORDS_MAP.map(item => item.word).join('|') + ')\\b',
+      'gi'
+    );
+
+    cleanText = cleanText.replace(combinedPattern, (match) => {
+      const lowerMatch = match.toLowerCase();
+      // Ensure we only add ONE symbol for medium level to prevent p_y-me-nt
+      if (stealthLevel === 'medium' && match.length > 2) {
+        const separators = ['_', '-', ' '];
+        const sep = separators[Math.floor(Math.random() * separators.length)];
+        const insertPos = Math.floor(Math.random() * (match.length - 2)) + 1; // 1 to length-1
+        return match.slice(0, insertPos) + sep + match.slice(insertPos);
+      }
+      return getObfuscatedWord(lowerMatch, stealthLevel);
     });
 
-    // Professional semantic replacement
-    let profRewrite = inputText;
-    RESTRICTED_WORDS_MAP.forEach(item => {
-      profRewrite = profRewrite.replace(item.pattern, item.professional);
+    profRewrite = profRewrite.replace(combinedPattern, (match) => {
+      const lowerMatch = match.toLowerCase();
+      const rule = RESTRICTED_WORDS_MAP.find(item => item.word === lowerMatch);
+      return rule ? rule.professional : match;
     });
 
     // Formal template
@@ -393,7 +413,20 @@ export default function MessageHelperPage() {
   const risk = getRiskScore();
 
   return (
-    <div className="space-y-6 pb-12">
+    <div className="space-y-6 pb-12 relative">
+      <AnimatePresence>
+        {copied && (
+          <motion.div
+            initial={{ opacity: 0, y: -50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -50 }}
+            className="fixed top-8 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-2 bg-green-950/90 border border-green-500/30 text-green-400 px-6 py-3 rounded-full shadow-2xl backdrop-blur-md"
+          >
+            <Check className="w-5 h-5" />
+            <span className="text-sm font-bold tracking-wider uppercase">Copied to clipboard</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
       {/* Header */}
       <div>
         <h1 className="text-2xl lg:text-3xl font-extrabold tracking-tight text-white">MESSAGE HELPER</h1>
@@ -490,8 +523,8 @@ export default function MessageHelperPage() {
                 disabled={!activeText}
                 className="px-4 py-2.5 rounded-lg bg-gray-900 border border-glass-border hover:bg-glass-hover text-white font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-1.5"
               >
-                <Copy className="w-4 h-4" />
-                <span>Copy</span>
+                {copied ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
+                <span className={copied ? "text-green-400" : ""}>{copied ? 'Copied' : 'Copy'}</span>
               </button>
 
               <button
@@ -555,7 +588,7 @@ export default function MessageHelperPage() {
                       onClick={() => handleCopy(activeText)}
                       className="absolute top-3 right-3 p-1.5 rounded hover:bg-glass-hover text-gray-400 hover:text-white transition-colors"
                     >
-                      <Copy className="w-4 h-4" />
+                      {copied ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
                     </button>
                     <pre className="whitespace-pre-wrap font-sans text-sm text-gray-300 pr-8">{activeText}</pre>
                   </div>
