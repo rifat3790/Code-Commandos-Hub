@@ -196,7 +196,7 @@ export default function OrdersDashboard({ csvData }: { csvData: string }) {
         const validData = results.data
           .filter((row: any) => row['Order ID'] && row['Order ID'].trim() !== '')
           .map((row: any) => {
-            const deliveryDateStr = row['Delivery Date'];
+            const deliveryDateStr = row['Deli_Date'];
             const originalTimeline = row['Deadline'] || "";
             let targetTime = null;
 
@@ -266,7 +266,7 @@ export default function OrdersDashboard({ csvData }: { csvData: string }) {
     data.forEach(d => {
       if (d['Service Line']) serviceLines.add(d['Service Line'].trim());
       if (d['Status']) statuses.add(d['Status'].trim());
-      if (d['Delivery Date']) deliveryDates.add(d['Delivery Date'].trim());
+      if (d['Deli_Date']) deliveryDates.add(d['Deli_Date'].trim());
       
       const at = d['Assign Team'];
       if (at && typeof at === 'string') {
@@ -338,7 +338,7 @@ export default function OrdersDashboard({ csvData }: { csvData: string }) {
       todayEnd.setHours(23, 59, 59, 999);
 
       result = result.filter(d => {
-        const dd = (d['Delivery Date'] || '').trim().toLowerCase();
+        const dd = (d['Deli_Date'] || '').trim().toLowerCase();
         
         return deliveryDateFilter.some(f => {
           if (f === 'Today') {
@@ -484,7 +484,7 @@ export default function OrdersDashboard({ csvData }: { csvData: string }) {
         />
         
         <MultiSelectDropdown 
-          label="Delivery Date" 
+          label="Deli_Date" 
           options={filterOptions.deliveryDates} 
           selected={deliveryDateFilter} 
           onChange={setDeliveryDateFilter} 
