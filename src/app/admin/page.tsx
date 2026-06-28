@@ -130,7 +130,7 @@ export default function AdminDashboard() {
   };
 
   const allAvailableMenus = [
-    'Home', 'Workspace', 'Message Helper', 'Templates', 'Schema Builder', 
+    'Home', 'Workspace', 'Order Tracker', 'Message Helper', 'Templates', 'Schema Builder', 
     'Audit Suite', 'Projects', 'Mockup Studio', 'AI Assistant', 
     'Team Notes', 'Downloads', 'Member Profile', 'Settings'
   ];

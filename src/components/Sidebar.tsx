@@ -61,6 +61,7 @@ export default function Sidebar({ isMobileOpen = false, onCloseMobile }: Sidebar
   const baseNavItemsRaw = [
     { name: 'Home', path: '/', icon: Home },
     { name: 'Workspace', path: '/workspace', icon: LayoutDashboard },
+    { name: 'Order Tracker', path: '/tracker', icon: LayoutDashboard },
     { name: 'Message Helper', path: '/message-helper', icon: ShieldAlert },
     { name: 'Templates', path: '/templates', icon: FileCode2 },
     { name: 'Schema Builder', path: '/schema', icon: Layers },
