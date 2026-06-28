@@ -26,12 +26,65 @@ if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
 
 import { AuthProvider } from '@/context/AuthContext';
 import { usePathname } from 'next/navigation';
+import { ShieldAlert } from 'lucide-react';
+import { useWorkspaceStore } from '@/store/workspaceStore';
 
 import GlobalPendingModal from './GlobalPendingModal';
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const pathname = usePathname();
+  const storeSettings = useWorkspaceStore(state => state.settings);
+  const dbUser = useWorkspaceStore(state => state.dbUser);
+  const isHydrated = useWorkspaceStore(state => state.isHydrated);
+
+  // Route map to identify which menu controls which path
+  const routeToMenuMap: Record<string, string> = {
+    '/workspace': 'Workspace',
+    '/tracker': 'Order Tracker',
+    '/message-helper': 'Message Helper',
+    '/templates': 'Templates',
+    '/schema': 'Schema Builder',
+    '/audit': 'Audit Suite',
+    '/credentials': 'Projects',
+    '/mockup': 'Mockup Studio',
+    '/chat': 'AI Assistant',
+    '/notes': 'Team Notes',
+    '/downloads': 'Downloads',
+    '/member': 'Member Profile',
+    '/settings': 'Settings',
+    '/': 'Home'
+  };
+
+  let currentMenuName = '';
+  // Check exact match first
+  if (routeToMenuMap[pathname]) {
+    currentMenuName = routeToMenuMap[pathname];
+  } else {
+    // Check if pathname starts with any of the routes (excluding '/')
+    const matchedRoute = Object.keys(routeToMenuMap).find(route => route !== '/' && pathname.startsWith(route));
+    if (matchedRoute) {
+      currentMenuName = routeToMenuMap[matchedRoute];
+    }
+  }
+
+  const isAdminOrSuperAdmin = dbUser?.role === 'super_admin' || dbUser?.role === 'admin';
+  const isSuperAdmin = dbUser?.role === 'super_admin';
+  
+  // By default, authorized until proven otherwise.
+  // Wait until hydrated to show unauthorized to prevent flashing on load
+  let isAuthorized = true;
+  if (isHydrated) {
+    if (pathname.startsWith('/admin') && !isAdminOrSuperAdmin) {
+       isAuthorized = false;
+    } else if (!isSuperAdmin && currentMenuName) {
+       // All roles except super_admin respect the enabledMenus setting
+       const enabledMenus = storeSettings?.enabledMenus || Object.values(routeToMenuMap);
+       if (!enabledMenus.includes(currentMenuName)) {
+         isAuthorized = false;
+       }
+    }
+  }
 
   // Don't render the sidebar or standard layout structure for the login page
   if (pathname === '/login' || pathname === '/login/') {
@@ -71,7 +124,15 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
 
           {/* Main page content scroll viewport */}
           <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 relative bg-radial-[circle_at_top_right,rgba(16,185,129,0.03),transparent_40%]">
-            {children}
+            {!isAuthorized ? (
+               <div className="flex flex-col items-center justify-center h-full text-center">
+                 <ShieldAlert className="w-16 h-16 text-red-500 mb-4 glow-red" />
+                 <h1 className="text-3xl font-bold text-white mb-2">Access Denied</h1>
+                 <p className="text-gray-400">You do not have permission to view this page. The administrator has disabled this section for your account.</p>
+               </div>
+            ) : (
+               children
+            )}
           </main>
         </div>
       </div>
