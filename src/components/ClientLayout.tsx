@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Sidebar from './Sidebar';
-import { Menu, Terminal } from 'lucide-react';
+import { Menu, Terminal, ShieldAlert } from 'lucide-react';
 import Link from 'next/link';
 
 // Intercept hydration warnings in development to prevent browser-extension-induced overlay crashes
@@ -24,19 +24,16 @@ if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
   };
 }
 
-import { AuthProvider } from '@/context/AuthContext';
+import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { usePathname } from 'next/navigation';
-import { ShieldAlert } from 'lucide-react';
 import { useWorkspaceStore } from '@/store/workspaceStore';
-
 import GlobalPendingModal from './GlobalPendingModal';
 
-export default function ClientLayout({ children }: { children: React.ReactNode }) {
-  const [isMobileOpen, setIsMobileOpen] = useState(false);
+function ProtectedMainContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const storeSettings = useWorkspaceStore(state => state.settings);
-  const dbUser = useWorkspaceStore(state => state.dbUser);
   const isHydrated = useWorkspaceStore(state => state.isHydrated);
+  const { dbUser } = useAuth();
 
   // Route map to identify which menu controls which path
   const routeToMenuMap: Record<string, string> = {
@@ -74,7 +71,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   // By default, authorized until proven otherwise.
   // Wait until hydrated to show unauthorized to prevent flashing on load
   let isAuthorized = true;
-  if (isHydrated) {
+  if (isHydrated && dbUser !== undefined) {
     if (pathname.startsWith('/admin') && !isAdminOrSuperAdmin) {
        isAuthorized = false;
     } else if (!isSuperAdmin && currentMenuName) {
@@ -85,6 +82,23 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
        }
     }
   }
+
+  if (!isAuthorized) {
+    return (
+       <div className="flex flex-col items-center justify-center h-full text-center">
+         <ShieldAlert className="w-16 h-16 text-red-500 mb-4 glow-red" />
+         <h1 className="text-3xl font-bold text-white mb-2">Access Denied</h1>
+         <p className="text-gray-400">You do not have permission to view this page. The administrator has disabled this section for your account.</p>
+       </div>
+    );
+  }
+
+  return <>{children}</>;
+}
+
+export default function ClientLayout({ children }: { children: React.ReactNode }) {
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const pathname = usePathname();
 
   // Don't render the sidebar or standard layout structure for the login page
   if (pathname === '/login' || pathname === '/login/') {
@@ -124,15 +138,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
 
           {/* Main page content scroll viewport */}
           <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 relative bg-radial-[circle_at_top_right,rgba(16,185,129,0.03),transparent_40%]">
-            {!isAuthorized ? (
-               <div className="flex flex-col items-center justify-center h-full text-center">
-                 <ShieldAlert className="w-16 h-16 text-red-500 mb-4 glow-red" />
-                 <h1 className="text-3xl font-bold text-white mb-2">Access Denied</h1>
-                 <p className="text-gray-400">You do not have permission to view this page. The administrator has disabled this section for your account.</p>
-               </div>
-            ) : (
-               children
-            )}
+            <ProtectedMainContent>{children}</ProtectedMainContent>
           </main>
         </div>
       </div>
