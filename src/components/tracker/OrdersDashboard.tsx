@@ -196,7 +196,7 @@ export default function OrdersDashboard({ csvData }: { csvData: string }) {
         const validData = results.data
           .filter((row: any) => row['Order ID'] && row['Order ID'].trim() !== '')
           .map((row: any) => {
-            const deliveryDateStr = row['Deli_Date'];
+            const deliveryDateStr = row['Delivery Date'];
             const originalTimeline = row['Deadline'] || "";
             let targetTime = null;
 
