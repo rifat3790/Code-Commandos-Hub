@@ -166,6 +166,7 @@ export default function OrdersDashboard({ csvData }: { csvData: string }) {
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
   const [teamFilter, setTeamFilter] = useState<string[]>([]);
   const [nameFilter, setNameFilter] = useState<string[]>([]);
+  const [deliveryDateFilter, setDeliveryDateFilter] = useState<string[]>([]);
 
   useEffect(() => {
     const refreshInterval = setInterval(() => {
@@ -259,10 +260,13 @@ export default function OrdersDashboard({ csvData }: { csvData: string }) {
     const statuses = new Set<string>();
     const teams = new Set<string>();
     const names = new Set<string>();
+    const deliveryDates = new Set<string>();
+    deliveryDates.add('Today');
 
     data.forEach(d => {
       if (d['Service Line']) serviceLines.add(d['Service Line'].trim());
       if (d['Status']) statuses.add(d['Status'].trim());
+      if (d['Delivery Date']) deliveryDates.add(d['Delivery Date'].trim());
       
       const at = d['Assign Team'];
       if (at && typeof at === 'string') {
@@ -281,7 +285,12 @@ export default function OrdersDashboard({ csvData }: { csvData: string }) {
       serviceLines: Array.from(serviceLines).sort(),
       statuses: Array.from(statuses).sort(),
       teams: Array.from(teams).sort(),
-      names: Array.from(names).sort()
+      names: Array.from(names).sort(),
+      deliveryDates: Array.from(deliveryDates).sort((a, b) => {
+        if (a === 'Today') return -1;
+        if (b === 'Today') return 1;
+        return a.localeCompare(b);
+      })
     };
   }, [data]);
 
@@ -322,6 +331,27 @@ export default function OrdersDashboard({ csvData }: { csvData: string }) {
       });
     }
 
+    if (deliveryDateFilter.length > 0) {
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const todayEnd = new Date();
+      todayEnd.setHours(23, 59, 59, 999);
+
+      result = result.filter(d => {
+        const dd = (d['Delivery Date'] || '').trim().toLowerCase();
+        
+        return deliveryDateFilter.some(f => {
+          if (f === 'Today') {
+            if (d._targetTime) {
+               return d._targetTime >= todayStart.getTime() && d._targetTime <= todayEnd.getTime();
+            }
+            return false;
+          }
+          return dd === f.toLowerCase();
+        });
+      });
+    }
+
     // Apply global search
     if (searchQuery) {
       const lowerQuery = searchQuery.toLowerCase();
@@ -334,7 +364,7 @@ export default function OrdersDashboard({ csvData }: { csvData: string }) {
     }
 
     return result;
-  }, [data, searchQuery, serviceLineFilter, statusFilter, teamFilter, nameFilter]);
+  }, [data, searchQuery, serviceLineFilter, statusFilter, teamFilter, nameFilter, deliveryDateFilter]);
 
   // Calculate Total Value based on filtered data
   const totalValue = useMemo(() => {
@@ -454,7 +484,15 @@ export default function OrdersDashboard({ csvData }: { csvData: string }) {
         />
         
         <MultiSelectDropdown 
-          label="Names" 
+          label="Delivery Date" 
+          options={filterOptions.deliveryDates} 
+          selected={deliveryDateFilter} 
+          onChange={setDeliveryDateFilter} 
+          searchable={true}
+        />
+        
+        <MultiSelectDropdown 
+          label="Names"  
           options={filterOptions.names} 
           selected={nameFilter} 
           onChange={setNameFilter} 
