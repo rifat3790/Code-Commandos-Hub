@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { db } from '@/lib/firebase';
-import { collection, query, where, onSnapshot, addDoc, orderBy, serverTimestamp, getDocs } from 'firebase/firestore';
+import { collection, query, where, or, onSnapshot, addDoc, orderBy, serverTimestamp, getDocs } from 'firebase/firestore';
 import { MessageCircle, X, Send, User, ChevronLeft } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useWorkspaceStore } from '@/store/workspaceStore';
@@ -34,7 +34,7 @@ export default function ChatbotWidget() {
     if (!user) return;
 
     if (isAdminOrSuperAdmin) {
-      // Admin: Listen to all messages directed to 'admin' or sent by this admin
+      // Admin: Listen to all messages (orderBy uses default timestamp index)
       const q = query(
         collection(db, 'chats'),
         orderBy('timestamp', 'asc')
@@ -65,20 +65,25 @@ export default function ChatbotWidget() {
       });
       return () => unsubscribe();
     } else {
-      // Regular User: Listen to their own chat with 'admin'
+      // Regular User: Use 'or' query without orderBy to avoid composite index requirement
       const q = query(
         collection(db, 'chats'),
-        where('senderUid', 'in', [user.uid, 'admin']),
-        orderBy('timestamp', 'asc')
+        or(
+          where('senderUid', '==', user.uid),
+          where('receiverUid', '==', user.uid)
+        )
       );
       
       const unsubscribe = onSnapshot(q, (snapshot) => {
         let msgs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ChatMessage));
-        // Filter out messages not belonging to this user's thread
-        msgs = msgs.filter(m => 
-          (m.senderUid === user.uid && m.receiverUid === 'admin') || 
-          (m.senderUid === 'admin' && m.receiverUid === user.uid)
-        );
+        
+        // Sort manually client-side
+        msgs.sort((a, b) => {
+          const timeA = a.timestamp?.seconds || 0;
+          const timeB = b.timestamp?.seconds || 0;
+          return timeA - timeB;
+        });
+
         setMessages(msgs);
       });
       return () => unsubscribe();
