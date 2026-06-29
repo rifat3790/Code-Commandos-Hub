@@ -3,8 +3,9 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import Papa from 'papaparse';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Clock, CheckCircle2, FileSpreadsheet, ExternalLink, Filter, ChevronDown, Columns, DollarSign } from 'lucide-react';
+import { Search, Clock, CheckCircle2, FileSpreadsheet, ExternalLink, Filter, ChevronDown, Columns, DollarSign, Save } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/context/AuthContext';
 
 function parseTimeline(timelineStr: string): number | null {
   if (!timelineStr) return null;
@@ -154,6 +155,7 @@ function MultiSelectDropdown({
 }
 
 export default function OrdersDashboard({ csvData }: { csvData: string }) {
+  const { user, dbUser } = useAuth();
   const [data, setData] = useState<any[]>([]);
   const [allColumns, setAllColumns] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -167,6 +169,8 @@ export default function OrdersDashboard({ csvData }: { csvData: string }) {
   const [teamFilter, setTeamFilter] = useState<string[]>([]);
   const [nameFilter, setNameFilter] = useState<string[]>([]);
   const [deliveryDateFilter, setDeliveryDateFilter] = useState<string[]>([]);
+  
+  const [isSavingFilter, setIsSavingFilter] = useState(false);
 
   useEffect(() => {
     const refreshInterval = setInterval(() => {
@@ -238,21 +242,82 @@ export default function OrdersDashboard({ csvData }: { csvData: string }) {
           
         setData(validData);
 
+        const tf = dbUser?.trackerFilters || {};
+
         // Only set defaults on initial load (if visibleColumns is empty)
         setVisibleColumns(prev => {
           if (prev.length > 0) return prev;
+          if (tf.visibleColumns) return tf.visibleColumns;
           // Default columns per user request
           const defaultCols = ['Assign Team', 'Profile Name', 'Client name', 'Order ID', 'Status', 'Value', 'Amount'];
           return extractedColumns.filter(c => defaultCols.includes(c));
         });
 
         // Set default filters only on initial mount
-        setServiceLineFilter(prev => prev.length > 0 ? prev : ['Shopify']);
-        setStatusFilter(prev => prev.length > 0 ? prev : ['WIP']);
-        setTeamFilter(prev => prev.length > 0 ? prev : ['CC']);
+        setServiceLineFilter(prev => {
+          if (prev.length > 0) return prev;
+          if (tf.serviceLineFilter) return tf.serviceLineFilter;
+          return ['Shopify'];
+        });
+        
+        setStatusFilter(prev => {
+          if (prev.length > 0) return prev;
+          if (tf.statusFilter) return tf.statusFilter;
+          return ['WIP'];
+        });
+        
+        setTeamFilter(prev => {
+          if (prev.length > 0) return prev;
+          if (tf.teamFilter) return tf.teamFilter;
+          return ['CC'];
+        });
+
+        setNameFilter(prev => {
+          if (prev.length > 0) return prev;
+          if (tf.nameFilter) return tf.nameFilter;
+          return [];
+        });
+
+        setDeliveryDateFilter(prev => {
+          if (prev.length > 0) return prev;
+          if (tf.deliveryDateFilter) return tf.deliveryDateFilter;
+          return [];
+        });
       }
     });
-  }, [csvData]);
+  }, [csvData, dbUser]);
+
+  const handleSaveFilters = async () => {
+    if (!user) return;
+    setIsSavingFilter(true);
+    try {
+      const trackerFilters = {
+        visibleColumns,
+        serviceLineFilter,
+        statusFilter,
+        teamFilter,
+        nameFilter,
+        deliveryDateFilter
+      };
+
+      const res = await fetch(`/api/users/me?uid=${user.uid}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ trackerFilters })
+      });
+
+      if (res.ok) {
+        alert("Your custom filters have been saved successfully!");
+      } else {
+        alert("Failed to save filters.");
+      }
+    } catch (error) {
+      console.error(error);
+      alert("Failed to save filters.");
+    } finally {
+      setIsSavingFilter(false);
+    }
+  };
 
   // Extract unique filter options dynamically from data
   const filterOptions = useMemo(() => {
@@ -509,6 +574,17 @@ export default function OrdersDashboard({ csvData }: { csvData: string }) {
           onChange={setVisibleColumns} 
           searchable={true}
         />
+
+        <div className="ml-auto">
+          <button 
+            onClick={handleSaveFilters} 
+            disabled={isSavingFilter}
+            className="flex items-center gap-2 px-4 py-2 bg-brand-green hover:bg-brand-green-hover text-white rounded-xl text-sm font-semibold transition-colors glow-green"
+          >
+            <Save className="w-4 h-4" />
+            {isSavingFilter ? 'Saving...' : 'Save Filters'}
+          </button>
+        </div>
       </div>
 
       {/* Main Table */}

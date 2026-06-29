@@ -8,6 +8,7 @@ export interface IUser extends Document {
   phoneNumber?: string;
   photoURL?: string;
   role: 'super_admin' | 'admin' | 'user' | 'banned';
+  trackerFilters?: any;
   lastLoginAt?: Date;
   createdAt: Date;
 }
@@ -20,6 +21,7 @@ const UserSchema: Schema = new Schema({
   phoneNumber: { type: String },
   photoURL: { type: String },
   role: { type: String, enum: ['super_admin', 'admin', 'user', 'banned'], default: 'user' },
+  trackerFilters: { type: Object },
   lastLoginAt: { type: Date },
   createdAt: { type: Date, default: Date.now }
 });

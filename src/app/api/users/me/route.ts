@@ -18,3 +18,34 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
+
+export async function PUT(req: Request) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const firebaseUid = searchParams.get('uid');
+    
+    if (!firebaseUid) return NextResponse.json({ error: 'Missing uid' }, { status: 400 });
+
+    const body = await req.json();
+
+    await connectToDatabase();
+    
+    // Allows updating arbitrary user fields but for now just trackerFilters
+    const updateData: any = {};
+    if (body.trackerFilters !== undefined) {
+      updateData.trackerFilters = body.trackerFilters;
+    }
+
+    const updatedUser = await User.findOneAndUpdate(
+      { firebaseUid },
+      { $set: updateData },
+      { new: true }
+    );
+
+    if (!updatedUser) return NextResponse.json({ error: 'User not found' }, { status: 404 });
+
+    return NextResponse.json({ success: true, user: updatedUser }, { status: 200 });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
