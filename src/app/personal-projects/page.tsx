@@ -50,7 +50,7 @@ export default function PersonalProjectsPage() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-black tracking-tight text-white flex items-center gap-3">
-            <Database className="w-8 h-8 text-purple-500" />
+            <Database className="w-8 h-8 text-brand-green" />
             PERSONAL PROJECTS
           </h1>
           <p className="text-gray-400 mt-1">
@@ -179,7 +179,7 @@ function AdminDashboard({ userUid }: { userUid: string }) {
       <div className="glass-panel p-1 rounded-2xl border border-glass-border">
         {loading ? (
           <div className="flex justify-center items-center py-20">
-            <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-purple-500"></div>
+            <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-brand-green"></div>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -210,7 +210,7 @@ function AdminDashboard({ userUid }: { userUid: string }) {
                     <td className="p-3 text-sm text-gray-400">{p.month}</td>
                     <td className="p-3 text-sm font-medium text-white">{p.projectName}</td>
                     <td className="p-3 text-sm">
-                      <span className="bg-purple-500/20 text-purple-300 px-2 py-1 rounded-md border border-purple-500/30">
+                      <span className="bg-brand-green/20 text-brand-green px-2 py-1 rounded-md border border-brand-green/30">
                         {p.profileName}
                       </span>
                     </td>
@@ -325,7 +325,7 @@ function UserWorkflow({ userUid }: { userUid: string }) {
         </button>
         <button 
           onClick={() => setIsMonthModalOpen(true)}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-medium transition-colors glow-purple"
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-brand-green hover:bg-brand-green-hover text-white font-medium transition-colors glow-green"
         >
           <Plus className="w-5 h-5" />
           Create Month
@@ -334,14 +334,14 @@ function UserWorkflow({ userUid }: { userUid: string }) {
 
       {loading ? (
         <div className="flex justify-center items-center py-20">
-          <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-purple-500"></div>
+          <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-brand-green"></div>
         </div>
       ) : months.length === 0 ? (
         <div className="glass-panel p-12 rounded-2xl border border-glass-border text-center">
           <Calendar className="w-16 h-16 text-gray-700 mx-auto mb-4" />
           <h3 className="text-xl font-bold text-white mb-2">No Months Created</h3>
           <p className="text-gray-400 mb-6 max-w-md mx-auto">Create a month folder to start organizing your personal projects and tracking their values.</p>
-          <button onClick={() => setIsMonthModalOpen(true)} className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-medium transition-colors glow-purple">
+          <button onClick={() => setIsMonthModalOpen(true)} className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-brand-green hover:bg-brand-green-hover text-white font-medium transition-colors glow-green">
             <Plus className="w-5 h-5" /> Create First Month
           </button>
         </div>
@@ -351,15 +351,15 @@ function UserWorkflow({ userUid }: { userUid: string }) {
             <div 
               key={m._id} 
               onClick={() => setSelectedMonth(m.month)}
-              className="glass-panel p-6 rounded-2xl border border-glass-border hover:border-purple-500/50 cursor-pointer transition-all hover:-translate-y-1 group relative overflow-hidden"
+              className="glass-panel p-6 rounded-2xl border border-glass-border hover:border-brand-green/50 cursor-pointer transition-all hover:-translate-y-1 group relative overflow-hidden"
             >
               <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
                 <button onClick={(e) => handleDeleteMonth(m._id, e)} className="p-1.5 text-red-400 hover:bg-red-500/20 rounded-md transition-colors">
                   <Trash2 className="w-4 h-4" />
                 </button>
               </div>
-              <Calendar className="w-8 h-8 text-purple-400 mb-4 opacity-80" />
-              <h3 className="text-lg font-bold text-white mb-1 group-hover:text-purple-400 transition-colors">{m.month}</h3>
+              <Calendar className="w-8 h-8 text-brand-green mb-4 opacity-80" />
+              <h3 className="text-lg font-bold text-white mb-1 group-hover:text-brand-green transition-colors">{m.month}</h3>
               <p className="text-xs text-gray-500">Click to view projects</p>
             </div>
           ))}
@@ -382,7 +382,7 @@ function UserWorkflow({ userUid }: { userUid: string }) {
                 </div>
                 <div className="pt-2 flex justify-end gap-3">
                   <button type="button" onClick={() => setIsMonthModalOpen(false)} className="px-4 py-2 text-sm font-medium text-gray-400 hover:text-white transition-colors">Cancel</button>
-                  <button type="submit" disabled={isSubmitting} className="px-4 py-2 text-sm font-medium bg-purple-600 hover:bg-purple-500 text-white rounded-lg transition-colors flex items-center gap-2">
+                  <button type="submit" disabled={isSubmitting} className="px-4 py-2 text-sm font-medium bg-brand-green hover:bg-brand-green-hover text-white rounded-lg transition-colors flex items-center gap-2">
                     {isSubmitting ? 'Creating...' : 'Create Month'}
                   </button>
                 </div>
@@ -517,7 +517,7 @@ function UserProjectsView({ userUid, month, onBack }: { userUid: string, month: 
           <button onClick={fetchProjects} className="p-2.5 rounded-xl border border-glass-border bg-gray-900/50 text-gray-400 hover:text-white transition-colors">
             <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
           </button>
-          <button onClick={() => handleOpenModal()} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-medium transition-colors glow-purple">
+          <button onClick={() => handleOpenModal()} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-brand-green hover:bg-brand-green-hover text-white font-medium transition-colors glow-green">
             <Plus className="w-5 h-5" /> Add Project
           </button>
         </div>
@@ -526,7 +526,7 @@ function UserProjectsView({ userUid, month, onBack }: { userUid: string, month: 
       <div className="glass-panel p-1 rounded-2xl border border-glass-border">
         {loading ? (
           <div className="flex justify-center items-center py-20">
-            <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-purple-500"></div>
+            <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-brand-green"></div>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -547,7 +547,7 @@ function UserProjectsView({ userUid, month, onBack }: { userUid: string, month: 
                   <tr key={p._id} className="hover:bg-gray-800/30 transition-colors">
                     <td className="p-3 text-sm font-medium text-white">{p.projectName}</td>
                     <td className="p-3 text-sm text-gray-300">
-                      <span className="bg-purple-500/20 text-purple-300 px-2 py-1 rounded-md border border-purple-500/30">
+                      <span className="bg-brand-green/20 text-brand-green px-2 py-1 rounded-md border border-brand-green/30">
                         {p.profileName}
                       </span>
                     </td>
@@ -632,7 +632,7 @@ function UserProjectsView({ userUid, month, onBack }: { userUid: string, month: 
                   <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-sm font-medium text-gray-400 hover:text-white transition-colors">
                     Cancel
                   </button>
-                  <button type="submit" disabled={isSubmitting} className="px-4 py-2 text-sm font-medium bg-purple-600 hover:bg-purple-500 text-white rounded-lg transition-colors flex items-center gap-2">
+                  <button type="submit" disabled={isSubmitting} className="px-4 py-2 text-sm font-medium bg-brand-green hover:bg-brand-green-hover text-white rounded-lg transition-colors flex items-center gap-2">
                     {isSubmitting ? 'Saving...' : 'Save Project'}
                   </button>
                 </div>
@@ -644,3 +644,4 @@ function UserProjectsView({ userUid, month, onBack }: { userUid: string, month: 
     </div>
   );
 }
+

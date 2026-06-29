@@ -198,7 +198,7 @@ export default function HomePage() {
             Welcome back, <span className="bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">{displayName}</span>
           </h1>
           <p className="text-gray-400 text-sm md:text-base">
-            Your premium offline Shopify helper panel. Run card mockups, check client chats, edit workflows, and keep client communication flawless.
+            Your premium online Shopify helper panel. Run card mockups, check client chats, edit workflows, and keep client communication flawless.
           </p>
         </div>
         

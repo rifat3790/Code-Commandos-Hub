@@ -143,10 +143,10 @@ export default function ChatbotWidget() {
             className="bg-gray-900 border border-glass-border shadow-2xl rounded-2xl w-[350px] h-[500px] mb-4 flex flex-col overflow-hidden"
           >
             {/* Header */}
-            <div className="bg-purple-600 p-4 flex items-center justify-between text-white shadow-md">
+            <div className="bg-brand-green p-4 flex items-center justify-between text-white shadow-md">
               <div className="flex items-center gap-2">
                 {isAdminOrSuperAdmin && activeChatUser && (
-                  <button onClick={() => setActiveChatUser(null)} className="p-1 hover:bg-purple-700 rounded transition-colors">
+                  <button onClick={() => setActiveChatUser(null)} className="p-1 hover:bg-brand-green rounded transition-colors">
                     <ChevronLeft className="w-5 h-5" />
                   </button>
                 )}
@@ -155,7 +155,7 @@ export default function ChatbotWidget() {
                   {isAdminOrSuperAdmin ? (activeChatUser ? activeChatName : 'Active Chats') : 'Support Chat'}
                 </span>
               </div>
-              <button onClick={() => setIsOpen(false)} className="text-white/80 hover:text-white hover:bg-purple-700 p-1 rounded transition-colors">
+              <button onClick={() => setIsOpen(false)} className="text-white/80 hover:text-white hover:bg-brand-green p-1 rounded transition-colors">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -175,8 +175,8 @@ export default function ChatbotWidget() {
                         className="flex items-center justify-between p-3 rounded-xl border border-glass-border bg-gray-900 hover:bg-gray-800 transition-colors text-left"
                       >
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center">
-                            <User className="w-5 h-5 text-purple-400" />
+                          <div className="w-10 h-10 rounded-full bg-brand-green/20 flex items-center justify-center">
+                            <User className="w-5 h-5 text-brand-green" />
                           </div>
                           <div>
                             <p className="text-white font-medium text-sm">{c.name}</p>
@@ -206,7 +206,7 @@ export default function ChatbotWidget() {
                       <div key={msg.id || i} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
                         <div className={`max-w-[80%] rounded-2xl px-4 py-2 ${
                           isMe 
-                            ? 'bg-purple-600 text-white rounded-tr-sm' 
+                            ? 'bg-brand-green text-white rounded-tr-sm' 
                             : 'bg-gray-800 text-gray-200 border border-glass-border rounded-tl-sm'
                         }`}>
                           <p className="text-sm">{msg.text}</p>
@@ -230,12 +230,12 @@ export default function ChatbotWidget() {
                   value={newMessage}
                   onChange={(e) => setNewMessage(e.target.value)}
                   placeholder="Type a message..."
-                  className="flex-1 bg-gray-950 border border-gray-800 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-purple-500 transition-colors"
+                  className="flex-1 bg-gray-950 border border-gray-800 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-brand-green transition-colors"
                 />
                 <button
                   type="submit"
                   disabled={!newMessage.trim()}
-                  className="bg-purple-600 hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed text-white p-2 rounded-xl transition-colors glow-purple flex items-center justify-center w-10 h-10"
+                  className="bg-brand-green hover:bg-brand-green-hover disabled:opacity-50 disabled:cursor-not-allowed text-white p-2 rounded-xl transition-colors glow-green flex items-center justify-center w-10 h-10"
                 >
                   <Send className="w-4 h-4" />
                 </button>
@@ -248,7 +248,7 @@ export default function ChatbotWidget() {
       {/* Floating Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="w-14 h-14 bg-purple-600 hover:bg-purple-500 text-white rounded-full flex items-center justify-center shadow-lg glow-purple transition-transform hover:scale-105 relative"
+        className="w-14 h-14 bg-brand-green hover:bg-brand-green-hover text-white rounded-full flex items-center justify-center shadow-lg glow-green transition-transform hover:scale-105 relative"
       >
         <MessageCircle className="w-6 h-6" />
         {totalUnread > 0 && !isOpen && (
@@ -260,3 +260,4 @@ export default function ChatbotWidget() {
     </div>
   );
 }
+

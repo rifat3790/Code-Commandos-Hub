@@ -194,10 +194,10 @@ export default function Sidebar({ isMobileOpen = false, onCloseMobile }: Sidebar
             <p className="text-xs font-semibold text-white truncate">{isHydrated ? displayName : 'Developer'}</p>
             <div className="flex items-center gap-1 text-[10px] text-green-400">
               <Clock className="w-2.5 h-2.5" />
-              <span>Offline Ready</span>
+              <span>Online Ready</span>
             </div>
             <p className="text-[9px] text-gray-500 font-mono mt-1 select-none">
-              Build with Refayet
+              By Rifat
             </p>
           </div>
           <button 
@@ -258,10 +258,10 @@ export default function Sidebar({ isMobileOpen = false, onCloseMobile }: Sidebar
                 <p className="text-xs font-semibold text-white truncate">{isHydrated ? displayName : 'Developer'}</p>
                 <div className="flex items-center gap-1 text-[10px] text-green-400">
                   <Clock className="w-2.5 h-2.5" />
-                  <span>Offline Ready</span>
+                  <span>Online Ready</span>
                 </div>
                 <p className="text-[9px] text-gray-500 font-mono mt-1 select-none">
-                  Build with Refayet
+                  By Rifat
                 </p>
               </div>
               <button 
