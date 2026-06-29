@@ -1,77 +1,70 @@
 import { NextResponse } from 'next/server';
-import connectToDatabase from '@/lib/mongodb';
+import connectDB from '@/lib/mongodb';
 import PersonalProject from '@/models/PersonalProject';
-import User from '@/models/User';
 
-export async function GET(req: Request) {
+export async function GET(request: Request) {
   try {
-    const { searchParams } = new URL(req.url);
-    const firebaseUid = searchParams.get('uid');
+    await connectDB();
+    const { searchParams } = new URL(request.url);
+    const uid = searchParams.get('uid');
+    const month = searchParams.get('month');
+    const profileName = searchParams.get('profileName');
 
-    if (!firebaseUid) return NextResponse.json({ error: 'Missing uid' }, { status: 400 });
+    // Build dynamic query
+    const query: any = {};
+    if (uid) query.firebaseUid = uid;
+    if (month) query.month = month;
+    if (profileName) query.profileName = profileName;
 
-    await connectToDatabase();
-    
-    const user = await User.findOne({ firebaseUid });
-    if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    const projects = await PersonalProject.find(query).sort({ createdAt: -1 });
 
-    let projects;
-    if (user.role === 'admin' || user.role === 'super_admin') {
-      projects = await PersonalProject.find({}).sort({ createdAt: -1 });
-    } else {
-      projects = await PersonalProject.find({ firebaseUid }).sort({ createdAt: -1 });
-    }
-
-    return NextResponse.json({ success: true, projects }, { status: 200 });
+    return NextResponse.json({ success: true, projects });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
 
-export async function POST(req: Request) {
+export async function POST(request: Request) {
   try {
-    const body = await req.json();
-    if (!body.firebaseUid) return NextResponse.json({ error: 'Missing uid' }, { status: 400 });
-
-    await connectToDatabase();
-    
-    const newProject = new PersonalProject(body);
-    await newProject.save();
-
-    return NextResponse.json({ success: true, project: newProject }, { status: 201 });
+    await connectDB();
+    const body = await request.json();
+    const newProject = await PersonalProject.create(body);
+    return NextResponse.json({ success: true, project: newProject });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
 
-export async function PUT(req: Request) {
+export async function PUT(request: Request) {
   try {
-    const body = await req.json();
-    if (!body._id) return NextResponse.json({ error: 'Missing _id' }, { status: 400 });
+    await connectDB();
+    const body = await request.json();
+    const { _id, ...updateData } = body;
+    
+    const updatedProject = await PersonalProject.findByIdAndUpdate(
+      _id,
+      updateData,
+      { new: true }
+    );
 
-    await connectToDatabase();
-    
-    const updated = await PersonalProject.findByIdAndUpdate(body._id, { ...body, updatedAt: new Date() }, { new: true });
-    
-    return NextResponse.json({ success: true, project: updated }, { status: 200 });
+    return NextResponse.json({ success: true, project: updatedProject });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
 
-export async function DELETE(req: Request) {
+export async function DELETE(request: Request) {
   try {
-    const { searchParams } = new URL(req.url);
+    await connectDB();
+    const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
 
-    if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 });
+    if (!id) return NextResponse.json({ success: false, error: 'Missing id' }, { status: 400 });
 
-    await connectToDatabase();
-    
     await PersonalProject.findByIdAndDelete(id);
 
-    return NextResponse.json({ success: true }, { status: 200 });
+    return NextResponse.json({ success: true });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
