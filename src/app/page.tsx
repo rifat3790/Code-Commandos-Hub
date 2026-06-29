@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { 
@@ -15,7 +15,9 @@ import {
   Star, 
   Clock, 
   Plus,
-  Zap
+  Zap,
+  Briefcase,
+  DollarSign
 } from 'lucide-react';
 import { useWorkspaceStore } from '@/store/workspaceStore';
 import { useAuth } from '@/context/AuthContext';
@@ -57,7 +59,7 @@ function StarBackground() {
 
     const render = () => {
       ctx.clearRect(0, 0, width, height);
-      ctx.fillStyle = '#34d399'; // subtle emerald twinkling star dust
+      ctx.fillStyle = '#00C950';
 
       stars.forEach((star) => {
         star.alpha += star.delta;
@@ -94,13 +96,59 @@ function StarBackground() {
 export default function HomePage() {
   const store = useWorkspaceStore();
   const { user } = useAuth();
+  
   const [pinnedTools, setPinnedTools] = useState<string[]>(['msg-helper', 'congrats-studio']);
+  
+  // Real DB Data states
+  const [totalProjects, setTotalProjects] = useState(0);
+  const [lifetimeEarnings, setLifetimeEarnings] = useState(0);
+  const [recentNotes, setRecentNotes] = useState<any[]>([]);
+  const [totalNotes, setTotalNotes] = useState(0);
 
-  const displayName = user?.displayName || (user?.email ? user.email.split('@')[0] : store.memberProfile?.name) || 'Developer';
+  const displayName = user?.displayName || (user?.email ? user.email.split('@')[0] : 'Developer');
 
   useEffect(() => {
     store.hydrate();
   }, []);
+
+  useEffect(() => {
+    if (user?.uid) {
+      fetchDashboardData();
+    }
+  }, [user]);
+
+  const fetchDashboardData = async () => {
+    if (!user?.uid) return;
+    try {
+      // 1. Fetch Personal Projects for Earnings
+      const projRes = await fetch(`/api/personal-projects?uid=${user.uid}`);
+      const projData = await projRes.json();
+      if (projData.success && projData.projects) {
+        setTotalProjects(projData.projects.length);
+        const total = projData.projects.reduce((acc: number, p: any) => acc + (Number(p.revenue) || 0), 0);
+        setLifetimeEarnings(total);
+      }
+
+      // 2. Fetch Notes
+      const noteRes = await fetch(`/api/notes?uid=${user.uid}`);
+      const noteData = await noteRes.json();
+      if (noteData.success && noteData.notes) {
+        const standardNotes = noteData.notes.filter((n: any) => n.type === 'note' || n.type === 'checklist');
+        setTotalNotes(standardNotes.length);
+        setRecentNotes(standardNotes.slice(0, 2));
+      }
+
+    } catch (err) {
+      console.error('Failed to load dynamic dashboard data', err);
+    }
+  };
+
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 18) return 'Good afternoon';
+    return 'Good evening';
+  };
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -125,6 +173,7 @@ export default function HomePage() {
       icon: ShieldCheck,
       color: 'from-green-500/20 to-emerald-500/10',
       borderColor: 'group-hover:border-green-500/30',
+      hoverIcon: 'group-hover:text-green-400',
       href: '/message-helper',
     },
     {
@@ -134,6 +183,7 @@ export default function HomePage() {
       icon: Trophy,
       color: 'from-blue-500/20 to-indigo-500/10',
       borderColor: 'group-hover:border-blue-500/30',
+      hoverIcon: 'group-hover:text-blue-400',
       href: '/mockup',
     },
     {
@@ -143,6 +193,7 @@ export default function HomePage() {
       icon: FileCode,
       color: 'from-purple-500/20 to-pink-500/10',
       borderColor: 'group-hover:border-purple-500/30',
+      hoverIcon: 'group-hover:text-purple-400',
       href: '/templates',
     },
     {
@@ -152,18 +203,18 @@ export default function HomePage() {
       icon: MessageSquare,
       color: 'from-amber-500/20 to-orange-500/10',
       borderColor: 'group-hover:border-amber-500/30',
+      hoverIcon: 'group-hover:text-amber-400',
       href: '/chat',
     }
   ];
 
   const categories = [
-    { name: 'Communications', items: 34, desc: 'Fiverr replies, followups, extensions', icon: MessageSquare },
-    { name: 'Achievement Cards', items: 10, desc: 'Review mockup template styles', icon: Trophy },
-    { name: 'Shopify Scripts', items: 15, desc: 'Setup checklists, policy configurations', icon: FileCode },
-    { name: 'Internal Notes', items: store.notes.length, desc: 'Tasks list, board reminders', icon: StickyNote }
+    { name: 'Lifetime Earnings', items: `$${lifetimeEarnings.toLocaleString()}`, desc: 'Total revenue collected', icon: DollarSign },
+    { name: 'Client Projects', items: `${totalProjects} completed`, desc: 'Personal projects tracked', icon: Briefcase },
+    { name: 'Keep Notes', items: `${totalNotes} records`, desc: 'Active notes & checklists', icon: StickyNote },
+    { name: 'Template Presets', items: '24+ available', desc: 'Preloaded Shopify replies', icon: FileCode }
   ];
 
-  // Helper to get tool details for pinned section
   const getToolDetails = (id: string) => {
     switch(id) {
       case 'msg-helper':
@@ -187,34 +238,34 @@ export default function HomePage() {
         className="space-y-8 pb-12 relative z-10"
       >
       {/* 1. Hero Section */}
-      <motion.div variants={itemVariants} className="relative rounded-2xl p-6 lg:p-8 overflow-hidden glass-panel border-glass-border flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div className="absolute top-0 right-0 w-80 h-80 bg-green-500/5 rounded-full blur-[100px] pointer-events-none" />
-        <div className="space-y-2 max-w-xl">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-500/10 border border-green-500/25 text-green-400 text-xs font-semibold">
+      <motion.div variants={itemVariants} className="relative rounded-2xl p-6 lg:p-10 overflow-hidden glass-panel border-glass-border flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-2xl">
+        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-green-500/10 rounded-full blur-[120px] pointer-events-none -mr-20 -mt-20" />
+        <div className="space-y-3 max-w-2xl relative z-10">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-500/10 border border-green-500/25 text-green-400 text-xs font-semibold shadow-[0_0_15px_rgba(34,197,94,0.1)]">
             <Zap className="w-3.5 h-3.5" />
             <span>CODE COMMANDOS HUB ACTIVE</span>
           </div>
-          <h1 className="text-3xl lg:text-4xl font-extrabold tracking-tight text-white">
-            Welcome back, <span className="bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">{displayName}</span>
+          <h1 className="text-3xl lg:text-5xl font-extrabold tracking-tight text-white leading-tight">
+            {getGreeting()}, <span className="bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">{displayName}</span>
           </h1>
-          <p className="text-gray-400 text-sm md:text-base">
+          <p className="text-gray-400 text-sm md:text-base leading-relaxed">
             Your premium online Shopify helper panel. Run card mockups, check client chats, edit workflows, and keep client communication flawless.
           </p>
         </div>
         
         {/* Continue Last Work Card */}
-        <div className="bg-gray-950/50 border border-glass-border p-4 rounded-xl shrink-0 w-full md:w-80 space-y-3">
-          <div className="flex items-center gap-2 text-xs font-medium text-green-400 uppercase tracking-wider">
+        <div className="bg-gray-950/60 border border-glass-border p-5 rounded-2xl shrink-0 w-full md:w-80 space-y-4 backdrop-blur-md relative z-10 shadow-xl hover:border-green-500/30 transition-colors group">
+          <div className="flex items-center gap-2 text-xs font-bold text-green-400 uppercase tracking-wider">
             <Clock className="w-3.5 h-3.5" />
             <span>Continue Working</span>
           </div>
           <div>
             <h4 className="text-sm font-bold text-white">Congratulations Studio</h4>
-            <p className="text-xs text-gray-500 truncate">Last card compiled: Elite Layout</p>
+            <p className="text-xs text-gray-500 truncate mt-0.5">Last card compiled: Elite Layout</p>
           </div>
-          <Link href="/mockup" className="flex items-center justify-between w-full text-xs bg-green-500 hover:bg-green-600 text-black font-semibold py-2 px-3.5 rounded-lg transition-colors">
+          <Link href="/mockup" className="flex items-center justify-between w-full text-xs bg-brand-green hover:bg-brand-green-hover text-white font-bold py-2.5 px-4 rounded-xl transition-all shadow-lg glow-green group-hover:scale-[1.02]">
             <span>Resume Card Studio</span>
-            <ArrowRight className="w-3.5 h-3.5" />
+            <ArrowRight className="w-4 h-4" />
           </Link>
         </div>
       </motion.div>
@@ -230,19 +281,21 @@ export default function HomePage() {
             <h3 className="text-lg font-bold text-white flex items-center gap-2">
               <span>Quick Actions</span>
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 lg:gap-6">
               {quickActions.map((action) => (
                 <Link key={action.id} href={action.href} className="group">
-                  <div className={`h-full p-5 rounded-xl border border-glass-border bg-gradient-to-br ${action.color} hover:bg-glass-hover hover:border-white/10 transition-all duration-300 relative overflow-hidden flex flex-col justify-between space-y-4`}>
-                    <div className="flex items-start justify-between">
-                      <div className="p-3 bg-gray-900/60 rounded-lg text-white group-hover:text-green-400 transition-colors">
-                        <action.icon className="w-6 h-6 stroke-[1.7]" />
+                  <div className={`h-full p-6 rounded-2xl border border-glass-border bg-gradient-to-br ${action.color} hover:bg-glass-hover ${action.borderColor} transition-all duration-300 relative overflow-hidden flex flex-col justify-between space-y-6 shadow-lg`}>
+                    <div className="flex items-start justify-between relative z-10">
+                      <div className={`p-3.5 bg-gray-900/60 rounded-xl text-white ${action.hoverIcon} transition-colors shadow-sm`}>
+                        <action.icon className="w-7 h-7 stroke-[1.7]" />
                       </div>
-                      <ArrowRight className="w-4 h-4 text-gray-500 group-hover:text-white transition-colors" />
+                      <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center group-hover:bg-white/10 transition-colors">
+                        <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-white transition-colors" />
+                      </div>
                     </div>
-                    <div>
-                      <h4 className="font-bold text-white group-hover:text-green-400 transition-colors">{action.name}</h4>
-                      <p className="text-xs text-gray-400 mt-1">{action.desc}</p>
+                    <div className="relative z-10">
+                      <h4 className={`text-base font-bold text-white ${action.hoverIcon} transition-colors`}>{action.name}</h4>
+                      <p className="text-xs text-gray-400 mt-1.5 leading-relaxed">{action.desc}</p>
                     </div>
                   </div>
                 </Link>
@@ -250,21 +303,21 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* 3. Tool Categories */}
+          {/* 3. Dynamic Statistics */}
           <div className="space-y-4">
-            <h3 className="text-lg font-bold text-white">Tool Categories</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+            <h3 className="text-lg font-bold text-white">Your Overview</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {categories.map((cat, i) => (
-                <div key={i} className="p-4 rounded-xl border border-glass-border bg-gray-950/30 space-y-2">
-                  <div className="p-2 bg-glass-hover rounded-lg inline-block text-green-400">
-                    <cat.icon className="w-4.5 h-4.5" />
+                <div key={i} className="p-4 rounded-2xl border border-glass-border bg-gray-950/40 space-y-3 hover:bg-gray-950/60 transition-colors shadow-md group">
+                  <div className="p-2.5 bg-glass-hover rounded-xl inline-block text-green-400 group-hover:scale-110 transition-transform">
+                    <cat.icon className="w-5 h-5" />
                   </div>
                   <div>
-                    <h4 className="text-xs font-semibold text-white">{cat.name}</h4>
-                    <p className="text-[10px] text-gray-500 mt-0.5">{cat.desc}</p>
+                    <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">{cat.name}</h4>
+                    <p className="text-[10px] text-gray-500 mt-1">{cat.desc}</p>
                   </div>
-                  <div className="text-xs font-bold text-green-400">
-                    {cat.items} presets
+                  <div className="text-lg font-extrabold text-white">
+                    {cat.items}
                   </div>
                 </div>
               ))}
@@ -273,12 +326,12 @@ export default function HomePage() {
 
         </div>
 
-        {/* Right Side: Recent Activity, Pinned, Team Notes */}
+        {/* Right Side: Recent Activity, Pinned, Keep Notes */}
         <div className="space-y-8">
           
           {/* Pinned Tools */}
-          <div className="p-5 rounded-xl border border-glass-border bg-gray-950/20 space-y-4">
-            <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center justify-between">
+          <div className="p-5 rounded-2xl border border-glass-border bg-gray-950/30 space-y-4 shadow-lg">
+            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center justify-between">
               <span>Pinned Tools</span>
               <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
             </h3>
@@ -286,17 +339,17 @@ export default function HomePage() {
               {pinnedTools.map((toolId) => {
                 const details = getToolDetails(toolId);
                 return (
-                  <Link key={toolId} href={details.path} className="flex items-center justify-between p-3 rounded-lg bg-gray-950/60 border border-glass-border hover:bg-glass-hover hover:border-white/10 transition-all">
+                  <Link key={toolId} href={details.path} className="flex items-center justify-between p-3.5 rounded-xl bg-gray-950/60 border border-glass-border hover:bg-glass-hover hover:border-white/10 transition-all group">
                     <div className="flex items-center gap-3">
-                      <div className={`p-2 rounded-lg ${details.color}`}>
-                        <details.icon className="w-4 h-4" />
+                      <div className={`p-2 rounded-lg ${details.color} group-hover:scale-110 transition-transform`}>
+                        <details.icon className="w-4.5 h-4.5" />
                       </div>
                       <div className="text-left">
-                        <p className="text-xs font-bold text-white">{details.name}</p>
-                        <p className="text-[10px] text-gray-500">{details.desc}</p>
+                        <p className="text-xs font-bold text-white group-hover:text-green-400 transition-colors">{details.name}</p>
+                        <p className="text-[10px] text-gray-500 mt-0.5">{details.desc}</p>
                       </div>
                     </div>
-                    <ArrowRight className="w-3.5 h-3.5 text-gray-600" />
+                    <ArrowRight className="w-4 h-4 text-gray-600 group-hover:text-white transition-colors" />
                   </Link>
                 );
               })}
@@ -304,18 +357,18 @@ export default function HomePage() {
           </div>
 
           {/* Recent Activity */}
-          <div className="p-5 rounded-xl border border-glass-border bg-gray-950/20 space-y-4">
-            <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center justify-between">
+          <div className="p-5 rounded-2xl border border-glass-border bg-gray-950/30 space-y-4 shadow-lg">
+            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center justify-between">
               <span>Recent Activity</span>
               <Clock className="w-4 h-4 text-gray-500" />
             </h3>
-            <div className="space-y-3.5 max-h-[200px] overflow-y-auto pr-1">
+            <div className="space-y-4 max-h-[220px] overflow-y-auto pr-2 custom-scrollbar">
               {store.recentActivities.length > 0 ? (
                 store.recentActivities.slice(0, 5).map((act) => (
-                  <div key={act.id} className="text-left space-y-0.5">
+                  <div key={act.id} className="text-left space-y-1 relative pl-4 before:content-[''] before:absolute before:left-0 before:top-1.5 before:w-1.5 before:h-1.5 before:bg-green-500 before:rounded-full">
                     <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-bold text-white truncate max-w-[150px]">{act.title}</span>
-                      <span className="text-[9px] text-gray-500">
+                      <span className="text-[11.5px] font-bold text-white truncate max-w-[150px]">{act.title}</span>
+                      <span className="text-[9px] text-gray-500 font-medium">
                         {new Date(act.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
                     </div>
@@ -328,28 +381,38 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Team Notes Widget */}
-          <div className="p-5 rounded-xl border border-glass-border bg-gray-950/20 space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold text-white uppercase tracking-wider">Team Notes</h3>
-              <Link href="/notes" className="text-xs text-green-400 hover:underline">View All</Link>
+          {/* Keep Notes Widget */}
+          <div className="p-5 rounded-2xl border border-glass-border bg-gray-950/30 space-y-4 shadow-lg relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-green-500 to-emerald-500" />
+            <div className="flex items-center justify-between pt-1">
+              <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                <StickyNote className="w-3.5 h-3.5 text-green-400" />
+                Keep Notes
+              </h3>
+              <Link href="/notes" className="text-xs font-medium text-green-400 hover:text-green-300 hover:underline transition-colors">View All</Link>
             </div>
             <div className="space-y-3">
-              {store.notes.slice(0, 2).map((note) => (
-                <div key={note.id} className="p-3 rounded-lg bg-gray-950/40 border border-glass-border space-y-1.5 text-left">
-                  <h4 className="text-xs font-bold text-white truncate">{note.title}</h4>
-                  <p className="text-[10px] text-gray-400 line-clamp-2">
+              {recentNotes.length > 0 ? recentNotes.map((note) => (
+                <Link href="/notes" key={note._id} className="block p-4 rounded-xl bg-gray-950/60 border border-glass-border space-y-2 text-left hover:border-green-500/30 transition-colors group">
+                  <h4 className="text-xs font-bold text-white group-hover:text-green-400 transition-colors truncate">{note.title}</h4>
+                  <p className="text-[10.5px] text-gray-400 line-clamp-2 leading-relaxed">
                     {note.content || `${note.listItems?.length || 0} checklists total`}
                   </p>
+                </Link>
+              )) : (
+                <div className="p-4 rounded-xl border border-dashed border-white/10 text-center text-xs text-gray-500">
+                  No notes saved yet.
                 </div>
-              ))}
+              )}
             </div>
           </div>
       </div>
       </div>
-      <div className="pt-8 pb-4 text-center border-t border-white/5 mt-8 shrink-0">
-        <p className="text-[10px] text-gray-500 font-mono tracking-widest uppercase select-none">
-          Build with Refayet • Code Commandos Omega Prime v1.2.0
+      <div className="pt-10 pb-4 text-center border-t border-white/5 mt-10 shrink-0">
+        <p className="text-[10px] text-gray-500 font-mono tracking-widest uppercase select-none flex items-center justify-center gap-2">
+          <span>By Refayet</span>
+          <span className="w-1 h-1 bg-green-500 rounded-full animate-pulse" />
+          <span>Code Commandos Omega Prime v1.2.0</span>
         </p>
       </div>
     </motion.div>

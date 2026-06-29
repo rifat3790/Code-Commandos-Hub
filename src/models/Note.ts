@@ -6,6 +6,7 @@ export interface INote extends Document {
   content: string;
   type: string;
   listItems?: { id: string; text: string; completed: boolean }[];
+  color?: string; // For sticky notes
   createdAt: Date;
   updatedAt: Date;
 }
@@ -22,6 +23,7 @@ const NoteSchema: Schema = new Schema({
       completed: { type: Boolean, default: false }
     }
   ],
+  color: { type: String }, // For sticky notes
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
 });

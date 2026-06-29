@@ -44,6 +44,9 @@ export async function PUT(req: Request) {
     if (body.role !== undefined) {
       updateData.role = body.role;
     }
+    if (body.calculatorSettings !== undefined) {
+      updateData.calculatorSettings = body.calculatorSettings;
+    }
 
     const updatedUser = await User.findOneAndUpdate(
       { firebaseUid },

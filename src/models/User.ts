@@ -10,6 +10,12 @@ export interface IUser extends Document {
   skills?: string[];
   role: 'super_admin' | 'admin' | 'user' | 'banned';
   trackerFilters?: any;
+  calculatorSettings?: {
+    platformFeePercent: number;
+    withdrawalFeePercent: number;
+    conversionRate: number;
+    currencySymbol: string;
+  };
   lastLoginAt?: Date;
   createdAt: Date;
 }
@@ -24,6 +30,12 @@ const UserSchema: Schema = new Schema({
   skills: { type: [String], default: [] },
   role: { type: String, enum: ['super_admin', 'admin', 'user', 'banned'], default: 'user' },
   trackerFilters: { type: Object },
+  calculatorSettings: {
+    platformFeePercent: { type: Number },
+    withdrawalFeePercent: { type: Number },
+    conversionRate: { type: Number },
+    currencySymbol: { type: String }
+  },
   lastLoginAt: { type: Date },
   createdAt: { type: Date, default: Date.now }
 });

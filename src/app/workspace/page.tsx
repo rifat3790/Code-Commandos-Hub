@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   MessageSquare, 
   FileCode, 
@@ -15,17 +15,26 @@ import {
   Check, 
   Sparkles,
   ArrowUpRight,
-  Pin
+  Pin,
+  Save,
+  Loader2
 } from 'lucide-react';
 import { useWorkspaceStore } from '@/store/workspaceStore';
-import { StickyNote } from '@/types';
+import { useAuth } from '@/context/AuthContext';
+import toast from 'react-hot-toast';
 
 export default function WorkspacePage() {
   const store = useWorkspaceStore();
+  const { user } = useAuth();
+  
   const [newStickyText, setNewStickyText] = useState('');
-  const [stickyColor, setStickyColor] = useState<StickyNote['color']>('yellow');
+  const [stickyColor, setStickyColor] = useState('yellow');
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [quickSearch, setQuickSearch] = useState('');
+  
+  // Sticky Notes from MongoDB
+  const [stickyNotes, setStickyNotes] = useState<any[]>([]);
+  const [isLoadingNotes, setIsLoadingNotes] = useState(true);
 
   // Freelance Calculator state variables
   const [grossAmount, setGrossAmount] = useState<number>(1000);
@@ -33,16 +42,125 @@ export default function WorkspacePage() {
   const [withdrawalFeePercent, setWithdrawalFeePercent] = useState<number>(2);
   const [conversionRate, setConversionRate] = useState<number>(115);
   const [currencySymbol, setCurrencySymbol] = useState<string>('৳');
-  
+  const [isSavingCalc, setIsSavingCalc] = useState(false);
+
   useEffect(() => {
     store.hydrate();
   }, []);
 
-  const handleAddSticky = (e: React.FormEvent) => {
+  useEffect(() => {
+    if (user?.uid) {
+      fetchStickyNotes();
+      fetchUserSettings();
+    }
+  }, [user]);
+
+  const fetchUserSettings = async () => {
+    if (!user?.uid) return;
+    try {
+      const res = await fetch(`/api/users/me?uid=${user.uid}`);
+      const data = await res.json();
+      if (data.success && data.user?.calculatorSettings) {
+        const calc = data.user.calculatorSettings;
+        if (calc.platformFeePercent !== undefined) setPlatformFeePercent(calc.platformFeePercent);
+        if (calc.withdrawalFeePercent !== undefined) setWithdrawalFeePercent(calc.withdrawalFeePercent);
+        if (calc.conversionRate !== undefined) setConversionRate(calc.conversionRate);
+        if (calc.currencySymbol !== undefined) setCurrencySymbol(calc.currencySymbol);
+      }
+    } catch (err) {
+      console.error('Failed to fetch user settings:', err);
+    }
+  };
+
+  const saveCalculatorSettings = async () => {
+    if (!user?.uid) return;
+    setIsSavingCalc(true);
+    try {
+      const res = await fetch(`/api/users/me?uid=${user.uid}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          calculatorSettings: {
+            platformFeePercent,
+            withdrawalFeePercent,
+            conversionRate,
+            currencySymbol
+          }
+        })
+      });
+      if (res.ok) {
+        toast.success('Calculator settings saved!');
+      } else {
+        toast.error('Failed to save calculator settings.');
+      }
+    } catch (err) {
+      toast.error('Error saving settings.');
+    } finally {
+      setIsSavingCalc(false);
+    }
+  };
+
+  const fetchStickyNotes = async () => {
+    if (!user?.uid) return;
+    try {
+      setIsLoadingNotes(true);
+      const res = await fetch(`/api/notes?uid=${user.uid}`);
+      const data = await res.json();
+      if (data.success) {
+        setStickyNotes(data.notes.filter((n: any) => n.type === 'sticky'));
+      }
+    } catch (err) {
+      console.error('Failed to fetch sticky notes:', err);
+      toast.error('Failed to load sticky board');
+    } finally {
+      setIsLoadingNotes(false);
+    }
+  };
+
+  const handleAddSticky = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newStickyText.trim()) return;
-    store.addStickyNote(newStickyText.trim(), stickyColor);
-    setNewStickyText('');
+    if (!newStickyText.trim() || !user?.uid) return;
+    
+    try {
+      const res = await fetch(`/api/notes?uid=${user.uid}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: 'Sticky Note',
+          content: newStickyText.trim(),
+          type: 'sticky',
+          color: stickyColor
+        })
+      });
+      
+      const data = await res.json();
+      if (data.success) {
+        setStickyNotes([data.note, ...stickyNotes]);
+        setNewStickyText('');
+        toast.success('Sticky added!');
+      } else {
+        toast.error('Failed to add sticky.');
+      }
+    } catch (err) {
+      toast.error('Error adding sticky.');
+    }
+  };
+
+  const handleDeleteSticky = async (id: string) => {
+    if (!user?.uid) return;
+    try {
+      const res = await fetch(`/api/notes/${id}?uid=${user.uid}`, {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        setStickyNotes(stickyNotes.filter(n => n._id !== id));
+        toast.success('Sticky deleted');
+      } else {
+        toast.error('Failed to delete sticky');
+      }
+    } catch (err) {
+      toast.error('Error deleting sticky');
+    }
   };
 
   const handleCopyText = (id: string, text: string) => {
@@ -58,7 +176,7 @@ export default function WorkspacePage() {
          t.title.toLowerCase().includes(quickSearch.toLowerCase())
   ).slice(0, 4);
 
-  const colors: { value: StickyNote['color']; border: string; bg: string; text: string }[] = [
+  const colors = [
     { value: 'yellow', border: 'border-yellow-500/30', bg: 'bg-yellow-950/20', text: 'text-yellow-200' },
     { value: 'pink', border: 'border-pink-500/30', bg: 'bg-pink-950/20', text: 'text-pink-200' },
     { value: 'blue', border: 'border-blue-500/30', bg: 'bg-blue-950/20', text: 'text-blue-200' },
@@ -84,60 +202,64 @@ export default function WorkspacePage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             
             {/* Open Message Helper */}
-            <div className="p-5 rounded-xl border border-glass-border bg-gray-950/40 hover:border-green-500/30 hover:bg-glass-hover transition-all group relative">
+            <div className="p-5 rounded-xl border border-glass-border bg-gray-950/40 hover:border-green-500/30 hover:bg-glass-hover transition-all group relative overflow-hidden">
               <Link href="/message-helper" className="absolute inset-0 z-10" />
-              <div className="flex items-start justify-between">
-                <div className="p-2.5 bg-green-500/10 text-green-400 rounded-lg">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-green-500/5 rounded-full blur-3xl pointer-events-none group-hover:bg-green-500/10 transition-colors" />
+              <div className="flex items-start justify-between relative z-10">
+                <div className="p-2.5 bg-green-500/10 text-green-400 rounded-lg group-hover:scale-110 transition-transform">
                   <ShieldAlert className="w-5 h-5" />
                 </div>
                 <ArrowUpRight className="w-4 h-4 text-gray-600 group-hover:text-white transition-colors" />
               </div>
-              <div className="mt-4">
+              <div className="mt-4 relative z-10">
                 <h3 className="text-sm font-bold text-white group-hover:text-green-400 transition-colors">Fiverr Message Checker</h3>
                 <p className="text-xs text-gray-400 mt-1">Review drafts for flagged words (e.g. payment, contact) and correct them.</p>
               </div>
             </div>
 
             {/* Open Templates */}
-            <div className="p-5 rounded-xl border border-glass-border bg-gray-950/40 hover:border-purple-500/30 hover:bg-glass-hover transition-all group relative">
+            <div className="p-5 rounded-xl border border-glass-border bg-gray-950/40 hover:border-purple-500/30 hover:bg-glass-hover transition-all group relative overflow-hidden">
               <Link href="/templates" className="absolute inset-0 z-10" />
-              <div className="flex items-start justify-between">
-                <div className="p-2.5 bg-purple-500/10 text-purple-400 rounded-lg">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/5 rounded-full blur-3xl pointer-events-none group-hover:bg-purple-500/10 transition-colors" />
+              <div className="flex items-start justify-between relative z-10">
+                <div className="p-2.5 bg-purple-500/10 text-purple-400 rounded-lg group-hover:scale-110 transition-transform">
                   <FileCode className="w-5 h-5" />
                 </div>
                 <ArrowUpRight className="w-4 h-4 text-gray-600 group-hover:text-white transition-colors" />
               </div>
-              <div className="mt-4">
+              <div className="mt-4 relative z-10">
                 <h3 className="text-sm font-bold text-white group-hover:text-purple-400 transition-colors">Team Template Hub</h3>
                 <p className="text-xs text-gray-400 mt-1">Access over 20+ preset updates, delivery followups, and billing queries.</p>
               </div>
             </div>
 
             {/* Generate Mockup */}
-            <div className="p-5 rounded-xl border border-glass-border bg-gray-950/40 hover:border-blue-500/30 hover:bg-glass-hover transition-all group relative">
+            <div className="p-5 rounded-xl border border-glass-border bg-gray-950/40 hover:border-blue-500/30 hover:bg-glass-hover transition-all group relative overflow-hidden">
               <Link href="/mockup" className="absolute inset-0 z-10" />
-              <div className="flex items-start justify-between">
-                <div className="p-2.5 bg-blue-500/10 text-blue-400 rounded-lg">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full blur-3xl pointer-events-none group-hover:bg-blue-500/10 transition-colors" />
+              <div className="flex items-start justify-between relative z-10">
+                <div className="p-2.5 bg-blue-500/10 text-blue-400 rounded-lg group-hover:scale-110 transition-transform">
                   <Trophy className="w-5 h-5" />
                 </div>
                 <ArrowUpRight className="w-4 h-4 text-gray-600 group-hover:text-white transition-colors" />
               </div>
-              <div className="mt-4">
+              <div className="mt-4 relative z-10">
                 <h3 className="text-sm font-bold text-white group-hover:text-blue-400 transition-colors">Congratulations Studio</h3>
                 <p className="text-xs text-gray-400 mt-1">Render high-end congratulatory review blocks to PNG images.</p>
               </div>
             </div>
 
             {/* Open Chat */}
-            <div className="p-5 rounded-xl border border-glass-border bg-gray-950/40 hover:border-amber-500/30 hover:bg-glass-hover transition-all group relative">
+            <div className="p-5 rounded-xl border border-glass-border bg-gray-950/40 hover:border-amber-500/30 hover:bg-glass-hover transition-all group relative overflow-hidden">
               <Link href="/chat" className="absolute inset-0 z-10" />
-              <div className="flex items-start justify-between">
-                <div className="p-2.5 bg-amber-500/10 text-amber-400 rounded-lg">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-3xl pointer-events-none group-hover:bg-amber-500/10 transition-colors" />
+              <div className="flex items-start justify-between relative z-10">
+                <div className="p-2.5 bg-amber-500/10 text-amber-400 rounded-lg group-hover:scale-110 transition-transform">
                   <MessageSquare className="w-5 h-5" />
                 </div>
                 <ArrowUpRight className="w-4 h-4 text-gray-600 group-hover:text-white transition-colors" />
               </div>
-              <div className="mt-4">
+              <div className="mt-4 relative z-10">
                 <h3 className="text-sm font-bold text-white group-hover:text-amber-400 transition-colors">Chat Assistant</h3>
                 <p className="text-xs text-gray-400 mt-1">Write, simplify, or fix tone locally for client revisions.</p>
               </div>
@@ -146,11 +268,11 @@ export default function WorkspacePage() {
           </div>
 
           {/* Sticky Notes Canvas */}
-          <div className="p-5 rounded-xl border border-glass-border bg-gray-950/20 space-y-4">
+          <div className="p-5 rounded-xl border border-glass-border bg-gray-950/20 space-y-4 shadow-[0_8px_30px_rgb(0,0,0,0.12)]">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <h2 className="text-base font-bold text-white flex items-center gap-2">
                 <Pin className="w-4.5 h-4.5 text-green-400" />
-                <span>Sticky Board</span>
+                <span>Cloud Sticky Board</span>
               </h2>
               <form onSubmit={handleAddSticky} className="flex gap-2 w-full sm:w-auto">
                 <input
@@ -158,12 +280,12 @@ export default function WorkspacePage() {
                   placeholder="Sticky note..."
                   value={newStickyText}
                   onChange={(e) => setNewStickyText(e.target.value)}
-                  className="px-3 py-1.5 text-xs rounded-lg glass-input w-full sm:w-60"
+                  className="px-3 py-1.5 text-xs rounded-lg glass-input w-full sm:w-60 focus:ring-2 focus:ring-green-500/50 outline-none"
                 />
                 <select
                   value={stickyColor}
-                  onChange={(e) => setStickyColor(e.target.value as StickyNote['color'])}
-                  className="px-2 py-1.5 text-xs rounded-lg glass-input cursor-pointer"
+                  onChange={(e) => setStickyColor(e.target.value)}
+                  className="px-2 py-1.5 text-xs rounded-lg glass-input cursor-pointer focus:ring-2 focus:ring-green-500/50 outline-none"
                 >
                   <option value="yellow">Yellow</option>
                   <option value="pink">Pink</option>
@@ -171,42 +293,52 @@ export default function WorkspacePage() {
                   <option value="green">Green</option>
                   <option value="purple">Purple</option>
                 </select>
-                <button type="submit" className="p-2 rounded-lg bg-green-500 hover:bg-green-600 text-black">
+                <button type="submit" disabled={!newStickyText.trim() || isLoadingNotes} className="p-2 rounded-lg bg-green-500 hover:bg-green-600 disabled:opacity-50 text-black transition-colors">
                   <Plus className="w-4 h-4" />
                 </button>
               </form>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-              {store.stickyNotes.length > 0 ? (
-                store.stickyNotes.map((note) => {
-                  const style = colors.find(c => c.value === note.color) || colors[0];
-                  return (
-                    <motion.div 
-                      key={note.id}
-                      layout
-                      className={`p-4 rounded-xl border flex flex-col justify-between h-36 ${style.border} ${style.bg}`}
-                    >
-                      <p className={`text-xs ${style.text} overflow-y-auto leading-relaxed h-full pr-1 font-medium`}>
-                        {note.content}
-                      </p>
-                      <div className="flex items-center justify-between pt-2 mt-2 border-t border-white/5">
-                        <span className="text-[9px] text-gray-500">
-                          {new Date(note.updatedAt).toLocaleDateString()}
-                        </span>
-                        <button 
-                          onClick={() => store.deleteStickyNote(note.id)}
-                          className="p-1 rounded text-gray-500 hover:text-red-400 hover:bg-white/5 transition-colors"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </motion.div>
-                  );
-                })
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 min-h-[160px]">
+              {isLoadingNotes ? (
+                <div className="col-span-full flex items-center justify-center py-8">
+                  <Loader2 className="w-6 h-6 text-green-500 animate-spin" />
+                </div>
+              ) : stickyNotes.length > 0 ? (
+                <AnimatePresence>
+                  {stickyNotes.map((note) => {
+                    const style = colors.find(c => c.value === note.color) || colors[0];
+                    return (
+                      <motion.div 
+                        key={note._id}
+                        layout
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.8 }}
+                        className={`p-4 rounded-xl border flex flex-col justify-between h-36 shadow-lg hover:shadow-xl transition-shadow ${style.border} ${style.bg}`}
+                      >
+                        <p className={`text-xs ${style.text} overflow-y-auto leading-relaxed h-full pr-1 font-medium`}>
+                          {note.content}
+                        </p>
+                        <div className="flex items-center justify-between pt-2 mt-2 border-t border-white/10">
+                          <span className="text-[9px] text-white/50 font-medium">
+                            {new Date(note.createdAt).toLocaleDateString()}
+                          </span>
+                          <button 
+                            onClick={() => handleDeleteSticky(note._id)}
+                            className="p-1 rounded text-white/40 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </AnimatePresence>
               ) : (
-                <div className="col-span-full text-center py-8 border border-dashed border-glass-border rounded-xl text-gray-500 text-xs">
-                  Sticky board is empty. Create a post-it note above.
+                <div className="col-span-full text-center py-10 border border-dashed border-glass-border rounded-xl text-gray-500 text-xs bg-gray-950/30">
+                  <Pin className="w-6 h-6 text-gray-700 mx-auto mb-2" />
+                  Your cloud sticky board is empty.
                 </div>
               )}
             </div>
@@ -232,12 +364,12 @@ export default function WorkspacePage() {
               placeholder="Search delivery presets..."
               value={quickSearch}
               onChange={(e) => setQuickSearch(e.target.value)}
-              className="w-full px-3 py-1.5 text-xs rounded-lg glass-input"
+              className="w-full px-3 py-1.5 text-xs rounded-lg glass-input focus:ring-2 focus:ring-green-500/50 outline-none"
             />
 
             <div className="space-y-3.5">
               {deliveryTemplates.map((tpl) => (
-                <div key={tpl.id} className="p-3 rounded-lg bg-gray-950/60 border border-glass-border space-y-2 text-left">
+                <div key={tpl.id} className="p-3 rounded-lg bg-gray-950/60 border border-glass-border space-y-2 text-left hover:border-white/10 transition-colors">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-white truncate max-w-[170px]">{tpl.title}</span>
                     <button
@@ -258,39 +390,6 @@ export default function WorkspacePage() {
             </div>
           </div>
 
-          {/* Recent Downloads */}
-          <div className="p-5 rounded-xl border border-glass-border bg-gray-950/20 space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-base font-bold text-white flex items-center gap-2">
-                <Download className="w-4.5 h-4.5 text-green-400" />
-                <span>Recent Downloads</span>
-              </h2>
-              <Link href="/downloads" className="text-xs text-green-400 hover:underline">All files</Link>
-            </div>
-
-            <div className="space-y-2 max-h-[260px] overflow-y-auto pr-1">
-              {store.downloads.length > 0 ? (
-                store.downloads.slice(0, 5).map((item) => (
-                  <div key={item.id} className="flex items-center justify-between p-2.5 rounded-lg bg-gray-950/40 border border-glass-border text-left">
-                    <div className="overflow-hidden">
-                      <p className="text-xs font-semibold text-white truncate">{item.name}</p>
-                      <p className="text-[9px] text-gray-500">{item.size} • {item.date}</p>
-                    </div>
-                    <a 
-                      href={item.url} 
-                      download={item.name} 
-                      className="p-1.5 rounded hover:bg-glass-hover text-green-400 transition-all"
-                    >
-                      <Download className="w-3.5 h-3.5" />
-                    </a>
-                  </div>
-                ))
-              ) : (
-                <p className="text-xs text-gray-500 text-center py-6">No files downloaded yet.</p>
-              )}
-            </div>
-          </div>
-
           {/* Freelance Earnings & Fee Calculator */}
           {(() => {
             const platformFeeUSD = grossAmount * (platformFeePercent / 100);
@@ -300,12 +399,22 @@ export default function WorkspacePage() {
 
             return (
               <div className="p-5 rounded-xl border border-glass-border bg-gray-950/20 space-y-4">
-                <div>
-                  <h2 className="text-base font-bold text-white flex items-center gap-2">
-                    <Sparkles className="w-4.5 h-4.5 text-green-400" />
-                    <span>Freelance Fee Calculator</span>
-                  </h2>
-                  <p className="text-[10px] text-gray-500 mt-0.5">Calculate platform fees, conversion rates, and net earnings.</p>
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h2 className="text-base font-bold text-white flex items-center gap-2">
+                      <Sparkles className="w-4.5 h-4.5 text-green-400" />
+                      <span>Freelance Calculator</span>
+                    </h2>
+                    <p className="text-[10px] text-gray-500 mt-0.5">Rates sync automatically with your account.</p>
+                  </div>
+                  <button 
+                    onClick={saveCalculatorSettings}
+                    disabled={isSavingCalc}
+                    className="p-1.5 rounded-lg bg-green-500/10 hover:bg-green-500/20 text-green-400 transition-colors flex items-center justify-center shrink-0"
+                    title="Save current rates as default"
+                  >
+                    {isSavingCalc ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                  </button>
                 </div>
 
                 <div className="space-y-3 text-left">
@@ -318,7 +427,7 @@ export default function WorkspacePage() {
                         type="number"
                         value={grossAmount || ''}
                         onChange={(e) => setGrossAmount(Number(e.target.value))}
-                        className="w-full pl-7 pr-3 py-1.5 text-xs rounded-lg glass-input font-bold"
+                        className="w-full pl-7 pr-3 py-1.5 text-xs rounded-lg glass-input font-bold focus:ring-2 focus:ring-green-500/50 outline-none"
                       />
                     </div>
                   </div>
@@ -331,7 +440,7 @@ export default function WorkspacePage() {
                         type="number"
                         value={platformFeePercent || ''}
                         onChange={(e) => setPlatformFeePercent(Number(e.target.value))}
-                        className="w-full px-2.5 py-1.5 text-xs rounded-lg glass-input font-semibold"
+                        className="w-full px-2.5 py-1.5 text-xs rounded-lg glass-input font-semibold focus:ring-2 focus:ring-green-500/50 outline-none"
                       />
                     </div>
                     {/* Withdrawal Fee Percent Input */}
@@ -341,7 +450,7 @@ export default function WorkspacePage() {
                         type="number"
                         value={withdrawalFeePercent || ''}
                         onChange={(e) => setWithdrawalFeePercent(Number(e.target.value))}
-                        className="w-full px-2.5 py-1.5 text-xs rounded-lg glass-input font-semibold"
+                        className="w-full px-2.5 py-1.5 text-xs rounded-lg glass-input font-semibold focus:ring-2 focus:ring-green-500/50 outline-none"
                       />
                     </div>
                   </div>
@@ -354,7 +463,7 @@ export default function WorkspacePage() {
                         type="number"
                         value={conversionRate || ''}
                         onChange={(e) => setConversionRate(Number(e.target.value))}
-                        className="w-full px-2.5 py-1.5 text-xs rounded-lg glass-input font-semibold"
+                        className="w-full px-2.5 py-1.5 text-xs rounded-lg glass-input font-semibold focus:ring-2 focus:ring-green-500/50 outline-none"
                       />
                     </div>
                     {/* Currency Code */}
@@ -364,7 +473,7 @@ export default function WorkspacePage() {
                         type="text"
                         value={currencySymbol}
                         onChange={(e) => setCurrencySymbol(e.target.value)}
-                        className="w-full px-2.5 py-1.5 text-xs rounded-lg glass-input font-semibold text-center"
+                        className="w-full px-2.5 py-1.5 text-xs rounded-lg glass-input font-semibold text-center focus:ring-2 focus:ring-green-500/50 outline-none"
                       />
                     </div>
                   </div>
@@ -387,7 +496,7 @@ export default function WorkspacePage() {
                       <span>Net Earnings (USD):</span>
                       <span className="font-mono">${netEarningsUSD.toFixed(2)}</span>
                     </div>
-                    <div className="flex justify-between font-black text-xs text-emerald-400 font-mono">
+                    <div className="flex justify-between font-black text-xs text-emerald-400 font-mono bg-green-500/10 p-2 rounded-lg border border-green-500/20">
                       <span>Local Currency ({currencySymbol}):</span>
                       <span>{currencySymbol}{netEarningsLocal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
