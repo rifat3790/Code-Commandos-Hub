@@ -143,7 +143,7 @@ export default function ChatbotWidget() {
             className="bg-gray-900 border border-glass-border shadow-2xl rounded-2xl w-[350px] h-[500px] mb-4 flex flex-col overflow-hidden"
           >
             {/* Header */}
-            <div className="bg-brand-green p-4 flex items-center justify-between text-white shadow-md">
+            <div className="bg-brand-green p-4 flex items-center justify-between text-black shadow-md">
               <div className="flex items-center gap-2">
                 {isAdminOrSuperAdmin && activeChatUser && (
                   <button onClick={() => setActiveChatUser(null)} className="p-1 hover:bg-brand-green rounded transition-colors">
@@ -155,7 +155,7 @@ export default function ChatbotWidget() {
                   {isAdminOrSuperAdmin ? (activeChatUser ? activeChatName : 'Active Chats') : 'Support Chat'}
                 </span>
               </div>
-              <button onClick={() => setIsOpen(false)} className="text-white/80 hover:text-white hover:bg-brand-green p-1 rounded transition-colors">
+              <button onClick={() => setIsOpen(false)} className="text-black/80 hover:text-black hover:bg-brand-green p-1 rounded transition-colors">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -206,7 +206,7 @@ export default function ChatbotWidget() {
                       <div key={msg.id || i} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
                         <div className={`max-w-[80%] rounded-2xl px-4 py-2 ${
                           isMe 
-                            ? 'bg-brand-green text-white rounded-tr-sm' 
+                            ? 'bg-brand-green text-black rounded-tr-sm' 
                             : 'bg-gray-800 text-gray-200 border border-glass-border rounded-tl-sm'
                         }`}>
                           <p className="text-sm">{msg.text}</p>
@@ -235,7 +235,7 @@ export default function ChatbotWidget() {
                 <button
                   type="submit"
                   disabled={!newMessage.trim()}
-                  className="bg-brand-green hover:bg-brand-green-hover disabled:opacity-50 disabled:cursor-not-allowed text-white p-2 rounded-xl transition-colors glow-green flex items-center justify-center w-10 h-10"
+                  className="bg-brand-green hover:bg-brand-green-hover disabled:opacity-50 disabled:cursor-not-allowed text-black p-2 rounded-xl transition-colors glow-green flex items-center justify-center w-10 h-10"
                 >
                   <Send className="w-4 h-4" />
                 </button>
@@ -248,7 +248,7 @@ export default function ChatbotWidget() {
       {/* Floating Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="w-14 h-14 bg-brand-green hover:bg-brand-green-hover text-white rounded-full flex items-center justify-center shadow-lg glow-green transition-transform hover:scale-105 relative"
+        className="w-14 h-14 bg-brand-green hover:bg-brand-green-hover text-black rounded-full flex items-center justify-center shadow-lg glow-green transition-transform hover:scale-105 relative"
       >
         <MessageCircle className="w-6 h-6" />
         {totalUnread > 0 && !isOpen && (

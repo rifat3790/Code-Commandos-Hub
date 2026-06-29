@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Clock, CheckCircle2, FileSpreadsheet, ExternalLink, Filter, ChevronDown, Columns, DollarSign, Save } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
+import toast from 'react-hot-toast';
 
 function parseTimeline(timelineStr: string): number | null {
   if (!timelineStr) return null;
@@ -307,13 +308,13 @@ export default function OrdersDashboard({ csvData }: { csvData: string }) {
       });
 
       if (res.ok) {
-        alert("Your custom filters have been saved successfully!");
+        toast.success("Your custom filters have been saved successfully!");
       } else {
-        alert("Failed to save filters.");
+        toast.error("Failed to save filters.");
       }
     } catch (error) {
       console.error(error);
-      alert("Failed to save filters.");
+      toast.error("Failed to save filters.");
     } finally {
       setIsSavingFilter(false);
     }
@@ -579,7 +580,7 @@ export default function OrdersDashboard({ csvData }: { csvData: string }) {
           <button 
             onClick={handleSaveFilters} 
             disabled={isSavingFilter}
-            className="flex items-center gap-2 px-4 py-2 bg-brand-green hover:bg-brand-green-hover text-white rounded-xl text-sm font-semibold transition-colors glow-green"
+            className="flex items-center gap-2 px-4 py-2 bg-brand-green hover:bg-brand-green-hover text-black rounded-xl text-sm font-semibold transition-colors glow-green"
           >
             <Save className="w-4 h-4" />
             {isSavingFilter ? 'Saving...' : 'Save Filters'}

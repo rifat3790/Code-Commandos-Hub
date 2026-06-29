@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import ClientLayout from '@/components/ClientLayout';
+import { Toaster } from 'react-hot-toast';
 import './globals.css';
 
 const geistSans = { variable: 'font-sans' };
@@ -30,6 +31,7 @@ export default function RootLayout({
         <ClientLayout>
           {children}
         </ClientLayout>
+        <Toaster position="top-center" />
       </body>
     </html>
   );

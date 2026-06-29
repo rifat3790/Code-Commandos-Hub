@@ -64,7 +64,7 @@ export default function PersonalProjectsPage() {
               onClick={() => setActiveTab('dashboard')}
               className={`px-6 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 ${
                 activeTab === 'dashboard' 
-                  ? 'bg-brand-green text-white shadow-lg glow-green' 
+                  ? 'bg-brand-green text-black shadow-lg glow-green' 
                   : 'text-gray-400 hover:text-white hover:bg-gray-800'
               }`}
             >
@@ -75,7 +75,7 @@ export default function PersonalProjectsPage() {
               onClick={() => setActiveTab('my-projects')}
               className={`px-6 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 ${
                 activeTab === 'my-projects' 
-                  ? 'bg-brand-green text-white shadow-lg glow-green' 
+                  ? 'bg-brand-green text-black shadow-lg glow-green' 
                   : 'text-gray-400 hover:text-white hover:bg-gray-800'
               }`}
             >
@@ -313,7 +313,7 @@ function AdminDashboard({ userUid }: { userUid: string }) {
           <button onClick={fetchData} className="p-2.5 rounded-xl border border-glass-border bg-gray-900/50 text-gray-400 hover:text-white transition-colors h-[38px] flex items-center justify-center">
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
-          <button onClick={exportCSV} className="px-4 py-2 rounded-xl border border-glass-border bg-gray-900/50 text-brand-green hover:text-white hover:bg-brand-green-hover transition-colors h-[38px] flex items-center justify-center gap-2 font-medium text-sm">
+          <button onClick={exportCSV} className="px-4 py-2 rounded-xl border border-glass-border bg-gray-900/50 text-brand-green hover:text-black hover:bg-brand-green-hover transition-colors h-[38px] flex items-center justify-center gap-2 font-medium text-sm">
             <Download className="w-4 h-4" /> Export CSV
           </button>
         </div>
@@ -479,7 +479,7 @@ function AdminDashboard({ userUid }: { userUid: string }) {
                   <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-sm font-medium text-gray-400 hover:text-white transition-colors">
                     Cancel
                   </button>
-                  <button type="submit" disabled={isSubmitting} className="px-4 py-2 text-sm font-medium bg-brand-green hover:bg-brand-green-hover text-white rounded-lg transition-colors flex items-center gap-2">
+                  <button type="submit" disabled={isSubmitting} className="px-4 py-2 text-sm font-medium bg-brand-green hover:bg-brand-green-hover text-black rounded-lg transition-colors flex items-center gap-2">
                     {isSubmitting ? 'Saving...' : 'Save Changes'}
                   </button>
                 </div>
@@ -574,7 +574,7 @@ function UserWorkflow({ userUid }: { userUid: string }) {
         </button>
         <button 
           onClick={() => setIsMonthModalOpen(true)}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-brand-green hover:bg-brand-green-hover text-white font-medium transition-colors glow-green"
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-brand-green hover:bg-brand-green-hover text-black font-medium transition-colors glow-green"
         >
           <Plus className="w-5 h-5" />
           Create Month
@@ -590,7 +590,7 @@ function UserWorkflow({ userUid }: { userUid: string }) {
           <Calendar className="w-16 h-16 text-gray-700 mx-auto mb-4" />
           <h3 className="text-xl font-bold text-white mb-2">No Months Created</h3>
           <p className="text-gray-400 mb-6 max-w-md mx-auto">Create a month folder to start organizing your personal projects and tracking their values.</p>
-          <button onClick={() => setIsMonthModalOpen(true)} className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-brand-green hover:bg-brand-green-hover text-white font-medium transition-colors glow-green">
+          <button onClick={() => setIsMonthModalOpen(true)} className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-brand-green hover:bg-brand-green-hover text-black font-medium transition-colors glow-green">
             <Plus className="w-5 h-5" /> Create First Month
           </button>
         </div>
@@ -631,7 +631,7 @@ function UserWorkflow({ userUid }: { userUid: string }) {
                 </div>
                 <div className="pt-2 flex justify-end gap-3">
                   <button type="button" onClick={() => setIsMonthModalOpen(false)} className="px-4 py-2 text-sm font-medium text-gray-400 hover:text-white transition-colors">Cancel</button>
-                  <button type="submit" disabled={isSubmitting} className="px-4 py-2 text-sm font-medium bg-brand-green hover:bg-brand-green-hover text-white rounded-lg transition-colors flex items-center gap-2">
+                  <button type="submit" disabled={isSubmitting} className="px-4 py-2 text-sm font-medium bg-brand-green hover:bg-brand-green-hover text-black rounded-lg transition-colors flex items-center gap-2">
                     {isSubmitting ? 'Creating...' : 'Create Month'}
                   </button>
                 </div>
@@ -765,7 +765,7 @@ function UserProjectsView({ userUid, month, onBack }: { userUid: string, month: 
           <button onClick={fetchProjects} className="p-2.5 rounded-xl border border-glass-border bg-gray-900/50 text-gray-400 hover:text-white transition-colors">
             <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
           </button>
-          <button onClick={() => handleOpenModal()} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-brand-green hover:bg-brand-green-hover text-white font-medium transition-colors glow-green">
+          <button onClick={() => handleOpenModal()} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-brand-green hover:bg-brand-green-hover text-black font-medium transition-colors glow-green">
             <Plus className="w-5 h-5" /> Add Project
           </button>
         </div>
@@ -880,7 +880,7 @@ function UserProjectsView({ userUid, month, onBack }: { userUid: string, month: 
                   <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-sm font-medium text-gray-400 hover:text-white transition-colors">
                     Cancel
                   </button>
-                  <button type="submit" disabled={isSubmitting} className="px-4 py-2 text-sm font-medium bg-brand-green hover:bg-brand-green-hover text-white rounded-lg transition-colors flex items-center gap-2">
+                  <button type="submit" disabled={isSubmitting} className="px-4 py-2 text-sm font-medium bg-brand-green hover:bg-brand-green-hover text-black rounded-lg transition-colors flex items-center gap-2">
                     {isSubmitting ? 'Saving...' : 'Save Project'}
                   </button>
                 </div>
