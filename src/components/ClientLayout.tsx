@@ -162,6 +162,9 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
 
           {/* Main page content scroll viewport */}
           <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 relative bg-radial-[circle_at_top_right,rgba(16,185,129,0.03),transparent_40%]">
+            <div className="hidden md:flex absolute top-6 right-8 z-50">
+              <FocusTimer />
+            </div>
             <ProtectedMainContent>{children}</ProtectedMainContent>
           </main>
         </div>
