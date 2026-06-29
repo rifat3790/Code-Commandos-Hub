@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Trash2, Edit2, Lock, Link as LinkIcon, Database, CheckCircle2, User as UserIcon, ExternalLink, RefreshCw, Calendar, ChevronLeft, Filter, DollarSign, Download, TrendingUp, Hash, Award } from 'lucide-react';
@@ -103,10 +103,29 @@ function AdminDashboard({ userUid }: { userUid: string }) {
   const [users, setUsers] = useState<DbUser[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Edit Modal State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [formData, setFormData] = useState({
+    projectName: '',
+    value: '',
+    profileName: '',
+    clientName: '',
+    storeUrl: '',
+    password: '',
+    firebaseUid: '',
+    month: ''
+  });
+
   // Filters
   const [filterMonth, setFilterMonth] = useState<string>('All');
   const [filterUser, setFilterUser] = useState<string>('All');
   const [filterProfile, setFilterProfile] = useState<string>('All');
+
+  // Infinite Scroll State
+  const [displayLimit, setDisplayLimit] = useState(50);
+  const observer = useRef<IntersectionObserver | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -187,6 +206,77 @@ function AdminDashboard({ userUid }: { userUid: string }) {
     link.click();
     document.body.removeChild(link);
   };
+
+  const handleOpenModal = (project: Project) => {
+    setEditingId(project._id);
+    setFormData({
+      projectName: project.projectName,
+      value: project.value,
+      profileName: project.profileName,
+      clientName: project.clientName,
+      storeUrl: project.storeUrl,
+      password: project.password || '',
+      firebaseUid: project.firebaseUid,
+      month: project.month
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    try {
+      const url = '/api/personal-projects';
+      const body = { ...formData, _id: editingId };
+
+      const res = await fetch(url, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      
+      const data = await res.json();
+      if (data.success) {
+        setIsModalOpen(false);
+        fetchData();
+      }
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this project?')) return;
+    try {
+      const res = await fetch(`/api/personal-projects?id=${id}`, { method: 'DELETE' });
+      if (res.ok) fetchData();
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  // Reset display limit on filter change
+  useEffect(() => {
+    setDisplayLimit(50);
+  }, [filterMonth, filterUser, filterProfile]);
+
+  // Infinite Scroll Observer logic
+  const lastElementRef = useCallback((node: HTMLTableRowElement | null) => {
+    if (loading) return;
+    if (observer.current) observer.current.disconnect();
+    
+    observer.current = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting && displayLimit < filteredProjects.length) {
+        setDisplayLimit(prev => prev + 50);
+      }
+    });
+
+    if (node) observer.current.observe(node);
+  }, [loading, displayLimit, filteredProjects.length]);
+
+  const displayedProjects = filteredProjects.slice(0, displayLimit);
 
   return (
     <div className="space-y-6">
@@ -274,40 +364,66 @@ function AdminDashboard({ userUid }: { userUid: string }) {
                   <th className="p-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Value</th>
                   <th className="p-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Store URL</th>
                   <th className="p-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Password</th>
+                  <th className="p-3 text-xs font-semibold text-gray-400 uppercase tracking-wider text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-glass-border">
-                {filteredProjects.map(p => (
-                  <tr key={p._id} className="hover:bg-gray-800/30 transition-colors">
-                    <td className="p-3 text-sm text-gray-300 font-medium">
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-full bg-blue-500/20 flex items-center justify-center">
-                          <UserIcon className="w-3 h-3 text-blue-400" />
+                {displayedProjects.map((p, index) => {
+                  const isLast = index === displayedProjects.length - 1;
+                  return (
+                    <tr 
+                      key={p._id} 
+                      ref={isLast ? lastElementRef : null} 
+                      className="hover:bg-gray-800/30 transition-colors"
+                    >
+                      <td className="p-3 text-sm text-gray-300 font-medium">
+                        <div className="flex items-center gap-2">
+                          <div className="w-6 h-6 rounded-full bg-blue-500/20 flex items-center justify-center">
+                            <UserIcon className="w-3 h-3 text-blue-400" />
+                          </div>
+                          {getUserName(p.firebaseUid)}
                         </div>
-                        {getUserName(p.firebaseUid)}
-                      </div>
-                    </td>
-                    <td className="p-3 text-sm text-gray-400">{p.month}</td>
-                    <td className="p-3 text-sm font-medium text-white">{p.projectName}</td>
-                    <td className="p-3 text-sm">
-                      <span className="bg-brand-green/20 text-brand-green px-2 py-1 rounded-md border border-brand-green/30">
-                        {p.profileName}
-                      </span>
-                    </td>
-                    <td className="p-3 text-sm text-gray-400">{p.clientName}</td>
-                    <td className="p-3 text-sm font-bold text-green-400">{p.value}</td>
-                    <td className="p-3 text-sm">
-                      <a href={p.storeUrl.startsWith('http') ? p.storeUrl : `https://${p.storeUrl}`} target="_blank" rel="noreferrer" className="text-blue-400 hover:text-blue-300 flex items-center gap-1">
-                        <ExternalLink className="w-3 h-3" /> Link
-                      </a>
-                    </td>
-                    <td className="p-3 text-sm text-gray-500 font-mono">{p.password || 'N/A'}</td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="p-3 text-sm text-gray-400">{p.month}</td>
+                      <td className="p-3 text-sm font-medium text-white">{p.projectName}</td>
+                      <td className="p-3 text-sm">
+                        <span className="bg-brand-green/20 text-brand-green px-2 py-1 rounded-md border border-brand-green/30">
+                          {p.profileName}
+                        </span>
+                      </td>
+                      <td className="p-3 text-sm text-gray-400">{p.clientName}</td>
+                      <td className="p-3 text-sm font-bold text-green-400">{p.value}</td>
+                      <td className="p-3 text-sm">
+                        <a href={p.storeUrl.startsWith('http') ? p.storeUrl : `https://${p.storeUrl}`} target="_blank" rel="noreferrer" className="text-blue-400 hover:text-blue-300 flex items-center gap-1">
+                          <ExternalLink className="w-3 h-3" /> Link
+                        </a>
+                      </td>
+                      <td className="p-3 text-sm text-gray-500 font-mono">{p.password || 'N/A'}</td>
+                      <td className="p-3 text-right">
+                        <div className="flex justify-end gap-2">
+                          <button onClick={() => handleOpenModal(p)} className="p-1.5 text-blue-400 hover:bg-blue-500/20 rounded-md transition-colors">
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button onClick={() => handleDelete(p._id)} className="p-1.5 text-red-400 hover:bg-red-500/20 rounded-md transition-colors">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
                 {filteredProjects.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="p-8 text-center text-gray-500">
+                    <td colSpan={9} className="p-8 text-center text-gray-500">
                       No projects found matching the filters.
+                    </td>
+                  </tr>
+                )}
+                {/* Infinite scroll loading indicator */}
+                {displayLimit < filteredProjects.length && (
+                  <tr>
+                    <td colSpan={9} className="p-4 text-center">
+                      <div className="inline-block animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-brand-green"></div>
                     </td>
                   </tr>
                 )}
@@ -316,6 +432,62 @@ function AdminDashboard({ userUid }: { userUid: string }) {
           </div>
         )}
       </div>
+
+      {/* Admin Edit Modal */}
+      <AnimatePresence>
+        {isModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsModalOpen(false)} />
+            <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative w-full max-w-lg bg-gray-900 border border-glass-border rounded-2xl shadow-2xl overflow-hidden">
+              <div className="p-6 border-b border-glass-border">
+                <h2 className="text-xl font-bold text-white">Edit User Project (Admin)</h2>
+              </div>
+              <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Project Name</label>
+                    <input required type="text" value={formData.projectName} onChange={e => setFormData({...formData, projectName: e.target.value})} className="w-full glass-input px-3 py-2 text-sm" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Project Value</label>
+                    <input required type="text" value={formData.value} onChange={e => setFormData({...formData, value: e.target.value})} className="w-full glass-input px-3 py-2 text-sm" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Profile Name</label>
+                    <input required type="text" value={formData.profileName} onChange={e => setFormData({...formData, profileName: e.target.value})} className="w-full glass-input px-3 py-2 text-sm" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Client Name</label>
+                    <input required type="text" value={formData.clientName} onChange={e => setFormData({...formData, clientName: e.target.value})} className="w-full glass-input px-3 py-2 text-sm" />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Store URL</label>
+                  <input required type="text" value={formData.storeUrl} onChange={e => setFormData({...formData, storeUrl: e.target.value})} className="w-full glass-input px-3 py-2 text-sm" />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Password (Optional)</label>
+                  <input type="text" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} className="w-full glass-input px-3 py-2 text-sm" />
+                </div>
+
+                <div className="pt-4 flex justify-end gap-3">
+                  <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-sm font-medium text-gray-400 hover:text-white transition-colors">
+                    Cancel
+                  </button>
+                  <button type="submit" disabled={isSubmitting} className="px-4 py-2 text-sm font-medium bg-brand-green hover:bg-brand-green-hover text-white rounded-lg transition-colors flex items-center gap-2">
+                    {isSubmitting ? 'Saving...' : 'Save Changes'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
