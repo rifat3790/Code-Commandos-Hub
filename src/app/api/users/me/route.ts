@@ -47,6 +47,9 @@ export async function PUT(req: Request) {
     if (body.calculatorSettings !== undefined) {
       updateData.calculatorSettings = body.calculatorSettings;
     }
+    if (body.themeColor !== undefined) {
+      updateData.themeColor = body.themeColor;
+    }
 
     const updatedUser = await User.findOneAndUpdate(
       { firebaseUid },

@@ -16,6 +16,7 @@ export interface IUser extends Document {
     conversionRate: number;
     currencySymbol: string;
   };
+  themeColor?: string;
   lastLoginAt?: Date;
   createdAt: Date;
 }
@@ -36,6 +37,7 @@ const UserSchema: Schema = new Schema({
     conversionRate: { type: Number },
     currencySymbol: { type: String }
   },
+  themeColor: { type: String, default: '#00C950' },
   lastLoginAt: { type: Date },
   createdAt: { type: Date, default: Date.now }
 });

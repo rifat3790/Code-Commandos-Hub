@@ -12,13 +12,16 @@ import {
   Info, 
   Check, 
   FileJson,
-  ShieldCheck
+  ShieldCheck,
+  Loader2
 } from 'lucide-react';
 import { useWorkspaceStore } from '@/store/workspaceStore';
+import { useTheme } from '@/context/ThemeContext';
 
 export default function SettingsPage() {
   const store = useWorkspaceStore();
-  const [accent, setAccent] = useState('green');
+  const { themeColor, setThemeColor, isUpdatingTheme } = useTheme();
+  
   const [storageUsage, setStorageUsage] = useState('0 KB');
   const [importStatus, setImportStatus] = useState<'idle' | 'success' | 'error'>('idle');
 
@@ -84,11 +87,10 @@ export default function SettingsPage() {
   };
 
   const accents = [
-    { name: 'green', color: 'bg-green-500', border: 'border-green-500/30' },
-    { name: 'blue', color: 'bg-blue-500', border: 'border-blue-500/30' },
-    { name: 'purple', color: 'bg-purple-500', border: 'border-purple-500/30' },
-    { name: 'orange', color: 'bg-orange-500', border: 'border-orange-500/30' },
-    { name: 'gray', color: 'bg-gray-400', border: 'border-gray-400/30' },
+    { name: 'green', color: 'bg-[#00C950]', hover: 'hover:bg-[#00B046]' },
+    { name: 'blue', color: 'bg-[#3B82F6]', hover: 'hover:bg-[#2563EB]' },
+    { name: 'purple', color: 'bg-[#8B5CF6]', hover: 'hover:bg-[#7C3AED]' },
+    { name: 'orange', color: 'bg-[#F97316]', hover: 'hover:bg-[#EA580C]' },
   ];
 
   return (
@@ -107,7 +109,7 @@ export default function SettingsPage() {
           {/* Backup Panel */}
           <div className="p-5 rounded-xl border border-glass-border bg-gray-950/20 space-y-4">
             <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
-              <Database className="w-4.5 h-4.5 text-green-400" />
+              <Database className="w-4.5 h-4.5 text-brand-green" style={{ color: 'var(--color-brand-green)' }} />
               <span>Backup & Restore Data</span>
             </h3>
             
@@ -118,7 +120,8 @@ export default function SettingsPage() {
             <div className="flex flex-col sm:flex-row gap-3 pt-2">
               <button
                 onClick={handleExportBackup}
-                className="px-4 py-2.5 rounded-lg bg-green-500 hover:bg-green-600 text-black font-bold text-xs uppercase tracking-wider transition-colors flex items-center justify-center gap-1.5 glow-green w-full"
+                className="px-4 py-2.5 rounded-lg bg-brand-green hover:bg-brand-green-hover text-black font-bold text-xs uppercase tracking-wider transition-colors flex items-center justify-center gap-1.5 glow-green w-full"
+                style={{ backgroundColor: 'var(--color-brand-green)' }}
               >
                 <Download className="w-4 h-4" />
                 <span>Export Backup</span>
@@ -179,26 +182,30 @@ export default function SettingsPage() {
         <div className="space-y-6">
           
           {/* Accent Color picker */}
-          <div className="p-5 rounded-xl border border-glass-border bg-gray-950/20 space-y-4">
-            <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
-              <Palette className="w-4.5 h-4.5 text-green-400" />
-              <span>UI Accent Colors</span>
-            </h3>
+          <div className="p-5 rounded-xl border border-glass-border bg-gray-950/20 space-y-4 relative">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                <Palette className="w-4.5 h-4.5 text-brand-green" style={{ color: 'var(--color-brand-green)' }} />
+                <span>UI Accent Colors</span>
+              </h3>
+              {isUpdatingTheme && <Loader2 className="w-4 h-4 text-brand-green animate-spin" style={{ color: 'var(--color-brand-green)' }} />}
+            </div>
             
             <p className="text-xs text-gray-500 leading-relaxed">
-              Modify UI highlights color themes (Note: System theme locks default dark backgrounds for glassmorphic layouts premium contrast).
+              Modify UI highlights color themes. Your preference is synced to your account.
             </p>
 
             <div className="flex gap-3 pt-2">
               {accents.map((acc) => (
                 <button
                   key={acc.name}
-                  onClick={() => setAccent(acc.name)}
-                  className={`w-8 h-8 rounded-full border-2 flex items-center justify-center transition-all ${acc.color} ${
-                    accent === acc.name ? 'border-white scale-110 shadow-lg' : 'border-transparent opacity-70'
+                  onClick={() => setThemeColor(acc.name as any)}
+                  className={`w-8 h-8 rounded-full border-2 flex items-center justify-center transition-all ${acc.color} ${acc.hover} ${
+                    themeColor === acc.name ? 'border-white scale-110 shadow-[0_0_15px_rgba(255,255,255,0.3)]' : 'border-transparent opacity-70'
                   }`}
+                  disabled={isUpdatingTheme}
                 >
-                  {accent === acc.name && <Check className="w-4 h-4 text-black stroke-[3]" />}
+                  {themeColor === acc.name && <Check className="w-4 h-4 text-black stroke-[3]" />}
                 </button>
               ))}
             </div>
@@ -207,7 +214,7 @@ export default function SettingsPage() {
           {/* Storage Capacity Monitor */}
           <div className="p-5 rounded-xl border border-glass-border bg-gray-950/20 space-y-4">
             <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
-              <Info className="w-4.5 h-4.5 text-green-400" />
+              <Info className="w-4.5 h-4.5 text-brand-green" style={{ color: 'var(--color-brand-green)' }} />
               <span>Storage Monitor</span>
             </h3>
             
@@ -220,14 +227,17 @@ export default function SettingsPage() {
                 {/* Visual meter bar */}
                 <div className="h-1.5 w-full bg-gray-900 border border-glass-border rounded-full overflow-hidden">
                   <div 
-                    className="h-full bg-green-400 rounded-full" 
-                    style={{ width: `${Math.min(100, (parseFloat(storageUsage) / 5000) * 100)}%` }}
+                    className="h-full bg-brand-green rounded-full transition-all duration-500" 
+                    style={{ 
+                      width: `${Math.min(100, (parseFloat(storageUsage) / 5000) * 100)}%`,
+                      backgroundColor: 'var(--color-brand-green)'
+                    }}
                   />
                 </div>
               </div>
 
               <div className="p-3 rounded-lg bg-gray-950/60 border border-glass-border flex items-start gap-2 text-[10px] text-gray-500 leading-relaxed">
-                <ShieldCheck className="w-4.5 h-4.5 text-green-400 shrink-0 mt-0.5" />
+                <ShieldCheck className="w-4.5 h-4.5 text-brand-green shrink-0 mt-0.5" style={{ color: 'var(--color-brand-green)' }} />
                 <p>
                   Your app configuration is fully sandboxed. No data packets leave this local computer. Your templates, images, and notes exist only in browser memory storage tables.
                 </p>

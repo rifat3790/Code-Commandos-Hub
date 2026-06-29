@@ -25,10 +25,15 @@ if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
 }
 
 import { AuthProvider, useAuth } from '@/context/AuthContext';
+import { ThemeProvider } from '@/context/ThemeContext';
 import { usePathname } from 'next/navigation';
 import { useWorkspaceStore } from '@/store/workspaceStore';
 import GlobalPendingModal from './GlobalPendingModal';
 import ChatbotWidget from './chat/ChatbotWidget';
+import CommandMenu from './CommandMenu';
+import FocusTimer from './FocusTimer';
+
+import { motion, AnimatePresence } from 'framer-motion';
 
 function ProtectedMainContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -95,7 +100,20 @@ function ProtectedMainContent({ children }: { children: React.ReactNode }) {
     );
   }
 
-  return <>{children}</>;
+  return (
+    <AnimatePresence mode="wait">
+      <motion.div
+        key={pathname}
+        initial={{ opacity: 0, y: 5 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -5 }}
+        transition={{ duration: 0.2 }}
+        className="h-full"
+      >
+        {children}
+      </motion.div>
+    </AnimatePresence>
+  );
 }
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
@@ -113,7 +131,8 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
 
   return (
     <AuthProvider>
-      <div className="flex flex-col md:flex-row h-screen w-screen overflow-hidden bg-[#030712]">
+      <ThemeProvider>
+        <div className="flex flex-col md:flex-row h-screen w-screen overflow-hidden bg-[#030712]">
         {/* Sidebar - responsive built-in mobile/desktop */}
         <Sidebar isMobileOpen={isMobileOpen} onCloseMobile={() => setIsMobileOpen(false)} />
         
@@ -130,11 +149,14 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
                 <Menu className="w-5 h-5" />
               </button>
               <Link href="/" className="flex items-center gap-2">
-                <div className="w-7.5 h-7.5 rounded-lg bg-green-500 flex items-center justify-center glow-green shrink-0">
+                <div className="w-7.5 h-7.5 rounded-lg bg-brand-green flex items-center justify-center glow-green shrink-0" style={{ backgroundColor: 'var(--color-brand-green)' }}>
                   <Terminal className="w-4.5 h-4.5 text-black stroke-[2.5]" />
                 </div>
-                <span className="font-bold text-sm tracking-wider text-white">CODE COMMANDOS HUB</span>
+                <span className="font-bold text-sm tracking-wider text-white hidden sm:inline-block">CODE COMMANDOS HUB</span>
               </Link>
+            </div>
+            <div className="flex items-center">
+              <FocusTimer />
             </div>
           </header>
 
@@ -145,9 +167,11 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
         </div>
       </div>
       
-      {/* Global Modals */}
-      <GlobalPendingModal />
-      <ChatbotWidget />
+        {/* Global Modals */}
+        <CommandMenu />
+        <GlobalPendingModal />
+        <ChatbotWidget />
+      </ThemeProvider>
     </AuthProvider>
   );
 }
