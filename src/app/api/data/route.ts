@@ -23,7 +23,7 @@ export async function GET() {
 
     let settings = settingsDoc;
     if (!settings) {
-      const defaultMenus = ['Home', 'Workspace', 'Order Tracker', 'Message Helper', 'Templates', 'Schema Builder', 'Audit Suite', 'Projects', 'Mockup Studio', 'AI Assistant', 'Team Notes', 'Downloads', 'Member Profile', 'Settings'];
+      const defaultMenus = ['Home', 'Workspace', 'Order Tracker', 'Personal Projects', 'Message Helper', 'Templates', 'Schema Builder', 'Audit Suite', 'Projects', 'Mockup Studio', 'AI Assistant', 'Team Notes', 'Downloads', 'Member Profile', 'Settings'];
       settings = await SettingsModel.create({ id: 'global', enabledMenus: defaultMenus });
     }
 

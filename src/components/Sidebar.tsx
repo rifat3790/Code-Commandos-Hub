@@ -23,7 +23,8 @@ import {
   Layers,
   Database,
   Gauge,
-  LogOut
+  LogOut,
+  FolderKanban
 } from 'lucide-react';
 import { useWorkspaceStore } from '@/store/workspaceStore';
 import { useAuth } from '@/context/AuthContext';
@@ -62,6 +63,7 @@ export default function Sidebar({ isMobileOpen = false, onCloseMobile }: Sidebar
     { name: 'Home', path: '/', icon: Home },
     { name: 'Workspace', path: '/workspace', icon: LayoutDashboard },
     { name: 'Order Tracker', path: '/tracker', icon: LayoutDashboard },
+    { name: 'Personal Projects', path: '/personal-projects', icon: FolderKanban },
     { name: 'Message Helper', path: '/message-helper', icon: ShieldAlert },
     { name: 'Templates', path: '/templates', icon: FileCode2 },
     { name: 'Schema Builder', path: '/schema', icon: Layers },

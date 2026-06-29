@@ -28,6 +28,7 @@ import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { usePathname } from 'next/navigation';
 import { useWorkspaceStore } from '@/store/workspaceStore';
 import GlobalPendingModal from './GlobalPendingModal';
+import ChatbotWidget from './chat/ChatbotWidget';
 
 function ProtectedMainContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -39,6 +40,7 @@ function ProtectedMainContent({ children }: { children: React.ReactNode }) {
   const routeToMenuMap: Record<string, string> = {
     '/workspace': 'Workspace',
     '/tracker': 'Order Tracker',
+    '/personal-projects': 'Personal Projects',
     '/message-helper': 'Message Helper',
     '/templates': 'Templates',
     '/schema': 'Schema Builder',
@@ -145,6 +147,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
       
       {/* Global Modals */}
       <GlobalPendingModal />
+      <ChatbotWidget />
     </AuthProvider>
   );
 }

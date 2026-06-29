@@ -120,7 +120,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   downloads: [],
   credentials: [],
   memberProfile: defaultProfile,
-  settings: { enabledMenus: ['Home', 'Workspace', 'Order Tracker', 'Message Helper', 'Templates', 'Schema Builder', 'Audit Suite', 'Projects', 'Mockup Studio', 'AI Assistant', 'Team Notes', 'Downloads', 'Member Profile', 'Settings'] },
+  settings: { enabledMenus: ['Home', 'Workspace', 'Order Tracker', 'Personal Projects', 'Message Helper', 'Templates', 'Schema Builder', 'Audit Suite', 'Projects', 'Mockup Studio', 'AI Assistant', 'Team Notes', 'Downloads', 'Member Profile', 'Settings'] },
   isHydrated: false,
   pendingModal: { isOpen: false, message: '' },
 
@@ -153,7 +153,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
           })(),
           credentials: data.data.credentials || [],
           recentActivities: data.data.recentActivities || [],
-          settings: data.data.settings || { enabledMenus: ['Home', 'Workspace', 'Order Tracker', 'Message Helper', 'Templates', 'Schema Builder', 'Audit Suite', 'Projects', 'Mockup Studio', 'AI Assistant', 'Team Notes', 'Downloads', 'Member Profile', 'Settings'] },
+          settings: data.data.settings || { enabledMenus: ['Home', 'Workspace', 'Order Tracker', 'Personal Projects', 'Message Helper', 'Templates', 'Schema Builder', 'Audit Suite', 'Projects', 'Mockup Studio', 'AI Assistant', 'Team Notes', 'Downloads', 'Member Profile', 'Settings'] },
           isHydrated: true
         });
       }
