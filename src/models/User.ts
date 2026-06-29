@@ -7,6 +7,7 @@ export interface IUser extends Document {
   teamName?: string;
   phoneNumber?: string;
   photoURL?: string;
+  skills?: string[];
   role: 'super_admin' | 'admin' | 'user' | 'banned';
   trackerFilters?: any;
   lastLoginAt?: Date;
@@ -20,6 +21,7 @@ const UserSchema: Schema = new Schema({
   teamName: { type: String },
   phoneNumber: { type: String },
   photoURL: { type: String },
+  skills: { type: [String], default: [] },
   role: { type: String, enum: ['super_admin', 'admin', 'user', 'banned'], default: 'user' },
   trackerFilters: { type: Object },
   lastLoginAt: { type: Date },

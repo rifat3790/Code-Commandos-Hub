@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { 
   User, 
@@ -12,18 +12,40 @@ import {
   Trash2, 
   CheckCircle2, 
   Save,
-  PenTool
+  PenTool,
+  Trophy,
+  Star,
+  Target,
+  Zap,
+  Loader2
 } from 'lucide-react';
-import { useWorkspaceStore } from '@/store/workspaceStore';
 import { useAuth } from '@/context/AuthContext';
+import { useWorkspaceStore } from '@/store/workspaceStore'; // Still needed for activity logs or local data
+
+interface ProjectData {
+  _id: string;
+  projectName: string;
+  clientName: string;
+  storeUrl: string;
+  value: string;
+  status: string;
+  createdAt: string;
+}
 
 export default function MemberProfilePage() {
   const store = useWorkspaceStore();
   const { user, dbUser } = useAuth();
+  
   const [name, setName] = useState('');
   const [role, setRole] = useState('');
+  const [skills, setSkills] = useState<string[]>([]);
   const [newSkill, setNewSkill] = useState('');
+  
   const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  
+  const [projects, setProjects] = useState<ProjectData[]>([]);
+  const [isLoadingProjects, setIsLoadingProjects] = useState(true);
 
   useEffect(() => {
     store.hydrate();
@@ -31,50 +53,118 @@ export default function MemberProfilePage() {
 
   // Hydrate local form states when store loads or user changes
   useEffect(() => {
-    setName(dbUser?.name || user?.displayName || store.memberProfile?.name || '');
-    setRole(dbUser?.role || store.memberProfile?.role || '');
-  }, [store.memberProfile, dbUser, user]);
+    if (dbUser) {
+      setName(dbUser.name || user?.displayName || '');
+      setRole(dbUser.role || '');
+      setSkills(dbUser.skills || []);
+    } else if (user) {
+      setName(user.displayName || '');
+    }
+  }, [dbUser, user]);
 
-  const handleSaveProfile = () => {
-    store.updateProfile({ name, role });
+  useEffect(() => {
+    if (user) {
+      fetchProjects();
+    } else {
+      setIsLoadingProjects(false);
+    }
+  }, [user]);
+
+  const fetchProjects = async () => {
+    try {
+      const res = await fetch(`/api/personal-projects?uid=${user?.uid}`);
+      const data = await res.json();
+      if (data.success) {
+        setProjects(data.projects || []);
+      }
+    } catch (error) {
+      console.error("Failed to fetch projects", error);
+    } finally {
+      setIsLoadingProjects(false);
+    }
+  };
+
+  const updateProfileInDB = async (updateData: any) => {
+    if (!user) return;
+    setIsSaving(true);
+    try {
+      await fetch(`/api/users/me?uid=${user.uid}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updateData)
+      });
+      // Force reload auth context if possible, or just update local state
+    } catch (error) {
+      console.error("Failed to update profile", error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSaveProfile = async () => {
+    await updateProfileInDB({ name, role });
     setIsEditing(false);
     store.logActivity('Profile Info Updated', 'note', 'Modified developer credentials.');
   };
 
-  const handleAddSkill = (e: React.FormEvent) => {
+  const handleAddSkill = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newSkill.trim() || store.memberProfile.skills.includes(newSkill.trim())) return;
-    store.updateProfile({
-      skills: [...store.memberProfile.skills, newSkill.trim()]
-    });
+    if (!newSkill.trim() || skills.includes(newSkill.trim())) return;
+    
+    const updatedSkills = [...skills, newSkill.trim()];
+    setSkills(updatedSkills);
     setNewSkill('');
+    
+    await updateProfileInDB({ skills: updatedSkills });
     store.logActivity('Skill Added', 'note', `Added skill: ${newSkill.trim()}`);
   };
 
-  const handleRemoveSkill = (skill: string) => {
-    store.updateProfile({
-      skills: store.memberProfile.skills.filter(s => s !== skill)
-    });
-    store.logActivity('Skill Removed', 'note', `Removed skill: ${skill}`);
+  const handleRemoveSkill = async (skillToRemove: string) => {
+    const updatedSkills = skills.filter(s => s !== skillToRemove);
+    setSkills(updatedSkills);
+    await updateProfileInDB({ skills: updatedSkills });
+    store.logActivity('Skill Removed', 'note', `Removed skill: ${skillToRemove}`);
   };
 
-  // Mock list of completed Shopify projects matching developer metrics
-  const completedProjects = [
-    { name: 'Fitestore-2 Custom Theme', client: 'stankosters', status: 'Delivered', value: '$220', link: 'fitestore-2.myshopify.com' },
-    { name: 'Bloom & Bath Subsections', client: 'Amonebln', status: 'Completed', value: '$180', link: 'bloomandbath.com' },
-    { name: 'Abbas Shopify Product Loader', client: 'abbas_pdg', status: 'Approved', value: '$350', link: 'abbaspdg-store.myshopify.com' },
-    { name: 'Fiverr Order Milestone Gateway', client: 'Daniel', status: 'Completed', value: '$90', link: 'daniel-shopify.myshopify.com' },
-  ];
+  // Dynamic Calculations
+  const { totalProjects, totalValue, averageValue } = useMemo(() => {
+    const total = projects.length;
+    const value = projects.reduce((acc, curr) => {
+      const num = parseFloat(String(curr.value).replace(/[^0-9.-]+/g, ""));
+      return acc + (isNaN(num) ? 0 : num);
+    }, 0);
+    const avg = total > 0 ? value / total : 0;
+    
+    return {
+      totalProjects: total,
+      totalValue: value,
+      averageValue: avg
+    };
+  }, [projects]);
 
-  const displayName = dbUser?.name || user?.displayName || store.memberProfile.name;
-  const displayRole = dbUser?.role || store.memberProfile.role;
+  // Determine Dynamic Badges based on accomplishments
+  const dynamicBadges = useMemo(() => {
+    const badges = [];
+    if (totalProjects >= 1) badges.push({ name: "First Project 🏆", color: "text-blue-400 bg-blue-500/10 border-blue-500/20", icon: Trophy });
+    if (totalProjects >= 10) badges.push({ name: "10+ Projects 🔥", color: "text-orange-400 bg-orange-500/10 border-orange-500/20", icon: Sparkles });
+    if (totalProjects >= 50) badges.push({ name: "Veteran 👑", color: "text-purple-400 bg-purple-500/10 border-purple-500/20", icon: Star });
+    
+    if (totalValue >= 1000) badges.push({ name: "$1k+ Earner 💰", color: "text-green-400 bg-green-500/10 border-green-500/20", icon: Target });
+    if (totalValue >= 5000) badges.push({ name: "$5k+ Elite 💎", color: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20", icon: Zap });
+    if (totalValue >= 10000) badges.push({ name: "$10k+ Master 🚀", color: "text-yellow-400 bg-yellow-500/10 border-yellow-500/20", icon: Award });
+    
+    return badges;
+  }, [totalProjects, totalValue]);
+
+  const displayName = dbUser?.name || user?.displayName || name || 'Developer';
+  const displayRole = dbUser?.role || role || 'User';
   const avatarText = displayName.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase();
 
   return (
     <div className="space-y-6 pb-12 text-left">
       {/* Header */}
       <div>
-        <h1 className="text-2xl lg:text-3xl font-extrabold tracking-tight text-white">MEMBER PROFILE</h1>
+        <h1 className="text-2xl lg:text-3xl font-extrabold tracking-tight text-white uppercase">MEMBER PROFILE</h1>
         <p className="text-gray-400 text-sm">Shopify expert team dashboard. Manage skills inventory and completed milestones.</p>
       </div>
 
@@ -104,11 +194,11 @@ export default function MemberProfilePage() {
             <div className="grid grid-cols-2 gap-2 border-t border-glass-border pt-4 text-xs font-medium">
               <div className="p-2 rounded bg-gray-950/40">
                 <span className="text-gray-500 text-[10px] block">Downloads</span>
-                <span className="text-white font-bold">{store.memberProfile.downloadsCount} files</span>
+                <span className="text-white font-bold">{store.memberProfile?.downloadsCount || 0} files</span>
               </div>
               <div className="p-2 rounded bg-gray-950/40">
                 <span className="text-gray-500 text-[10px] block">Template Uses</span>
-                <span className="text-white font-bold">{store.memberProfile.templateUsageCount} copies</span>
+                <span className="text-white font-bold">{store.memberProfile?.templateUsageCount || 0} copies</span>
               </div>
             </div>
 
@@ -123,21 +213,24 @@ export default function MemberProfilePage() {
                     className="w-full px-3 py-1.5 rounded-lg glass-input text-xs"
                   />
                 </div>
-                <div className="space-y-1">
-                  <label className="text-[9px] font-bold text-gray-400 uppercase">Role Title</label>
-                  <input
-                    type="text"
-                    value={role}
-                    onChange={(e) => setRole(e.target.value)}
-                    className="w-full px-3 py-1.5 rounded-lg glass-input text-xs"
-                  />
-                </div>
+                {dbUser?.role === 'super_admin' && (
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-bold text-gray-400 uppercase">Role Title</label>
+                    <input
+                      type="text"
+                      value={role}
+                      onChange={(e) => setRole(e.target.value)}
+                      className="w-full px-3 py-1.5 rounded-lg glass-input text-xs"
+                    />
+                  </div>
+                )}
                 <button
                   onClick={handleSaveProfile}
+                  disabled={isSaving}
                   className="w-full py-2 rounded-lg bg-green-500 hover:bg-green-600 text-black font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-1"
                 >
-                  <Save className="w-3.5 h-3.5" />
-                  <span>Save Changes</span>
+                  {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                  <span>{isSaving ? 'Saving...' : 'Save Changes'}</span>
                 </button>
               </div>
             ) : (
@@ -161,13 +254,37 @@ export default function MemberProfilePage() {
             <div className="space-y-3 text-xs">
               <div className="flex items-center justify-between p-2.5 rounded bg-gray-950/60 border border-glass-border">
                 <span className="text-gray-400 font-semibold">Total Projects Delivered</span>
-                <span className="text-white font-extrabold">{store.memberProfile.projectsCount}</span>
+                <span className="text-white font-extrabold">{totalProjects}</span>
+              </div>
+              <div className="flex items-center justify-between p-2.5 rounded bg-gray-950/60 border border-glass-border relative overflow-hidden">
+                <div className="absolute inset-0 bg-green-500/5 glow-green pointer-events-none"></div>
+                <span className="text-green-400 font-bold z-10">Lifetime Earnings</span>
+                <span className="text-green-400 font-extrabold z-10 text-sm">${totalValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               </div>
               <div className="flex items-center justify-between p-2.5 rounded bg-gray-950/60 border border-glass-border">
-                <span className="text-gray-400 font-semibold">Milestone Achievement Badges</span>
-                <span className="text-white font-extrabold">{store.memberProfile.achievementsCount} items</span>
+                <span className="text-gray-400 font-semibold">Average Value / Project</span>
+                <span className="text-white font-extrabold">${averageValue.toFixed(2)}</span>
+              </div>
+              <div className="flex items-center justify-between p-2.5 rounded bg-gray-950/60 border border-glass-border">
+                <span className="text-gray-400 font-semibold">Milestone Badges Unlocked</span>
+                <span className="text-white font-extrabold">{dynamicBadges.length} items</span>
               </div>
             </div>
+            
+            {/* Dynamic Badges Display */}
+            {dynamicBadges.length > 0 && (
+              <div className="pt-2 border-t border-glass-border">
+                <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider mb-2 block">Unlocked Badges</p>
+                <div className="flex flex-wrap gap-2">
+                  {dynamicBadges.map((badge, idx) => (
+                    <div key={idx} className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider border ${badge.color}`}>
+                      <badge.icon className="w-3 h-3" />
+                      {badge.name}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
         </div>
@@ -191,27 +308,32 @@ export default function MemberProfilePage() {
                   onChange={(e) => setNewSkill(e.target.value)}
                   className="px-3 py-1 text-xs rounded-lg glass-input w-44"
                 />
-                <button type="submit" className="p-2 rounded-lg bg-green-500 hover:bg-green-600 text-black">
-                  <Plus className="w-3.5 h-3.5" />
+                <button type="submit" disabled={isSaving} className="p-2 rounded-lg bg-green-500 hover:bg-green-600 text-black">
+                  {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
                 </button>
               </form>
             </div>
 
             <div className="flex flex-wrap gap-2">
-              {store.memberProfile.skills.map((skill) => (
-                <div 
-                  key={skill}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-900 border border-glass-border text-xs text-white"
-                >
-                  <span className="font-semibold">{skill}</span>
-                  <button 
-                    onClick={() => handleRemoveSkill(skill)}
-                    className="text-gray-500 hover:text-red-400 transition-colors ml-1"
+              {skills.length > 0 ? (
+                skills.map((skill) => (
+                  <div 
+                    key={skill}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-900 border border-glass-border text-xs text-white"
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              ))}
+                    <span className="font-semibold">{skill}</span>
+                    <button 
+                      onClick={() => handleRemoveSkill(skill)}
+                      disabled={isSaving}
+                      className="text-gray-500 hover:text-red-400 transition-colors ml-1"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))
+              ) : (
+                <p className="text-xs text-gray-500">No skills added yet. Add your Shopify skills above.</p>
+              )}
             </div>
           </div>
 
@@ -222,24 +344,38 @@ export default function MemberProfilePage() {
               <span>Completed Projects Logbook</span>
             </h3>
 
-            <div className="divide-y divide-glass-border max-h-[300px] overflow-y-auto">
-              {completedProjects.map((proj, idx) => (
-                <div key={idx} className="py-3 flex items-center justify-between text-xs gap-4">
-                  <div>
-                    <h4 className="font-bold text-white">{proj.name}</h4>
-                    <p className="text-gray-500 text-[10px] mt-0.5">
-                      Client: <span className="font-semibold text-gray-400">{proj.client}</span> • URL: <span className="italic text-blue-400">{proj.link}</span>
-                    </p>
+            {isLoadingProjects ? (
+              <div className="py-12 flex justify-center">
+                <Loader2 className="w-6 h-6 text-green-500 animate-spin" />
+              </div>
+            ) : projects.length > 0 ? (
+              <div className="divide-y divide-glass-border max-h-[400px] overflow-y-auto pr-2">
+                {projects.map((proj) => (
+                  <div key={proj._id} className="py-3 flex items-center justify-between text-xs gap-4">
+                    <div>
+                      <h4 className="font-bold text-white text-sm">{proj.projectName}</h4>
+                      <p className="text-gray-500 text-[10px] mt-0.5">
+                        Client: <span className="font-semibold text-gray-300">{proj.clientName}</span> • URL: <span className="italic text-blue-400">{proj.storeUrl}</span>
+                      </p>
+                      <p className="text-gray-600 text-[9px] mt-0.5">
+                        Submitted: {new Date(proj.createdAt).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <span className="inline-block px-2 py-0.5 rounded bg-green-500/10 border border-green-500/15 text-green-400 text-[10px] font-bold uppercase tracking-wider glow-green">
+                        COMPLETED
+                      </span>
+                      <span className="block text-green-400 font-mono mt-1 font-extrabold text-sm">${String(proj.value).replace(/[^0-9.-]+/g, "")}</span>
+                    </div>
                   </div>
-                  <div className="text-right shrink-0">
-                    <span className="inline-block px-2 py-0.5 rounded bg-green-500/10 border border-green-500/15 text-green-400 text-[10px] font-bold uppercase tracking-wider">
-                      {proj.status}
-                    </span>
-                    <span className="block text-gray-400 font-mono mt-1 font-bold">{proj.value}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="py-12 text-center space-y-2">
+                <p className="text-xs text-gray-400 font-medium">No projects logged yet.</p>
+                <p className="text-[10px] text-gray-500">Go to your Personal Projects tab to log completed work and unlock badges!</p>
+              </div>
+            )}
           </div>
 
         </div>

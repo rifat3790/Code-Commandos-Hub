@@ -30,10 +30,19 @@ export async function PUT(req: Request) {
 
     await connectToDatabase();
     
-    // Allows updating arbitrary user fields but for now just trackerFilters
+    // Allows updating arbitrary user fields but for now just trackerFilters and skills
     const updateData: any = {};
     if (body.trackerFilters !== undefined) {
       updateData.trackerFilters = body.trackerFilters;
+    }
+    if (body.skills !== undefined) {
+      updateData.skills = body.skills;
+    }
+    if (body.name !== undefined) {
+      updateData.name = body.name;
+    }
+    if (body.role !== undefined) {
+      updateData.role = body.role;
     }
 
     const updatedUser = await User.findOneAndUpdate(
