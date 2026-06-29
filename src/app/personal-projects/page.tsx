@@ -3,8 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Trash2, Edit2, Lock, Link as LinkIcon, Database, CheckCircle2, User as UserIcon, ExternalLink, RefreshCw, Calendar, ChevronLeft, Filter, DollarSign } from 'lucide-react';
-import { useWorkspaceStore } from '@/store/workspaceStore';
+import { Plus, Trash2, Edit2, Lock, Link as LinkIcon, Database, CheckCircle2, User as UserIcon, ExternalLink, RefreshCw, Calendar, ChevronLeft, Filter, DollarSign, Download, TrendingUp, Hash, Award } from 'lucide-react';
+import Papa from 'papaparse';
 
 interface ProjectMonth {
   _id: string;
@@ -33,7 +33,6 @@ interface DbUser {
   email: string;
 }
 
-// Utility to parse value string to number for summing (e.g. "$500" -> 500)
 const parseValue = (valStr: string) => {
   const parsed = parseFloat(valStr.replace(/[^0-9.-]+/g, ""));
   return isNaN(parsed) ? 0 : parsed;
@@ -42,6 +41,7 @@ const parseValue = (valStr: string) => {
 export default function PersonalProjectsPage() {
   const { user, dbUser } = useAuth();
   const isAdminOrSuperAdmin = dbUser?.role === 'super_admin' || dbUser?.role === 'admin';
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'my-projects'>(isAdminOrSuperAdmin ? 'dashboard' : 'my-projects');
 
   if (!user) return null;
 
@@ -54,14 +54,39 @@ export default function PersonalProjectsPage() {
             PERSONAL PROJECTS
           </h1>
           <p className="text-gray-400 mt-1">
-            {isAdminOrSuperAdmin 
-              ? "View and manage all users' personal projects." 
-              : "Organize your projects by month and track your total value."}
+            Organize your projects by month, track your total value, and access premium analytics.
           </p>
         </div>
+
+        {isAdminOrSuperAdmin && (
+          <div className="flex p-1 bg-gray-900/80 backdrop-blur-md rounded-xl border border-glass-border">
+            <button
+              onClick={() => setActiveTab('dashboard')}
+              className={`px-6 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 ${
+                activeTab === 'dashboard' 
+                  ? 'bg-brand-green text-white shadow-lg glow-green' 
+                  : 'text-gray-400 hover:text-white hover:bg-gray-800'
+              }`}
+            >
+              <TrendingUp className="w-4 h-4" />
+              Master Dashboard
+            </button>
+            <button
+              onClick={() => setActiveTab('my-projects')}
+              className={`px-6 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 ${
+                activeTab === 'my-projects' 
+                  ? 'bg-brand-green text-white shadow-lg glow-green' 
+                  : 'text-gray-400 hover:text-white hover:bg-gray-800'
+              }`}
+            >
+              <UserIcon className="w-4 h-4" />
+              My Projects
+            </button>
+          </div>
+        )}
       </div>
 
-      {isAdminOrSuperAdmin ? (
+      {isAdminOrSuperAdmin && activeTab === 'dashboard' ? (
         <AdminDashboard userUid={user.uid} />
       ) : (
         <UserWorkflow userUid={user.uid} />
@@ -90,12 +115,10 @@ function AdminDashboard({ userUid }: { userUid: string }) {
   const fetchData = async () => {
     setLoading(true);
     try {
-      // Fetch all projects
       const resProj = await fetch('/api/personal-projects');
       const dataProj = await resProj.json();
       if (dataProj.success) setProjects(dataProj.projects);
 
-      // Fetch all users to map UIDs to Names
       const resUsers = await fetch('/api/users/roles');
       const dataUsers = await resUsers.json();
       if (dataUsers.success) setUsers(dataUsers.users);
@@ -106,72 +129,129 @@ function AdminDashboard({ userUid }: { userUid: string }) {
     }
   };
 
-  // Unique values for dropdowns
-  const uniqueMonths = Array.from(new Set(projects.map(p => p.month))).sort();
-  const uniqueProfiles = Array.from(new Set(projects.map(p => p.profileName))).sort();
-  // Map users who actually have projects
-  const uidsWithProjects = Array.from(new Set(projects.map(p => p.firebaseUid)));
-  const usersWithProjects = uidsWithProjects.map(uid => {
-    const u = users.find(u => u.firebaseUid === uid);
-    return { uid, name: u?.name || u?.email || uid };
-  });
-
-  // Apply Filters
-  let filteredProjects = projects;
-  if (filterMonth !== 'All') filteredProjects = filteredProjects.filter(p => p.month === filterMonth);
-  if (filterUser !== 'All') filteredProjects = filteredProjects.filter(p => p.firebaseUid === filterUser);
-  if (filterProfile !== 'All') filteredProjects = filteredProjects.filter(p => p.profileName === filterProfile);
-
-  // Calculate Sum
-  const totalValue = filteredProjects.reduce((acc, p) => acc + parseValue(p.value), 0);
-
   const getUserName = (uid: string) => {
     const u = users.find(u => u.firebaseUid === uid);
     return u?.name || u?.email || uid;
   };
 
+  const uniqueMonths = Array.from(new Set(projects.map(p => p.month))).sort();
+  const uniqueProfiles = Array.from(new Set(projects.map(p => p.profileName))).sort();
+  const uidsWithProjects = Array.from(new Set(projects.map(p => p.firebaseUid)));
+  const usersWithProjects = uidsWithProjects.map(uid => ({ uid, name: getUserName(uid) }));
+
+  let filteredProjects = projects;
+  if (filterMonth !== 'All') filteredProjects = filteredProjects.filter(p => p.month === filterMonth);
+  if (filterUser !== 'All') filteredProjects = filteredProjects.filter(p => p.firebaseUid === filterUser);
+  if (filterProfile !== 'All') filteredProjects = filteredProjects.filter(p => p.profileName === filterProfile);
+
+  // Stats Calculations
+  const totalValue = filteredProjects.reduce((acc, p) => acc + parseValue(p.value), 0);
+  const totalProjectsCount = filteredProjects.length;
+  const avgValue = totalProjectsCount > 0 ? (totalValue / totalProjectsCount).toFixed(2) : '0.00';
+
+  // Find Top Profile
+  const profileEarnings: Record<string, number> = {};
+  filteredProjects.forEach(p => {
+    profileEarnings[p.profileName] = (profileEarnings[p.profileName] || 0) + parseValue(p.value);
+  });
+  let topProfile = 'N/A';
+  let maxEarnings = -1;
+  for (const [prof, earnings] of Object.entries(profileEarnings)) {
+    if (earnings > maxEarnings) {
+      maxEarnings = earnings;
+      topProfile = prof;
+    }
+  }
+
+  const exportCSV = () => {
+    if (filteredProjects.length === 0) return alert('No data to export!');
+    
+    const csvData = filteredProjects.map(p => ({
+      User: getUserName(p.firebaseUid),
+      Month: p.month,
+      'Project Name': p.projectName,
+      Profile: p.profileName,
+      Client: p.clientName,
+      Value: p.value,
+      'Store URL': p.storeUrl,
+      'Created At': new Date(p.createdAt).toLocaleDateString()
+    }));
+    
+    const csv = Papa.unparse(csvData);
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `Projects_Export_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className="space-y-6">
-      {/* Filters and Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="glass-panel p-6 rounded-2xl border border-glass-border flex flex-col justify-center items-center relative overflow-hidden group">
-          <div className="absolute inset-0 bg-gradient-to-br from-purple-500/20 to-pink-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-          <DollarSign className="w-8 h-8 text-green-400 mb-2 opacity-80" />
-          <p className="text-sm font-medium text-gray-400 uppercase tracking-widest mb-1">Total Value</p>
-          <p className="text-4xl font-black text-white">${totalValue.toLocaleString()}</p>
+      {/* Filters Bar */}
+      <div className="glass-panel p-4 rounded-2xl border border-glass-border flex flex-wrap gap-4 items-end">
+        <div className="flex-1 min-w-[180px]">
+          <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 block flex items-center gap-2">
+            <Calendar className="w-3 h-3" /> Month
+          </label>
+          <select value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)} className="w-full glass-input px-3 py-2 text-sm appearance-none cursor-pointer">
+            <option value="All">All Months</option>
+            {uniqueMonths.map(m => <option key={m} value={m}>{m}</option>)}
+          </select>
         </div>
-        
-        <div className="md:col-span-3 glass-panel p-4 rounded-2xl border border-glass-border flex flex-wrap gap-4 items-end">
-          <div className="flex-1 min-w-[200px]">
-            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 block flex items-center gap-2">
-              <Calendar className="w-3 h-3" /> Month
-            </label>
-            <select value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)} className="w-full glass-input px-3 py-2 text-sm appearance-none cursor-pointer">
-              <option value="All">All Months</option>
-              {uniqueMonths.map(m => <option key={m} value={m}>{m}</option>)}
-            </select>
-          </div>
-          <div className="flex-1 min-w-[200px]">
-            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 block flex items-center gap-2">
-              <UserIcon className="w-3 h-3" /> User
-            </label>
-            <select value={filterUser} onChange={(e) => setFilterUser(e.target.value)} className="w-full glass-input px-3 py-2 text-sm appearance-none cursor-pointer">
-              <option value="All">All Users</option>
-              {usersWithProjects.map(u => <option key={u.uid} value={u.uid}>{u.name}</option>)}
-            </select>
-          </div>
-          <div className="flex-1 min-w-[200px]">
-            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 block flex items-center gap-2">
-              <Filter className="w-3 h-3" /> Profile Name
-            </label>
-            <select value={filterProfile} onChange={(e) => setFilterProfile(e.target.value)} className="w-full glass-input px-3 py-2 text-sm appearance-none cursor-pointer">
-              <option value="All">All Profiles</option>
-              {uniqueProfiles.map(p => <option key={p} value={p}>{p}</option>)}
-            </select>
-          </div>
+        <div className="flex-1 min-w-[180px]">
+          <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 block flex items-center gap-2">
+            <UserIcon className="w-3 h-3" /> User
+          </label>
+          <select value={filterUser} onChange={(e) => setFilterUser(e.target.value)} className="w-full glass-input px-3 py-2 text-sm appearance-none cursor-pointer">
+            <option value="All">All Users</option>
+            {usersWithProjects.map(u => <option key={u.uid} value={u.uid}>{u.name}</option>)}
+          </select>
+        </div>
+        <div className="flex-1 min-w-[180px]">
+          <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 block flex items-center gap-2">
+            <Filter className="w-3 h-3" /> Profile
+          </label>
+          <select value={filterProfile} onChange={(e) => setFilterProfile(e.target.value)} className="w-full glass-input px-3 py-2 text-sm appearance-none cursor-pointer">
+            <option value="All">All Profiles</option>
+            {uniqueProfiles.map(p => <option key={p} value={p}>{p}</option>)}
+          </select>
+        </div>
+        <div className="flex gap-2">
           <button onClick={fetchData} className="p-2.5 rounded-xl border border-glass-border bg-gray-900/50 text-gray-400 hover:text-white transition-colors h-[38px] flex items-center justify-center">
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
+          <button onClick={exportCSV} className="px-4 py-2 rounded-xl border border-glass-border bg-gray-900/50 text-brand-green hover:text-white hover:bg-brand-green-hover transition-colors h-[38px] flex items-center justify-center gap-2 font-medium text-sm">
+            <Download className="w-4 h-4" /> Export CSV
+          </button>
+        </div>
+      </div>
+
+      {/* Premium Analytics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="glass-panel p-5 rounded-2xl border border-brand-green/30 bg-brand-green/5 relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-4 opacity-10">
+            <DollarSign className="w-16 h-16 text-brand-green" />
+          </div>
+          <p className="text-sm font-semibold text-brand-green uppercase tracking-widest mb-1 flex items-center gap-2"><DollarSign className="w-4 h-4"/> Total Value</p>
+          <p className="text-3xl font-black text-white">${totalValue.toLocaleString()}</p>
+        </div>
+
+        <div className="glass-panel p-5 rounded-2xl border border-glass-border relative overflow-hidden">
+          <p className="text-sm font-semibold text-gray-400 uppercase tracking-widest mb-1 flex items-center gap-2"><Hash className="w-4 h-4 text-blue-400"/> Projects Count</p>
+          <p className="text-3xl font-black text-white">{totalProjectsCount}</p>
+        </div>
+
+        <div className="glass-panel p-5 rounded-2xl border border-glass-border relative overflow-hidden">
+          <p className="text-sm font-semibold text-gray-400 uppercase tracking-widest mb-1 flex items-center gap-2"><TrendingUp className="w-4 h-4 text-orange-400"/> Average Value</p>
+          <p className="text-3xl font-black text-white">${avgValue}</p>
+        </div>
+
+        <div className="glass-panel p-5 rounded-2xl border border-glass-border relative overflow-hidden">
+          <p className="text-sm font-semibold text-gray-400 uppercase tracking-widest mb-1 flex items-center gap-2"><Award className="w-4 h-4 text-yellow-400"/> Top Profile</p>
+          <p className="text-2xl font-black text-white truncate" title={topProfile}>{topProfile}</p>
         </div>
       </div>
 
@@ -248,7 +328,6 @@ function UserWorkflow({ userUid }: { userUid: string }) {
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   
-  // Create Month Modal
   const [isMonthModalOpen, setIsMonthModalOpen] = useState(false);
   const [newMonthName, setNewMonthName] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -308,12 +387,10 @@ function UserWorkflow({ userUid }: { userUid: string }) {
     }
   };
 
-  // If a month is selected, show projects for that month
   if (selectedMonth) {
     return <UserProjectsView userUid={userUid} month={selectedMonth} onBack={() => setSelectedMonth(null)} />;
   }
 
-  // Otherwise, show the Month Grid
   return (
     <div className="space-y-6">
       <div className="flex justify-end gap-3">
@@ -402,7 +479,6 @@ function UserProjectsView({ userUid, month, onBack }: { userUid: string, month: 
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // Form Modal
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -644,4 +720,3 @@ function UserProjectsView({ userUid, month, onBack }: { userUid: string, month: 
     </div>
   );
 }
-
