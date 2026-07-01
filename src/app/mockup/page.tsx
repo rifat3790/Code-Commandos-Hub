@@ -1046,7 +1046,19 @@ export default function MockupPage() {
                           {renderFiverrNative()}
                         </div>
                       ) : reviewScreenshot ? (
-                        <img src={reviewScreenshot} className="w-full h-full object-contain" alt="Fiverr Review" />
+                        <>
+                          <img src={reviewScreenshot} className="w-full h-full object-contain" alt="Fiverr Review" />
+                          {/* Overlay Tips Badge for fiverr_split */}
+                          {specialBlocks.tipsEarned && tipsAmount && (
+                            <div className="absolute bottom-6 right-6 bg-yellow-400 text-black px-4 py-2 rounded-xl shadow-2xl flex items-center gap-2 border-2 border-yellow-200 transform rotate-[-3deg] z-20">
+                              <Award className="w-5 h-5 fill-yellow-600 text-yellow-700" />
+                              <div className="flex flex-col text-left">
+                                <span className="font-black text-xs uppercase leading-none">Client Tipped</span>
+                                <span className="font-black text-lg leading-none">${tipsAmount}</span>
+                              </div>
+                            </div>
+                          )}
+                        </>
                       ) : null}
                     </div>
                   </div>
