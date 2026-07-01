@@ -1123,16 +1123,19 @@ export default function MockupPage() {
               {/* VERTICAL absolute right logo text ribbon (upright, zero-crop safety strip) */}
               {structure !== 'banner' && structure !== 'fiverr_split' && (
                 <div 
-                  className="absolute right-0 top-0 bottom-0 w-12 flex items-center justify-center select-none z-10 border-l border-white/10 bg-black/25 backdrop-blur-[2px] overflow-hidden"
+                  className="absolute right-0 top-0 bottom-0 w-12 flex items-center justify-center select-none z-10 border-l border-white/10 bg-black/25 backdrop-blur-[2px]"
                 >
-                  <div className="relative w-full h-full flex items-center justify-center">
-                    <img 
-                      src="/omega.png" 
-                      alt="Omega Softvence" 
-                      className="absolute max-w-none opacity-90"
-                      style={{ width: '130px', transform: 'rotate(-90deg)' }}
-                    />
-                  </div>
+                  <span 
+                    className="text-[9px] font-black tracking-[0.3em] uppercase font-mono text-center leading-none"
+                    style={{ 
+                      writingMode: 'vertical-rl',
+                      textOrientation: 'upright',
+                      color: themeColor,
+                      textShadow: `0 0 10px ${themeColor}40`
+                    }}
+                  >
+                    SOFTVENCE OMEGA PRIME
+                  </span>
                 </div>
               )}
 
@@ -1228,13 +1231,21 @@ export default function MockupPage() {
                     </div>
 
                     {/* Vertical logo ribbon */}
-                    <div className="absolute right-6 top-1/2 -translate-y-1/2 flex items-center justify-center select-none z-10">
-                      <img 
-                        src="/omega.png" 
-                        alt="Omega Softvence" 
-                        className="max-w-none opacity-90" 
-                        style={{ width: '140px', transform: 'rotate(-90deg)' }}
-                      />
+                    <div className="absolute right-4 top-1/2 -translate-y-1/2 flex flex-col items-center select-none z-10 w-8">
+                      <div 
+                        className="flex flex-col items-center font-sans"
+                        style={{
+                          writingMode: 'vertical-lr',
+                          transform: 'rotate(180deg)',
+                        }}
+                      >
+                        <span className="text-[17px] font-black text-white uppercase tracking-widest leading-none">
+                          sof<span className="text-green-400 font-extrabold">t</span>vence
+                        </span>
+                        <span className="text-[8.5px] text-gray-400 uppercase tracking-widest mt-1.5 block font-semibold">
+                          Omega
+                        </span>
+                      </div>
                     </div>
                   </div>
 
