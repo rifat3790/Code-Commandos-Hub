@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { db } from '@/lib/firebase';
-import { collection, query, where, or, onSnapshot, addDoc, orderBy, serverTimestamp, getDocs } from 'firebase/firestore';
+import { collection, query, where, or, onSnapshot, addDoc, orderBy, serverTimestamp, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { MessageCircle, X, Send, User, ChevronLeft } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useWorkspaceStore } from '@/store/workspaceStore';
@@ -93,6 +93,35 @@ export default function ChatbotWidget() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isOpen, activeChatUser]);
+
+  // Mark messages as read when chat is opened
+  useEffect(() => {
+    if (!user || !isOpen) return;
+
+    if (isAdminOrSuperAdmin && !activeChatUser) return;
+
+    const msgsToUpdate = messages.filter(m => {
+      if (m.readStatus) return false;
+      if (isAdminOrSuperAdmin) {
+        return m.receiverUid === 'admin' && m.senderUid === activeChatUser;
+      } else {
+        return m.receiverUid === user.uid;
+      }
+    });
+
+    if (msgsToUpdate.length > 0) {
+      msgsToUpdate.forEach(async (msg) => {
+        try {
+          await updateDoc(doc(db, 'chats', msg.id), {
+            readStatus: true
+          });
+        } catch (error) {
+          console.error("Error updating message read status:", error);
+        }
+      });
+    }
+  }, [isOpen, activeChatUser, messages, user, isAdminOrSuperAdmin]);
+
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
