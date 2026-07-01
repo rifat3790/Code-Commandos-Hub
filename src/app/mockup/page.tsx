@@ -497,7 +497,7 @@ export default function MockupPage() {
         </svg>
       );
       badgeContent = (
-        <div className={`bg-white/30 backdrop-blur-xl ${colors.text} px-6 py-3 rounded-full shadow-lg flex items-center gap-3 border border-white/60 transform rotate-[-1deg]`}>
+        <div className={`bg-white/90 ${colors.text} px-6 py-3 rounded-full shadow-lg flex items-center gap-3 border border-gray-300 transform rotate-[-1deg]`}>
           <div className="bg-white/60 p-1.5 rounded-full">
             <Award className="w-5 h-5 text-gray-800" />
           </div>
@@ -532,7 +532,7 @@ export default function MockupPage() {
         </div>
       );
       badgeContent = (
-        <div className={`bg-white/95 backdrop-blur-md text-black px-8 py-5 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.15)] flex flex-col items-center gap-1 border-4 ${colors.border} transform rotate-[-2deg] transition-transform`}>
+        <div className={`bg-white text-black px-8 py-5 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.15)] flex flex-col items-center gap-1 border-4 ${colors.border} transform rotate-[-2deg] transition-transform`}>
           <div className="flex items-center gap-1.5 mb-1">
             <Award className={`w-5 h-5 ${colors.icon}`} />
             <span className={`font-black text-[13px] uppercase tracking-widest ${colors.icon}`}>Tips</span>
@@ -542,7 +542,7 @@ export default function MockupPage() {
       );
     } else if (tipsStyle === 'center_elegant_tag') {
       badgeContent = (
-        <div className={`bg-gradient-to-br ${colors.bg} ${colors.text} px-10 py-5 rounded-tl-3xl rounded-br-3xl rounded-tr-sm rounded-bl-sm shadow-2xl flex flex-col items-center border-[3px] border-white/80 transform rotate-[2deg] backdrop-blur-md`}>
+        <div className={`bg-gradient-to-br ${colors.bg} ${colors.text} px-10 py-5 rounded-tl-3xl rounded-br-3xl rounded-tr-sm rounded-bl-sm shadow-2xl flex flex-col items-center border-[3px] border-white/80 transform rotate-[2deg]`}>
            <div className="flex items-center gap-2 mb-2">
              <Star className={`w-5 h-5 fill-current opacity-70`} />
              <span className="font-black text-xs uppercase tracking-widest opacity-90">Client Tipped</span>
@@ -567,7 +567,7 @@ export default function MockupPage() {
         </svg>
       );
       badgeContent = (
-        <div className={`bg-gradient-to-br ${colors.bg} ${colors.text} px-6 py-3 rounded-2xl shadow-xl flex items-center gap-3 border-[3px] border-white/80 transform rotate-[-3deg] backdrop-blur-md`}>
+        <div className={`bg-gradient-to-br ${colors.bg} ${colors.text} px-6 py-3 rounded-2xl shadow-xl flex items-center gap-3 border-[3px] border-white/80 transform rotate-[-3deg]`}>
           <div className="bg-white/40 p-2 rounded-full shadow-inner border border-white/50">
             <Award className={`w-7 h-7 fill-white ${colors.icon} drop-shadow-sm`} />
           </div>
