@@ -153,7 +153,7 @@ export default function AdminDashboard() {
   const allAvailableMenus = [
     'Home', 'Workspace', 'Order Tracker', 'Personal Projects', 'Message Helper', 'Templates', 'Schema Builder',
     'Audit Suite', 'Projects', 'Mockup Studio', 'AI Assistant', 
-    'Team Notes', 'Downloads', 'Member Profile', 'Settings'
+    'Team Notes', 'Downloads', 'Member Profile', 'Shopify Codes', 'Settings'
   ];
 
   if (loading || !dbUser) return null;
