@@ -175,7 +175,7 @@ export default function MockupPage() {
   const [website, setWebsite] = useState('fitestore-2.myshopify.com');
   const [completionDate, setCompletionDate] = useState('2026-06-19'); // date input
   const [tipsAmount, setTipsAmount] = useState('50');
-  const [tipsStyle, setTipsStyle] = useState<TipsStyle>('premium_gold');
+  const [tipsStyle, setTipsStyle] = useState<TipsStyle>('center_floating_arrow');
   const [tipsColorTheme, setTipsColorTheme] = useState<TipsColorTheme>('yellow');
   
   // Customization
