@@ -20,7 +20,7 @@ interface WorkspaceState {
   downloads: DownloadItem[];
   credentials: StoreCredential[];
   memberProfile: MemberProfile;
-  settings: { enabledMenus: string[] };
+  settings: { enabledMenus: string[], adminEnabledMenus?: string[], userEnabledMenus?: string[] };
   isHydrated: boolean;
   pendingModal: { isOpen: boolean; message: string };
 
@@ -55,7 +55,7 @@ interface WorkspaceState {
 
   updateProfile: (updates: Partial<MemberProfile>) => Promise<void>;
   logActivity: (title: string, type: RecentActivity['type'], details: string) => Promise<void>;
-  updateSettings: (enabledMenus: string[]) => Promise<void>;
+  updateSettings: (settings: { enabledMenus?: string[], adminEnabledMenus?: string[], userEnabledMenus?: string[] }) => Promise<void>;
   exportBackup: () => string;
   importBackup: (dataStr: string) => boolean;
 }
@@ -120,7 +120,11 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   downloads: [],
   credentials: [],
   memberProfile: defaultProfile,
-  settings: { enabledMenus: ['Home', 'Workspace', 'Order Tracker', 'Personal Projects', 'Message Helper', 'Templates', 'Schema Builder', 'Audit Suite', 'Projects', 'Mockup Studio', 'AI Assistant', 'Team Notes', 'Downloads', 'Member Profile', 'Settings'] },
+  settings: { 
+    enabledMenus: ['Home', 'Workspace', 'Order Tracker', 'Personal Projects', 'Message Helper', 'Templates', 'Schema Builder', 'Audit Suite', 'Projects', 'Mockup Studio', 'AI Assistant', 'Team Notes', 'Downloads', 'Member Profile', 'Settings'], 
+    adminEnabledMenus: ['Home', 'Workspace', 'Order Tracker', 'Personal Projects', 'Message Helper', 'Templates', 'Schema Builder', 'Audit Suite', 'Projects', 'Mockup Studio', 'AI Assistant', 'Team Notes', 'Downloads', 'Member Profile', 'Settings'], 
+    userEnabledMenus: ['Home', 'Workspace', 'Order Tracker', 'Personal Projects', 'Message Helper', 'Templates', 'Schema Builder', 'Audit Suite', 'Projects', 'AI Assistant', 'Team Notes', 'Downloads', 'Member Profile', 'Settings'] 
+  },
   isHydrated: false,
   pendingModal: { isOpen: false, message: '' },
 
@@ -371,14 +375,14 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     }
   },
 
-  updateSettings: async (enabledMenus) => {
+  updateSettings: async (settings) => {
     try {
       const currentUser = auth.currentUser;
       if (!currentUser) return;
       const res = await fetch('/api/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ firebaseUid: currentUser.uid, enabledMenus })
+        body: JSON.stringify({ firebaseUid: currentUser.uid, ...settings })
       });
       const data = await res.json();
       if (data.success) {

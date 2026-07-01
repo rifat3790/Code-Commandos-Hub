@@ -172,6 +172,7 @@ export default function MockupPage() {
   const [projectName, setProjectName] = useState('Shopify Custom Section Builder');
   const [website, setWebsite] = useState('fitestore-2.myshopify.com');
   const [completionDate, setCompletionDate] = useState('2026-06-19'); // date input
+  const [tipsAmount, setTipsAmount] = useState('50');
   
   // Customization
   const [customMessage, setCustomMessage] = useState('Keep achieving, Keep Shining.');
@@ -425,7 +426,7 @@ export default function MockupPage() {
             </div>
           </div>
 
-          {/* Verification checkmarks */}
+          {/* Verification checkmarks & Tips */}
           <div className="space-y-1.5 pt-2 border-t border-gray-100 text-[10px] font-bold">
             <div className="flex items-center gap-1.5 text-emerald-600">
               <CheckCircle2 className="w-3.5 h-3.5 fill-emerald-600 text-white shrink-0" />
@@ -435,6 +436,12 @@ export default function MockupPage() {
               <CheckCircle2 className="w-3.5 h-3.5 fill-emerald-600 text-white shrink-0" />
               <span>Order completed</span>
             </div>
+            {specialBlocks.tipsEarned && tipsAmount && (
+              <div className="flex items-center gap-1.5 text-yellow-500 mt-2 p-1.5 bg-yellow-50 rounded-md border border-yellow-100">
+                <Award className="w-4 h-4 fill-yellow-500 text-white shrink-0" />
+                <span className="font-extrabold text-[11px]">Client tipped ${tipsAmount}</span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -720,6 +727,18 @@ export default function MockupPage() {
                   />
                 </div>
                 <div className="space-y-1">
+                  <label className="text-[9px] font-bold text-gray-400 uppercase">Tips Amount ($)</label>
+                  <input
+                    type="text"
+                    value={tipsAmount}
+                    onChange={(e) => setTipsAmount(e.target.value)}
+                    className="w-full px-3 py-1.5 rounded-lg glass-input text-xs font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
                   <label className="text-[9px] font-bold text-gray-400 uppercase">Completion Date</label>
                   <input
                     type="date"
@@ -998,7 +1017,7 @@ export default function MockupPage() {
                         }}
                       >
                         <span className="text-[17px] font-black text-white uppercase tracking-widest leading-none">
-                          sof<span className="text-green-400 font-extrabold">t</span>nence
+                          sof<span className="text-green-400 font-extrabold">t</span>vence
                         </span>
                         <span className="text-[8.5px] text-gray-400 uppercase tracking-widest mt-1.5 block font-semibold">
                           Omega

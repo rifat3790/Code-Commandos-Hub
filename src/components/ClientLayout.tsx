@@ -82,8 +82,12 @@ function ProtectedMainContent({ children }: { children: React.ReactNode }) {
     if (pathname.startsWith('/admin') && !isAdminOrSuperAdmin) {
        isAuthorized = false;
     } else if (!isSuperAdmin && currentMenuName) {
-       // All roles except super_admin respect the enabledMenus setting
-       const enabledMenus = storeSettings?.enabledMenus || Object.values(routeToMenuMap);
+       // Check settings based on role
+       const userMenus = storeSettings?.userEnabledMenus?.length ? storeSettings.userEnabledMenus : (storeSettings?.enabledMenus || Object.values(routeToMenuMap));
+       const adminMenus = storeSettings?.adminEnabledMenus?.length ? storeSettings.adminEnabledMenus : (storeSettings?.enabledMenus || Object.values(routeToMenuMap));
+       
+       const enabledMenus = dbUser?.role === 'admin' ? adminMenus : userMenus;
+
        if (!enabledMenus.includes(currentMenuName)) {
          isAuthorized = false;
        }

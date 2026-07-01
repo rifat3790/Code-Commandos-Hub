@@ -78,13 +78,15 @@ export default function Sidebar({ isMobileOpen = false, onCloseMobile }: Sidebar
   ];
 
   const storeSettings = useWorkspaceStore((state) => state.settings);
-  const enabledMenus = storeSettings?.enabledMenus || baseNavItemsRaw.map(n => n.name);
+  const userMenus = storeSettings?.userEnabledMenus?.length ? storeSettings.userEnabledMenus : (storeSettings?.enabledMenus || baseNavItemsRaw.map(n => n.name));
+  const adminMenus = storeSettings?.adminEnabledMenus?.length ? storeSettings.adminEnabledMenus : (storeSettings?.enabledMenus || baseNavItemsRaw.map(n => n.name));
 
   // For non-super_admin users, filter out disabled menus
   const isAdminOrSuperAdmin = dbUser?.role === 'super_admin' || dbUser?.role === 'admin';
   const baseNavItems = baseNavItemsRaw.filter(item => {
-    if (dbUser?.role === 'super_admin') return true; // Super admin always sees all
-    return enabledMenus.includes(item.name);
+    if (dbUser?.role === 'super_admin') return true;
+    if (dbUser?.role === 'admin') return adminMenus.includes(item.name);
+    return userMenus.includes(item.name);
   });
 
   const navItems = isAdminOrSuperAdmin

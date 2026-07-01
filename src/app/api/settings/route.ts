@@ -5,8 +5,8 @@ import User from '@/models/User';
 
 export async function POST(req: Request) {
   try {
-    const { enabledMenus, firebaseUid } = await req.json();
-    if (!firebaseUid || !enabledMenus) {
+    const { enabledMenus, adminEnabledMenus, userEnabledMenus, firebaseUid } = await req.json();
+    if (!firebaseUid) {
       return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });
     }
 
@@ -18,9 +18,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Only super_admin can change menu settings' }, { status: 403 });
     }
 
+    const updateData: any = {};
+    if (enabledMenus) updateData.enabledMenus = enabledMenus;
+    if (adminEnabledMenus) updateData.adminEnabledMenus = adminEnabledMenus;
+    if (userEnabledMenus) updateData.userEnabledMenus = userEnabledMenus;
+
     const settings = await Settings.findOneAndUpdate(
       { id: 'global' }, 
-      { enabledMenus }, 
+      { $set: updateData }, 
       { new: true, upsert: true }
     );
     

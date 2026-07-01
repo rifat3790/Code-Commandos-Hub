@@ -21,11 +21,22 @@ export default function AdminDashboard() {
 
   const [newUserPass, setNewUserPass] = useState('');
   const [isCreatingUser, setIsCreatingUser] = useState(false);
-  const [enabledMenus, setEnabledMenus] = useState<string[]>([]);
+  const [adminEnabledMenus, setAdminEnabledMenus] = useState<string[]>([]);
+  const [userEnabledMenus, setUserEnabledMenus] = useState<string[]>([]);
 
   useEffect(() => {
-    if (storeSettings?.enabledMenus) {
-      setEnabledMenus(storeSettings.enabledMenus);
+    if (storeSettings) {
+      if (storeSettings.adminEnabledMenus && storeSettings.adminEnabledMenus.length > 0) {
+        setAdminEnabledMenus(storeSettings.adminEnabledMenus);
+      } else if (storeSettings.enabledMenus) {
+        setAdminEnabledMenus(storeSettings.enabledMenus);
+      }
+      
+      if (storeSettings.userEnabledMenus && storeSettings.userEnabledMenus.length > 0) {
+        setUserEnabledMenus(storeSettings.userEnabledMenus);
+      } else if (storeSettings.enabledMenus) {
+        setUserEnabledMenus(storeSettings.enabledMenus);
+      }
     }
   }, [storeSettings]);
 
@@ -118,15 +129,25 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleToggleMenu = async (menuName: string) => {
+  const handleToggleMenu = async (menuName: string, roleType: 'admin' | 'user') => {
     let newMenus;
-    if (enabledMenus.includes(menuName)) {
-      newMenus = enabledMenus.filter(m => m !== menuName);
+    if (roleType === 'admin') {
+      if (adminEnabledMenus.includes(menuName)) {
+        newMenus = adminEnabledMenus.filter(m => m !== menuName);
+      } else {
+        newMenus = [...adminEnabledMenus, menuName];
+      }
+      setAdminEnabledMenus(newMenus);
+      await updateSettings({ adminEnabledMenus: newMenus });
     } else {
-      newMenus = [...enabledMenus, menuName];
+      if (userEnabledMenus.includes(menuName)) {
+        newMenus = userEnabledMenus.filter(m => m !== menuName);
+      } else {
+        newMenus = [...userEnabledMenus, menuName];
+      }
+      setUserEnabledMenus(newMenus);
+      await updateSettings({ userEnabledMenus: newMenus });
     }
-    setEnabledMenus(newMenus);
-    await updateSettings(newMenus);
   };
 
   const allAvailableMenus = [
@@ -272,17 +293,34 @@ export default function AdminDashboard() {
       ) : activeTab === 'menus' ? (
         <div className="space-y-6">
           <div className="bg-gray-900 border border-glass-border p-6 rounded-xl space-y-4">
-            <h2 className="text-white font-bold text-sm uppercase tracking-wider">Configure User Dashboard Menus</h2>
-            <p className="text-xs text-gray-400 pb-4">Select which menus should be visible to normal users in their dashboard sidebar.</p>
+            <h2 className="text-white font-bold text-sm uppercase tracking-wider text-green-400">Configure Admin Dashboard Menus</h2>
+            <p className="text-xs text-gray-400 pb-2">Select which menus should be visible to Admins in their dashboard sidebar.</p>
             
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pb-6 border-b border-glass-border">
               {allAvailableMenus.map(menu => (
-                <label key={menu} className="flex items-center gap-3 p-3 bg-black/30 border border-glass-border rounded-lg cursor-pointer hover:bg-black/50 transition-colors">
+                <label key={`admin-${menu}`} className="flex items-center gap-3 p-3 bg-black/30 border border-glass-border rounded-lg cursor-pointer hover:bg-black/50 transition-colors">
                   <input 
                     type="checkbox" 
                     className="w-4 h-4 text-green-500 bg-gray-800 border-gray-600 rounded focus:ring-green-500 focus:ring-2"
-                    checked={enabledMenus.includes(menu)}
-                    onChange={() => handleToggleMenu(menu)}
+                    checked={adminEnabledMenus.includes(menu)}
+                    onChange={() => handleToggleMenu(menu, 'admin')}
+                  />
+                  <span className="text-sm text-white">{menu}</span>
+                </label>
+              ))}
+            </div>
+
+            <h2 className="text-white font-bold text-sm uppercase tracking-wider text-blue-400 pt-4">Configure User Dashboard Menus</h2>
+            <p className="text-xs text-gray-400 pb-2">Select which menus should be visible to Normal Users in their dashboard sidebar.</p>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {allAvailableMenus.map(menu => (
+                <label key={`user-${menu}`} className="flex items-center gap-3 p-3 bg-black/30 border border-glass-border rounded-lg cursor-pointer hover:bg-black/50 transition-colors">
+                  <input 
+                    type="checkbox" 
+                    className="w-4 h-4 text-blue-500 bg-gray-800 border-gray-600 rounded focus:ring-blue-500 focus:ring-2"
+                    checked={userEnabledMenus.includes(menu)}
+                    onChange={() => handleToggleMenu(menu, 'user')}
                   />
                   <span className="text-sm text-white">{menu}</span>
                 </label>
