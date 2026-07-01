@@ -74,6 +74,7 @@ export default function Sidebar({ isMobileOpen = false, onCloseMobile }: Sidebar
     { name: 'Team Notes', path: '/notes', icon: StickyNote },
     { name: 'Downloads', path: '/downloads', icon: Download },
     { name: 'Member Profile', path: '/member', icon: User },
+    { name: 'Shopify Codes', path: '/shopify-codes', icon: FileCode2 },
     { name: 'Settings', path: '/settings', icon: Settings },
   ];
 
