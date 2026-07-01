@@ -648,8 +648,8 @@ export default function MockupPage() {
             </div>
           </div>
           {/* Image content */}
-          <div className={`overflow-hidden w-full bg-white flex items-center justify-center ${heightClass.replace('max-h-', 'h-')}`}>
-            <img src={reviewScreenshot} className="w-full h-full object-contain" alt="Review details screenshot" />
+          <div className="overflow-hidden w-full bg-white flex items-center justify-center">
+            <img src={reviewScreenshot} className="w-full h-auto" alt="Review details screenshot" />
           </div>
           
           {/* Overlay Tips Badge */}
@@ -1258,11 +1258,11 @@ export default function MockupPage() {
                           {renderFiverrNative()}
                         </div>
                       ) : reviewScreenshot ? (
-                        <>
-                          <img src={reviewScreenshot} className="w-full h-full object-contain" alt="Fiverr Review" />
+                        <div className="w-full h-full bg-white">
+                          <img src={reviewScreenshot} className="w-full h-full object-cover" alt="Fiverr Review" />
                           {/* Overlay Tips Badge for fiverr_split */}
                           {renderPremiumTipsBadge("bottom-6 right-6")}
-                        </>
+                        </div>
                       ) : null}
                     </div>
                   </div>
