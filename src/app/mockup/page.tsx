@@ -31,7 +31,7 @@ import { MockupStyle } from '@/types';
 
 type LayoutStructure = 'banner' | 'fiverr_split' | 'split' | 'spotlight' | 'certificate' | 'sidebyside' | 'showcase' | 'bento' | 'dual_screen' | 'premium_award';
 type PatternOverlay = 'none' | 'dots' | 'grid' | 'waves';
-type TipsStyle = 'premium_gold' | 'neon_cyberpunk' | 'minimal_glass' | 'playful_bubble' | 'center_floating_arrow' | 'center_elegant_tag' | 'center_neon_glow';
+type TipsStyle = 'premium_gold' | 'neon_cyberpunk' | 'minimal_glass' | 'playful_bubble' | 'center_floating_arrow' | 'center_elegant_tag' | 'center_neon_glow' | 'center_pill_premium' | 'center_diamond_glass' | 'center_massive_medal';
 type TipsColorTheme = 'yellow' | 'emerald' | 'amethyst' | 'ruby' | 'sapphire' | 'monochrome';
 
 const LAYOUTS: { value: MockupStyle; label: string; desc: string }[] = [
@@ -545,7 +545,7 @@ export default function MockupPage() {
         <div className={`bg-gradient-to-br ${colors.bg} ${colors.text} px-10 py-5 rounded-tl-3xl rounded-br-3xl rounded-tr-sm rounded-bl-sm shadow-2xl flex flex-col items-center border-[3px] border-white/80 transform rotate-[2deg]`}>
            <div className="flex items-center gap-2 mb-2">
              <Star className={`w-5 h-5 fill-current opacity-70`} />
-             <span className="font-black text-xs uppercase tracking-widest opacity-90">Client Tipped</span>
+             <span className="font-black text-xs uppercase tracking-widest opacity-90">Tips</span>
              <Star className={`w-5 h-5 fill-current opacity-70`} />
            </div>
            <span className="font-black text-5xl leading-none drop-shadow-sm">${tipsAmount}</span>
@@ -554,8 +554,38 @@ export default function MockupPage() {
     } else if (tipsStyle === 'center_neon_glow') {
       badgeContent = (
         <div className={`bg-gray-950 px-10 py-6 rounded-2xl flex flex-col items-center border-[3px] transform rotate-[-1deg] ${colors.border} ${colors.glow}`}>
-           <span className={`font-mono text-sm uppercase tracking-widest ${colors.icon} mb-2`}>Excellent Work!</span>
+           <span className={`font-mono text-sm uppercase tracking-widest ${colors.icon} mb-2`}>Tips</span>
            <span className="font-black font-mono text-5xl text-white tracking-tighter drop-shadow-md">${tipsAmount}</span>
+        </div>
+      );
+    } else if (tipsStyle === 'center_pill_premium') {
+      badgeContent = (
+        <div className={`bg-gradient-to-r ${colors.bg} px-14 py-6 rounded-full shadow-2xl flex flex-col items-center border-[4px] border-white/90 transform scale-105`}>
+           <div className="flex items-center gap-2 mb-1 bg-white/20 px-4 py-1 rounded-full shadow-inner">
+             <span className={`font-black text-xs uppercase tracking-[0.25em] ${colors.text}`}>Tips</span>
+           </div>
+           <span className={`font-black text-6xl tracking-tighter drop-shadow-xl ${colors.text}`}>${tipsAmount}</span>
+        </div>
+      );
+    } else if (tipsStyle === 'center_diamond_glass') {
+      badgeContent = (
+        <div className="relative transform rotate-12 drop-shadow-2xl translate-y-2">
+          <div className="absolute inset-0 bg-white/95 rounded-3xl transform rotate-45 border-4 border-gray-100"></div>
+          <div className="relative z-10 p-12 flex flex-col items-center justify-center transform -rotate-12">
+             <span className={`font-black text-[12px] uppercase tracking-widest ${colors.icon} mb-1 opacity-80`}>Tips</span>
+             <span className={`font-black text-5xl leading-none ${colors.text}`}>${tipsAmount}</span>
+          </div>
+        </div>
+      );
+    } else if (tipsStyle === 'center_massive_medal') {
+      badgeContent = (
+        <div className={`bg-gradient-to-b ${colors.bg} px-12 py-10 rounded-full shadow-2xl flex flex-col items-center border-[8px] border-white transform scale-110`}>
+           <div className="flex items-center gap-2 mb-1 opacity-90">
+             <Star className={`w-5 h-5 fill-current ${colors.text}`} />
+             <span className={`font-black text-[13px] uppercase tracking-[0.3em] ${colors.text}`}>Tips</span>
+             <Star className={`w-5 h-5 fill-current ${colors.text}`} />
+           </div>
+           <span className={`font-black text-7xl tracking-tighter drop-shadow-md ${colors.text}`}>${tipsAmount}</span>
         </div>
       );
     } else {
@@ -772,7 +802,7 @@ export default function MockupPage() {
             </span>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">
-                <label className="text-[9px] font-bold text-gray-400 uppercase">Member Name</label>
+                <label className="text-[9px] font-bold text-gray-400 uppercase">Team Name</label>
                 <input
                   type="text"
                   value={memberName}
@@ -781,7 +811,7 @@ export default function MockupPage() {
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-[9px] font-bold text-gray-400 uppercase">Role / Team Title</label>
+                <label className="text-[9px] font-bold text-gray-400 uppercase">Member Name</label>
                 <input
                   type="text"
                   value={role}
@@ -828,6 +858,9 @@ export default function MockupPage() {
                   <option value="center_floating_arrow">Center Floating Arrow</option>
                   <option value="center_elegant_tag">Center Elegant Tag</option>
                   <option value="center_neon_glow">Center Neon Glow</option>
+                  <option value="center_pill_premium">Center Pill Premium</option>
+                  <option value="center_diamond_glass">Center Diamond Glass</option>
+                  <option value="center_massive_medal">Center Massive Medal</option>
                 </select>
               </div>
               <div className="space-y-1">
