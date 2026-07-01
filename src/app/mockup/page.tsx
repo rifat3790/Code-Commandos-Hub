@@ -1120,21 +1120,16 @@ export default function MockupPage() {
               {renderPremiumStars()}
 
               {/* VERTICAL absolute right logo text ribbon (upright, zero-crop safety strip) */}
+              {/* VERTICAL absolute right logo text ribbon (upright, zero-crop safety strip) */}
               {structure !== 'banner' && structure !== 'fiverr_split' && (
                 <div 
                   className="absolute right-0 top-0 bottom-0 w-12 flex items-center justify-center select-none z-10 border-l border-white/10 bg-black/25 backdrop-blur-[2px]"
                 >
-                  <span 
-                    className="text-[9px] font-black tracking-[0.3em] uppercase font-mono text-center leading-none"
-                    style={{ 
-                      writingMode: 'vertical-rl',
-                      textOrientation: 'upright',
-                      color: themeColor,
-                      textShadow: `0 0 10px ${themeColor}40`
-                    }}
-                  >
-                    SOFTVENCE OMEGA PRIME
-                  </span>
+                  <img 
+                    src="/omega.png" 
+                    alt="Omega Softvence" 
+                    className="w-32 h-auto opacity-90 -rotate-90" 
+                  />
                 </div>
               )}
 
@@ -1230,21 +1225,12 @@ export default function MockupPage() {
                     </div>
 
                     {/* Vertical logo ribbon */}
-                    <div className="absolute right-4 top-1/2 -translate-y-1/2 flex flex-col items-center select-none z-10 w-8">
-                      <div 
-                        className="flex flex-col items-center font-sans"
-                        style={{
-                          writingMode: 'vertical-lr',
-                          transform: 'rotate(180deg)',
-                        }}
-                      >
-                        <span className="text-[17px] font-black text-white uppercase tracking-widest leading-none">
-                          sof<span className="text-green-400 font-extrabold">t</span>vence
-                        </span>
-                        <span className="text-[8.5px] text-gray-400 uppercase tracking-widest mt-1.5 block font-semibold">
-                          Omega
-                        </span>
-                      </div>
+                    <div className="absolute right-[-30px] top-1/2 -translate-y-1/2 flex items-center justify-center select-none z-10 w-32 h-10 -rotate-90">
+                      <img 
+                        src="/omega.png" 
+                        alt="Omega Softvence" 
+                        className="w-full h-auto opacity-90" 
+                      />
                     </div>
                   </div>
 
