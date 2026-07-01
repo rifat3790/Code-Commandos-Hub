@@ -31,6 +31,8 @@ import { MockupStyle } from '@/types';
 
 type LayoutStructure = 'banner' | 'fiverr_split' | 'split' | 'spotlight' | 'certificate' | 'sidebyside' | 'showcase' | 'bento' | 'dual_screen' | 'premium_award';
 type PatternOverlay = 'none' | 'dots' | 'grid' | 'waves';
+type TipsStyle = 'premium_gold' | 'neon_cyberpunk' | 'minimal_glass' | 'playful_bubble';
+type TipsColorTheme = 'yellow' | 'emerald' | 'amethyst' | 'ruby' | 'sapphire' | 'monochrome';
 
 const LAYOUTS: { value: MockupStyle; label: string; desc: string }[] = [
   { value: 'green-award', label: 'Green Award', desc: 'Image 1 green banner design' },
@@ -173,6 +175,8 @@ export default function MockupPage() {
   const [website, setWebsite] = useState('fitestore-2.myshopify.com');
   const [completionDate, setCompletionDate] = useState('2026-06-19'); // date input
   const [tipsAmount, setTipsAmount] = useState('50');
+  const [tipsStyle, setTipsStyle] = useState<TipsStyle>('premium_gold');
+  const [tipsColorTheme, setTipsColorTheme] = useState<TipsColorTheme>('yellow');
   
   // Customization
   const [customMessage, setCustomMessage] = useState('Keep achieving, Keep Shining.');
@@ -449,30 +453,105 @@ export default function MockupPage() {
     );
   };
 
+  const getTipsColors = (theme: TipsColorTheme) => {
+    switch (theme) {
+      case 'emerald': return { bg: 'from-emerald-300 via-emerald-400 to-green-500', border: 'border-emerald-200', text: 'text-emerald-950', icon: 'text-emerald-600', arrow: 'text-emerald-500/90 drop-shadow-[0_2px_8px_rgba(16,185,129,0.6)]', glow: 'shadow-[0_0_25px_rgba(16,185,129,0.5)]' };
+      case 'amethyst': return { bg: 'from-purple-300 via-purple-400 to-fuchsia-500', border: 'border-purple-200', text: 'text-purple-950', icon: 'text-purple-600', arrow: 'text-purple-500/90 drop-shadow-[0_2px_8px_rgba(168,85,247,0.6)]', glow: 'shadow-[0_0_25px_rgba(168,85,247,0.5)]' };
+      case 'ruby': return { bg: 'from-rose-300 via-rose-400 to-red-500', border: 'border-rose-200', text: 'text-rose-950', icon: 'text-rose-600', arrow: 'text-rose-500/90 drop-shadow-[0_2px_8px_rgba(244,63,94,0.6)]', glow: 'shadow-[0_0_25px_rgba(244,63,94,0.5)]' };
+      case 'sapphire': return { bg: 'from-blue-300 via-blue-400 to-indigo-500', border: 'border-blue-200', text: 'text-blue-950', icon: 'text-blue-600', arrow: 'text-blue-500/90 drop-shadow-[0_2px_8px_rgba(59,130,246,0.6)]', glow: 'shadow-[0_0_25px_rgba(59,130,246,0.5)]' };
+      case 'monochrome': return { bg: 'from-gray-100 via-gray-300 to-gray-400', border: 'border-gray-200', text: 'text-gray-950', icon: 'text-gray-700', arrow: 'text-gray-300/90 drop-shadow-[0_2px_8px_rgba(156,163,175,0.6)]', glow: 'shadow-[0_0_25px_rgba(156,163,175,0.5)]' };
+      case 'yellow':
+      default: return { bg: 'from-yellow-300 via-yellow-400 to-amber-500', border: 'border-yellow-200', text: 'text-yellow-950', icon: 'text-yellow-600', arrow: 'text-yellow-500/90 drop-shadow-[0_2px_8px_rgba(250,204,21,0.6)]', glow: 'shadow-[0_0_25px_rgba(250,204,21,0.5)]' };
+    }
+  };
+
   // Helper to render the premium tips badge with a decorative pointing arrow
   const renderPremiumTipsBadge = (positionClass = "bottom-6 right-6") => {
     if (!specialBlocks.tipsEarned || !tipsAmount) return null;
     
+    const colors = getTipsColors(tipsColorTheme);
+    let badgeContent = null;
+    let arrowSvg = null;
+
+    if (tipsStyle === 'neon_cyberpunk') {
+      arrowSvg = (
+        <svg width="45" height="45" viewBox="0 0 100 100" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="square" strokeLinejoin="miter" className="transform rotate-12 -translate-y-2 translate-x-2">
+          <path d="M 5 80 L 40 20 L 85 45" />
+          <polyline points="65 30 85 45 65 60" />
+        </svg>
+      );
+      badgeContent = (
+        <div className={`bg-gray-950 text-white px-6 py-2.5 flex items-center gap-3 border-[2px] transform rotate-[-2deg] ${colors.border} ${colors.glow}`}>
+          <Award className={`w-7 h-7 ${colors.icon}`} />
+          <div className="flex flex-col text-left">
+            <span className={`font-mono text-[9px] uppercase tracking-widest ${colors.icon} leading-none mb-1`}>Tips</span>
+            <span className="font-black font-mono text-2xl leading-none tracking-tighter text-white">${tipsAmount}</span>
+          </div>
+        </div>
+      );
+    } else if (tipsStyle === 'minimal_glass') {
+      arrowSvg = (
+        <svg width="50" height="50" viewBox="0 0 100 100" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="transform rotate-12 -translate-y-2">
+          <path d="M 5 80 Q 40 10 85 45" />
+          <circle cx="85" cy="45" r="4" fill="currentColor" />
+        </svg>
+      );
+      badgeContent = (
+        <div className={`bg-white/10 backdrop-blur-xl text-white px-6 py-3 rounded-full shadow-lg flex items-center gap-3 border border-white/20 transform rotate-[-1deg]`}>
+          <div className="bg-white/20 p-1.5 rounded-full">
+            <Award className="w-5 h-5 text-white" />
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="font-medium text-xs uppercase tracking-widest text-gray-200">Tips</span>
+            <span className="font-light text-2xl tracking-wide text-white">${tipsAmount}</span>
+          </div>
+        </div>
+      );
+    } else if (tipsStyle === 'playful_bubble') {
+      arrowSvg = (
+        <svg width="45" height="45" viewBox="0 0 100 100" fill="none" stroke="currentColor" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" className="transform rotate-[-10deg]">
+          <path d="M 20 80 Q 50 50 85 45" />
+          <polygon points="65 35 85 45 70 60" fill="currentColor" />
+        </svg>
+      );
+      badgeContent = (
+        <div className={`bg-gradient-to-br ${colors.bg} ${colors.text} px-6 py-4 rounded-[2rem] rounded-bl-sm shadow-xl flex items-center gap-3 border-4 border-white transform rotate-[2deg] transition-transform`}>
+          <div className="flex flex-col text-center">
+            <span className="font-black text-[12px] uppercase tracking-wider opacity-80 leading-none mb-1">Tips</span>
+            <span className="font-black text-3xl leading-none">${tipsAmount}</span>
+          </div>
+        </div>
+      );
+    } else {
+      // Premium Gold (default)
+      arrowSvg = (
+        <svg width="55" height="55" viewBox="0 0 100 100" fill="none" stroke="currentColor" strokeWidth="5.5" strokeLinecap="round" strokeLinejoin="round" className="transform rotate-12 -translate-y-2 translate-x-2">
+          <path d="M 5 80 Q 40 10 85 45" />
+          <polyline points="65 30 85 45 65 60" />
+        </svg>
+      );
+      badgeContent = (
+        <div className={`bg-gradient-to-br ${colors.bg} ${colors.text} px-6 py-3 rounded-2xl shadow-xl flex items-center gap-3 border-[3px] border-white/80 transform rotate-[-3deg] backdrop-blur-md`}>
+          <div className="bg-white/40 p-2 rounded-full shadow-inner border border-white/50">
+            <Award className={`w-7 h-7 fill-white ${colors.icon} drop-shadow-sm`} />
+          </div>
+          <div className="flex flex-col text-left">
+            <span className={`font-extrabold text-[11px] uppercase tracking-widest opacity-80 leading-none mb-1`}>Tips</span>
+            <span className={`font-black text-3xl leading-none tracking-tighter ${colors.text} drop-shadow-sm`}>${tipsAmount}</span>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className={`absolute ${positionClass} flex items-end gap-1 z-30`}>
         {/* Decorative Pointing Arrow */}
-        <div className="mb-4 mr-1 text-yellow-500/90 drop-shadow-[0_2px_8px_rgba(250,204,21,0.6)]">
-          <svg width="55" height="55" viewBox="0 0 100 100" fill="none" stroke="currentColor" strokeWidth="5.5" strokeLinecap="round" strokeLinejoin="round" className="transform rotate-12 -translate-y-2 translate-x-2">
-            <path d="M 5 80 Q 40 10 85 45" />
-            <polyline points="65 30 85 45 65 60" />
-          </svg>
+        <div className={`mb-4 mr-1 ${tipsStyle === 'minimal_glass' ? 'text-white drop-shadow-[0_2px_8px_rgba(255,255,255,0.6)]' : colors.arrow}`}>
+          {arrowSvg}
         </div>
         
         {/* Premium Tips Badge */}
-        <div className="bg-gradient-to-br from-yellow-300 via-yellow-400 to-amber-500 text-black px-6 py-3 rounded-2xl shadow-[0_15px_35px_-5px_rgba(250,204,21,0.45)] flex items-center gap-3 border-[3px] border-white/80 transform rotate-[-3deg] backdrop-blur-md">
-          <div className="bg-white/40 p-2 rounded-full shadow-inner border border-white/50">
-            <Award className="w-7 h-7 fill-white text-yellow-600 drop-shadow-sm" />
-          </div>
-          <div className="flex flex-col text-left">
-            <span className="font-extrabold text-[11px] uppercase tracking-widest text-black/70 leading-none mb-1">Tips</span>
-            <span className="font-black text-3xl leading-none tracking-tighter text-black drop-shadow-sm">${tipsAmount}</span>
-          </div>
-        </div>
+        {badgeContent}
       </div>
     );
   };
@@ -689,6 +768,37 @@ export default function MockupPage() {
                   className="w-full px-3 py-1.5 rounded-lg glass-input text-xs font-mono border-yellow-500/30"
                   placeholder="e.g. 150"
                 />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-[9px] font-bold text-gray-400 uppercase text-yellow-400">Tips Layout Style</label>
+                <select
+                  value={tipsStyle}
+                  onChange={(e) => setTipsStyle(e.target.value as TipsStyle)}
+                  className="w-full px-3 py-1.5 rounded-lg glass-input text-xs font-medium cursor-pointer"
+                >
+                  <option value="premium_gold">Premium Gold</option>
+                  <option value="neon_cyberpunk">Neon Cyberpunk</option>
+                  <option value="minimal_glass">Minimal Glass</option>
+                  <option value="playful_bubble">Playful Bubble</option>
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[9px] font-bold text-gray-400 uppercase text-yellow-400">Tips Color Theme</label>
+                <select
+                  value={tipsColorTheme}
+                  onChange={(e) => setTipsColorTheme(e.target.value as TipsColorTheme)}
+                  className="w-full px-3 py-1.5 rounded-lg glass-input text-xs font-medium cursor-pointer"
+                >
+                  <option value="yellow">Yellow Gold</option>
+                  <option value="emerald">Emerald Green</option>
+                  <option value="amethyst">Amethyst Purple</option>
+                  <option value="ruby">Ruby Red</option>
+                  <option value="sapphire">Sapphire Blue</option>
+                  <option value="monochrome">Monochrome</option>
+                </select>
               </div>
             </div>
 
