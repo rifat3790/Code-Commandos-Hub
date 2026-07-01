@@ -449,6 +449,34 @@ export default function MockupPage() {
     );
   };
 
+  // Helper to render the premium tips badge with a decorative pointing arrow
+  const renderPremiumTipsBadge = (positionClass = "bottom-6 right-6") => {
+    if (!specialBlocks.tipsEarned || !tipsAmount) return null;
+    
+    return (
+      <div className={`absolute ${positionClass} flex items-end gap-1 z-30`}>
+        {/* Decorative Pointing Arrow */}
+        <div className="mb-4 mr-1 text-yellow-500/90 drop-shadow-[0_2px_8px_rgba(250,204,21,0.6)]">
+          <svg width="55" height="55" viewBox="0 0 100 100" fill="none" stroke="currentColor" strokeWidth="5.5" strokeLinecap="round" strokeLinejoin="round" className="transform rotate-12 -translate-y-2 translate-x-2">
+            <path d="M 5 80 Q 40 10 85 45" />
+            <polyline points="65 30 85 45 65 60" />
+          </svg>
+        </div>
+        
+        {/* Premium Tips Badge */}
+        <div className="bg-gradient-to-br from-yellow-300 via-yellow-400 to-amber-500 text-black px-6 py-3 rounded-2xl shadow-[0_15px_35px_-5px_rgba(250,204,21,0.45)] flex items-center gap-3 border-[3px] border-white/80 transform rotate-[-3deg] backdrop-blur-md">
+          <div className="bg-white/40 p-2 rounded-full shadow-inner border border-white/50">
+            <Award className="w-7 h-7 fill-white text-yellow-600 drop-shadow-sm" />
+          </div>
+          <div className="flex flex-col text-left">
+            <span className="font-extrabold text-[11px] uppercase tracking-widest text-black/70 leading-none mb-1">Tips</span>
+            <span className="font-black text-3xl leading-none tracking-tighter text-black drop-shadow-sm">${tipsAmount}</span>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // Helper to render screenshot image inside a premium mock browser window
   const renderScreenshotBrowserFrame = (heightClass = "max-h-[260px]") => {
     if (reviewScreenshot) {
@@ -471,15 +499,7 @@ export default function MockupPage() {
           </div>
           
           {/* Overlay Tips Badge */}
-          {specialBlocks.tipsEarned && tipsAmount && (
-            <div className="absolute bottom-4 right-4 bg-yellow-400 text-black px-4 py-2 rounded-xl shadow-2xl flex items-center gap-2 border-2 border-yellow-200 transform rotate-[-3deg] z-20">
-              <Award className="w-5 h-5 fill-yellow-600 text-yellow-700" />
-              <div className="flex flex-col">
-                <span className="font-black text-xs uppercase leading-none">Client Tipped</span>
-                <span className="font-black text-lg leading-none">${tipsAmount}</span>
-              </div>
-            </div>
-          )}
+          {renderPremiumTipsBadge("bottom-4 right-4")}
         </div>
       );
     }
@@ -1049,15 +1069,7 @@ export default function MockupPage() {
                         <>
                           <img src={reviewScreenshot} className="w-full h-full object-contain" alt="Fiverr Review" />
                           {/* Overlay Tips Badge for fiverr_split */}
-                          {specialBlocks.tipsEarned && tipsAmount && (
-                            <div className="absolute bottom-6 right-6 bg-yellow-400 text-black px-4 py-2 rounded-xl shadow-2xl flex items-center gap-2 border-2 border-yellow-200 transform rotate-[-3deg] z-20">
-                              <Award className="w-5 h-5 fill-yellow-600 text-yellow-700" />
-                              <div className="flex flex-col text-left">
-                                <span className="font-black text-xs uppercase leading-none">Client Tipped</span>
-                                <span className="font-black text-lg leading-none">${tipsAmount}</span>
-                              </div>
-                            </div>
-                          )}
+                          {renderPremiumTipsBadge("bottom-6 right-6")}
                         </>
                       ) : null}
                     </div>
