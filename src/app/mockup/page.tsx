@@ -31,7 +31,7 @@ import { MockupStyle } from '@/types';
 
 type LayoutStructure = 'banner' | 'fiverr_split' | 'split' | 'spotlight' | 'certificate' | 'sidebyside' | 'showcase' | 'bento' | 'dual_screen' | 'premium_award';
 type PatternOverlay = 'none' | 'dots' | 'grid' | 'waves';
-type TipsStyle = 'premium_gold' | 'neon_cyberpunk' | 'minimal_glass' | 'playful_bubble';
+type TipsStyle = 'premium_gold' | 'neon_cyberpunk' | 'minimal_glass' | 'playful_bubble' | 'center_floating_arrow' | 'center_elegant_tag' | 'center_neon_glow';
 type TipsColorTheme = 'yellow' | 'emerald' | 'amethyst' | 'ruby' | 'sapphire' | 'monochrome';
 
 const LAYOUTS: { value: MockupStyle; label: string; desc: string }[] = [
@@ -497,13 +497,13 @@ export default function MockupPage() {
         </svg>
       );
       badgeContent = (
-        <div className={`bg-white/10 backdrop-blur-xl text-white px-6 py-3 rounded-full shadow-lg flex items-center gap-3 border border-white/20 transform rotate-[-1deg]`}>
-          <div className="bg-white/20 p-1.5 rounded-full">
-            <Award className="w-5 h-5 text-white" />
+        <div className={`bg-white/30 backdrop-blur-xl ${colors.text} px-6 py-3 rounded-full shadow-lg flex items-center gap-3 border border-white/60 transform rotate-[-1deg]`}>
+          <div className="bg-white/60 p-1.5 rounded-full">
+            <Award className="w-5 h-5 text-gray-800" />
           </div>
           <div className="flex items-center gap-2">
-            <span className="font-medium text-xs uppercase tracking-widest text-gray-200">Tips</span>
-            <span className="font-light text-2xl tracking-wide text-white">${tipsAmount}</span>
+            <span className="font-bold text-xs uppercase tracking-widest text-gray-800">Tips</span>
+            <span className="font-black text-2xl tracking-wide text-gray-900">${tipsAmount}</span>
           </div>
         </div>
       );
@@ -520,6 +520,42 @@ export default function MockupPage() {
             <span className="font-black text-[12px] uppercase tracking-wider opacity-80 leading-none mb-1">Tips</span>
             <span className="font-black text-3xl leading-none">${tipsAmount}</span>
           </div>
+        </div>
+      );
+    } else if (tipsStyle === 'center_floating_arrow') {
+      arrowSvg = (
+        <div className={`absolute top-full right-full -mr-16 -mt-8 ${colors.arrow} pointer-events-none drop-shadow-xl`}>
+          <svg width="220" height="150" viewBox="0 0 250 150" fill="none" stroke="currentColor" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M 20 130 Q 100 120 230 30" />
+            <polygon points="205 30 235 25 225 55" fill="currentColor" />
+          </svg>
+        </div>
+      );
+      badgeContent = (
+        <div className={`bg-white/95 backdrop-blur-md text-black px-8 py-5 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.15)] flex flex-col items-center gap-1 border-4 ${colors.border} transform rotate-[-2deg] transition-transform`}>
+          <div className="flex items-center gap-1.5 mb-1">
+            <Award className={`w-5 h-5 ${colors.icon}`} />
+            <span className={`font-black text-[13px] uppercase tracking-widest ${colors.icon}`}>Tips</span>
+          </div>
+          <span className={`font-black text-5xl leading-none tracking-tighter ${colors.text}`}>${tipsAmount}</span>
+        </div>
+      );
+    } else if (tipsStyle === 'center_elegant_tag') {
+      badgeContent = (
+        <div className={`bg-gradient-to-br ${colors.bg} ${colors.text} px-10 py-5 rounded-tl-3xl rounded-br-3xl rounded-tr-sm rounded-bl-sm shadow-2xl flex flex-col items-center border-[3px] border-white/80 transform rotate-[2deg] backdrop-blur-md`}>
+           <div className="flex items-center gap-2 mb-2">
+             <Star className={`w-5 h-5 fill-current opacity-70`} />
+             <span className="font-black text-xs uppercase tracking-widest opacity-90">Client Tipped</span>
+             <Star className={`w-5 h-5 fill-current opacity-70`} />
+           </div>
+           <span className="font-black text-5xl leading-none drop-shadow-sm">${tipsAmount}</span>
+        </div>
+      );
+    } else if (tipsStyle === 'center_neon_glow') {
+      badgeContent = (
+        <div className={`bg-gray-950 px-10 py-6 rounded-2xl flex flex-col items-center border-[3px] transform rotate-[-1deg] ${colors.border} ${colors.glow}`}>
+           <span className={`font-mono text-sm uppercase tracking-widest ${colors.icon} mb-2`}>Excellent Work!</span>
+           <span className="font-black font-mono text-5xl text-white tracking-tighter drop-shadow-md">${tipsAmount}</span>
         </div>
       );
     } else {
@@ -543,12 +579,18 @@ export default function MockupPage() {
       );
     }
 
+    const isCentered = tipsStyle.startsWith('center_');
+    const finalPosition = isCentered ? "top-[55%] left-1/2 transform -translate-x-1/2 -translate-y-1/2" : positionClass;
+
     return (
-      <div className={`absolute ${positionClass} flex items-end gap-1 z-30`}>
+      <div className={`absolute ${finalPosition} flex items-end gap-1 z-40`}>
         {/* Decorative Pointing Arrow */}
-        <div className={`mb-4 mr-1 ${tipsStyle === 'minimal_glass' ? 'text-white drop-shadow-[0_2px_8px_rgba(255,255,255,0.6)]' : colors.arrow}`}>
-          {arrowSvg}
-        </div>
+        {!isCentered && (
+          <div className={`mb-4 mr-1 ${tipsStyle === 'minimal_glass' ? 'text-gray-800 drop-shadow-[0_2px_8px_rgba(255,255,255,0.8)]' : colors.arrow}`}>
+            {arrowSvg}
+          </div>
+        )}
+        {isCentered && arrowSvg}
         
         {/* Premium Tips Badge */}
         {badgeContent}
@@ -779,10 +821,13 @@ export default function MockupPage() {
                   onChange={(e) => setTipsStyle(e.target.value as TipsStyle)}
                   className="w-full px-3 py-1.5 rounded-lg glass-input text-xs font-medium cursor-pointer"
                 >
-                  <option value="premium_gold">Premium Gold</option>
-                  <option value="neon_cyberpunk">Neon Cyberpunk</option>
-                  <option value="minimal_glass">Minimal Glass</option>
-                  <option value="playful_bubble">Playful Bubble</option>
+                  <option value="premium_gold">Premium Gold (Bottom Right)</option>
+                  <option value="neon_cyberpunk">Neon Cyberpunk (Bottom Right)</option>
+                  <option value="minimal_glass">Minimal Glass (Bottom Right)</option>
+                  <option value="playful_bubble">Playful Bubble (Bottom Right)</option>
+                  <option value="center_floating_arrow">Center Floating Arrow</option>
+                  <option value="center_elegant_tag">Center Elegant Tag</option>
+                  <option value="center_neon_glow">Center Neon Glow</option>
                 </select>
               </div>
               <div className="space-y-1">
