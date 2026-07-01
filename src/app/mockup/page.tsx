@@ -523,14 +523,6 @@ export default function MockupPage() {
         </div>
       );
     } else if (tipsStyle === 'center_floating_arrow') {
-      arrowSvg = (
-        <div className={`absolute top-full right-full -mr-16 -mt-8 ${colors.arrow} pointer-events-none drop-shadow-xl`}>
-          <svg width="220" height="150" viewBox="0 0 250 150" fill="none" stroke="currentColor" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M 20 130 Q 100 120 230 30" />
-            <polygon points="205 30 235 25 225 55" fill="currentColor" />
-          </svg>
-        </div>
-      );
       badgeContent = (
         <div className={`bg-white text-black px-8 py-5 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.15)] flex flex-col items-center gap-1 border-4 ${colors.border} transform rotate-[-2deg] transition-transform`}>
           <div className="flex items-center gap-1.5 mb-1">
@@ -611,6 +603,17 @@ export default function MockupPage() {
 
     const isCentered = tipsStyle.startsWith('center_');
     const finalPosition = isCentered ? "top-[55%] left-1/2 transform -translate-x-1/2 -translate-y-1/2" : positionClass;
+
+    if (isCentered) {
+      arrowSvg = (
+        <div className={`absolute top-full right-full -mr-16 -mt-8 ${colors.arrow} pointer-events-none drop-shadow-xl`}>
+          <svg width="220" height="150" viewBox="0 0 250 150" fill="none" stroke="currentColor" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M 20 130 Q 100 120 230 30" />
+            <polygon points="205 30 235 25 225 55" fill="currentColor" />
+          </svg>
+        </div>
+      );
+    }
 
     return (
       <div className={`absolute ${finalPosition} flex items-end gap-1 z-40`}>
