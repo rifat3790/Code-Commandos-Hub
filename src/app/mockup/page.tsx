@@ -469,6 +469,17 @@ export default function MockupPage() {
           <div className={`overflow-hidden w-full bg-white flex items-center justify-center ${heightClass.replace('max-h-', 'h-')}`}>
             <img src={reviewScreenshot} className="w-full h-full object-contain" alt="Review details screenshot" />
           </div>
+          
+          {/* Overlay Tips Badge */}
+          {specialBlocks.tipsEarned && tipsAmount && (
+            <div className="absolute bottom-4 right-4 bg-yellow-400 text-black px-4 py-2 rounded-xl shadow-2xl flex items-center gap-2 border-2 border-yellow-200 transform rotate-[-3deg] z-20">
+              <Award className="w-5 h-5 fill-yellow-600 text-yellow-700" />
+              <div className="flex flex-col">
+                <span className="font-black text-xs uppercase leading-none">Client Tipped</span>
+                <span className="font-black text-lg leading-none">${tipsAmount}</span>
+              </div>
+            </div>
+          )}
         </div>
       );
     }
@@ -639,14 +650,26 @@ export default function MockupPage() {
               </div>
             </div>
 
-            <div className="space-y-1">
-              <label className="text-[9px] font-bold text-gray-400 uppercase">Custom Sub-caption Message</label>
-              <input
-                type="text"
-                value={customMessage}
-                onChange={(e) => setCustomMessage(e.target.value)}
-                className="w-full px-3 py-1.5 rounded-lg glass-input text-xs"
-              />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-[9px] font-bold text-gray-400 uppercase">Custom Sub-caption Message</label>
+                <input
+                  type="text"
+                  value={customMessage}
+                  onChange={(e) => setCustomMessage(e.target.value)}
+                  className="w-full px-3 py-1.5 rounded-lg glass-input text-xs"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[9px] font-bold text-gray-400 uppercase text-yellow-400">Tips Amount ($)</label>
+                <input
+                  type="text"
+                  value={tipsAmount}
+                  onChange={(e) => setTipsAmount(e.target.value)}
+                  className="w-full px-3 py-1.5 rounded-lg glass-input text-xs font-mono border-yellow-500/30"
+                  placeholder="e.g. 150"
+                />
+              </div>
             </div>
 
             {/* Photo Upload */}
@@ -726,18 +749,6 @@ export default function MockupPage() {
                     className="w-full px-3 py-1.5 rounded-lg glass-input text-xs font-mono"
                   />
                 </div>
-                <div className="space-y-1">
-                  <label className="text-[9px] font-bold text-gray-400 uppercase">Tips Amount ($)</label>
-                  <input
-                    type="text"
-                    value={tipsAmount}
-                    onChange={(e) => setTipsAmount(e.target.value)}
-                    className="w-full px-3 py-1.5 rounded-lg glass-input text-xs font-mono"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <label className="text-[9px] font-bold text-gray-400 uppercase">Completion Date</label>
                   <input
