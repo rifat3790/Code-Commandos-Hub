@@ -1123,13 +1123,16 @@ export default function MockupPage() {
               {/* VERTICAL absolute right logo text ribbon (upright, zero-crop safety strip) */}
               {structure !== 'banner' && structure !== 'fiverr_split' && (
                 <div 
-                  className="absolute right-0 top-0 bottom-0 w-12 flex items-center justify-center select-none z-10 border-l border-white/10 bg-black/25 backdrop-blur-[2px]"
+                  className="absolute right-0 top-0 bottom-0 w-12 flex items-center justify-center select-none z-10 border-l border-white/10 bg-black/25 backdrop-blur-[2px] overflow-hidden"
                 >
-                  <img 
-                    src="/omega.png" 
-                    alt="Omega Softvence" 
-                    className="w-32 h-auto opacity-90 -rotate-90" 
-                  />
+                  <div className="relative w-full h-full flex items-center justify-center">
+                    <img 
+                      src="/omega.png" 
+                      alt="Omega Softvence" 
+                      className="absolute max-w-none opacity-90"
+                      style={{ width: '130px', transform: 'rotate(-90deg)' }}
+                    />
+                  </div>
                 </div>
               )}
 
@@ -1225,11 +1228,12 @@ export default function MockupPage() {
                     </div>
 
                     {/* Vertical logo ribbon */}
-                    <div className="absolute right-[-30px] top-1/2 -translate-y-1/2 flex items-center justify-center select-none z-10 w-32 h-10 -rotate-90">
+                    <div className="absolute right-6 top-1/2 -translate-y-1/2 flex items-center justify-center select-none z-10">
                       <img 
                         src="/omega.png" 
                         alt="Omega Softvence" 
-                        className="w-full h-auto opacity-90" 
+                        className="max-w-none opacity-90" 
+                        style={{ width: '140px', transform: 'rotate(-90deg)' }}
                       />
                     </div>
                   </div>
