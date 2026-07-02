@@ -5,7 +5,7 @@ import { ShopifySnippet } from '@/models/ShopifySnippet';
 export async function GET() {
   try {
     await connectToDatabase();
-    const snippets = await ShopifySnippet.find({}).sort({ createdAt: -1 });
+    const snippets = await ShopifySnippet.find({ status: 'approved' }).sort({ createdAt: -1 });
     return NextResponse.json(snippets);
   } catch (error) {
     console.error('Error fetching shopify snippets:', error);
@@ -27,6 +27,7 @@ export async function POST(req: Request) {
       title,
       code,
       createdBy,
+      status: 'pending',
     });
 
     return NextResponse.json(newSnippet, { status: 201 });

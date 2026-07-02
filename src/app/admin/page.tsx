@@ -10,8 +10,9 @@ export default function AdminDashboard() {
   const { user, dbUser, loading } = useAuth();
   const router = useRouter();
   
-  const [activeTab, setActiveTab] = useState<'pending' | 'users' | 'menus' | 'storage'>('pending');
+  const [activeTab, setActiveTab] = useState<'pending' | 'shopify' | 'users' | 'menus' | 'storage'>('pending');
   const [pendingChanges, setPendingChanges] = useState<any[]>([]);
+  const [pendingShopify, setPendingShopify] = useState<any[]>([]);
   const [storageStats, setStorageStats] = useState<any>(null);
   const [loadingStorage, setLoadingStorage] = useState(false);
   const [allUsers, setAllUsers] = useState<any[]>([]);
@@ -48,6 +49,7 @@ export default function AdminDashboard() {
         router.push('/');
       } else {
         fetchPending();
+        fetchPendingShopify();
         if (dbUser.role === 'super_admin') {
           fetchUsers();
         }
@@ -59,6 +61,12 @@ export default function AdminDashboard() {
     const res = await fetch('/api/pending');
     const data = await res.json();
     if (data.success) setPendingChanges(data.changes);
+  };
+
+  const fetchPendingShopify = async () => {
+    const res = await fetch('/api/admin/shopify-snippets');
+    const data = await res.json();
+    if (data.success) setPendingShopify(data.snippets);
   };
 
   const fetchStorageStats = async () => {
@@ -96,6 +104,15 @@ export default function AdminDashboard() {
       body: JSON.stringify({ changeId: id, firebaseUid: user?.uid, decision })
     });
     fetchPending();
+  };
+
+  const handleApproveRejectShopify = async (id: string, decision: 'approved' | 'rejected') => {
+    await fetch(`/api/admin/shopify-snippets/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: decision })
+    });
+    fetchPendingShopify();
   };
 
   const handlePromote = async (userId: string, newRole: string) => {
@@ -195,6 +212,12 @@ export default function AdminDashboard() {
         >
           Pending Changes
         </button>
+        <button
+          onClick={() => setActiveTab('shopify')}
+          className={`px-5 py-3 text-xs uppercase font-extrabold ${activeTab === 'shopify' ? 'text-green-400 border-b-2 border-green-500' : 'text-gray-500 hover:text-white'}`}
+        >
+          Shopify Approvals
+        </button>
         {dbUser.role === 'super_admin' && (
           <>
             <button
@@ -239,6 +262,31 @@ export default function AdminDashboard() {
                 </div>
                 <div className="bg-black/50 p-3 rounded-lg text-xs font-mono text-gray-400 overflow-x-auto border border-glass-border max-h-48 overflow-y-auto">
                   <pre>{JSON.stringify(change.data, null, 2)}</pre>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      ) : activeTab === 'shopify' ? (
+        <div className="space-y-4">
+          {pendingShopify.length === 0 ? (
+            <p className="text-gray-500 text-sm">No pending Shopify codes awaiting approval.</p>
+          ) : (
+            pendingShopify.map((snippet) => (
+              <div key={snippet._id} className="p-4 bg-gray-900 border border-glass-border rounded-xl space-y-3">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h3 className="font-bold text-white uppercase tracking-wider text-xs">Title: <span className="text-blue-400">{snippet.title}</span></h3>
+                    <p className="text-[10px] text-gray-500 mt-1">Requested by: {snippet.createdBy}</p>
+                    <p className="text-[10px] text-gray-500">Submitted at: {new Date(snippet.createdAt).toLocaleString()}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => handleApproveRejectShopify(snippet._id, 'approved')} className="p-2 bg-green-500/10 border border-green-500/20 text-green-400 rounded hover:bg-green-500/30 transition-all" title="Approve"><Check className="w-4 h-4" /></button>
+                    <button onClick={() => handleApproveRejectShopify(snippet._id, 'rejected')} className="p-2 bg-red-500/10 border border-red-500/20 text-red-400 rounded hover:bg-red-500/30 transition-all" title="Reject"><X className="w-4 h-4" /></button>
+                  </div>
+                </div>
+                <div className="bg-black/50 p-3 rounded-lg text-xs font-mono text-gray-400 overflow-x-auto border border-glass-border max-h-48 overflow-y-auto">
+                  <pre>{snippet.code}</pre>
                 </div>
               </div>
             ))

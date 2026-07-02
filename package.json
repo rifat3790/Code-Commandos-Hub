@@ -9,12 +9,16 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@codemirror/lang-html": "^6.4.11",
+    "@uiw/codemirror-theme-dracula": "^4.25.10",
+    "@uiw/react-codemirror": "^4.25.10",
     "canvas-confetti": "^1.9.4",
     "firebase": "^12.15.0",
     "framer-motion": "^12.40.0",
     "fuse.js": "^7.4.2",
     "html-to-image": "^1.11.13",
     "jspdf": "^4.2.1",
+    "liquidjs": "^10.27.1",
     "lucide-react": "^1.20.0",
     "mongoose": "^9.7.1",
     "next": "16.2.9",
