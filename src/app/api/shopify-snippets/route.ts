@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import connectToDatabase from '@/lib/mongodb';
 import { ShopifySnippet } from '@/models/ShopifySnippet';
+import User from '@/models/User';
 
 export async function GET() {
   try {
@@ -16,18 +17,27 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { title, code, createdBy } = body;
+    const { title, code, createdBy, firebaseUid } = body;
 
     if (!title || !code || !createdBy) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
     await connectToDatabase();
+    
+    let status: 'pending' | 'approved' | 'rejected' = 'pending';
+    if (firebaseUid) {
+      const userDoc = await User.findOne({ firebaseUid });
+      if (userDoc && (userDoc.role === 'admin' || userDoc.role === 'super_admin')) {
+        status = 'approved';
+      }
+    }
+
     const newSnippet = await ShopifySnippet.create({
       title,
       code,
       createdBy,
-      status: 'pending',
+      status,
     });
 
     return NextResponse.json(newSnippet, { status: 201 });

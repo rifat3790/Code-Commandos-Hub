@@ -535,7 +535,7 @@ export default function ShopifyCodesPage() {
       const res = await fetch('/api/shopify-snippets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, code, createdBy: displayName })
+        body: JSON.stringify({ title, code, createdBy: displayName, firebaseUid: user?.uid })
       });
 
       if (res.ok) {

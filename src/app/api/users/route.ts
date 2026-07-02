@@ -26,14 +26,21 @@ export async function POST(req: Request) {
       updateData.role = 'super_admin';
     }
 
+    const setOnInsertData: any = {};
+    if (!updateData.role) {
+      setOnInsertData.role = 'user';
+    }
+
+    const updateOps: any = { $set: updateData };
+    if (Object.keys(setOnInsertData).length > 0) {
+      updateOps.$setOnInsert = setOnInsertData;
+    }
+
     // Upsert user (update if exists, create if not)
     const user = await User.findOneAndUpdate(
       { firebaseUid },
-      { 
-        $set: updateData,
-        $setOnInsert: { role: 'user' }
-      },
-      { new: true, upsert: true }
+      updateOps,
+      { returnDocument: 'after', upsert: true }
     );
 
     return NextResponse.json({ success: true, user }, { status: 200 });
