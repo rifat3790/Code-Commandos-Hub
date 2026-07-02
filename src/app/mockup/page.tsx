@@ -915,7 +915,6 @@ export default function MockupPage() {
                 )}
               </div>
             </div>
-            </div>
 
             {/* Second Member for Dual Profile */}
             {structure === 'dual_profile' && (
@@ -2008,5 +2007,6 @@ export default function MockupPage() {
         </div>
 
       </div>
+    </div>
   );
 }
