@@ -143,12 +143,15 @@ export default function HomePage() {
     }
   };
 
-  const getGreeting = () => {
+  const [greeting, setGreeting] = useState('Good morning');
+
+  useEffect(() => {
     const hour = new Date().getHours();
-    if (hour < 12) return 'Good morning';
-    if (hour < 18) return 'Good afternoon';
-    return 'Good evening';
-  };
+    if (hour < 12) setGreeting('Good morning');
+    else if (hour < 18) setGreeting('Good afternoon');
+    else if (hour < 22) setGreeting('Good evening');
+    else setGreeting('Good night');
+  }, []);
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -246,7 +249,7 @@ export default function HomePage() {
             <span>CODE COMMANDOS HUB ACTIVE</span>
           </div>
           <h1 className="text-3xl lg:text-5xl font-extrabold tracking-tight text-white leading-tight">
-            {getGreeting()}, <span className="bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">{displayName}</span>
+            {greeting}, <span className="bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">{displayName}</span>
           </h1>
           <p className="text-gray-400 text-sm md:text-base leading-relaxed">
             Your premium online Shopify helper panel. Run card mockups, check client chats, edit workflows, and keep client communication flawless.

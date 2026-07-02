@@ -29,7 +29,7 @@ import confetti from 'canvas-confetti';
 import { useWorkspaceStore } from '@/store/workspaceStore';
 import { MockupStyle } from '@/types';
 
-type LayoutStructure = 'banner' | 'fiverr_split' | 'split' | 'spotlight' | 'certificate' | 'sidebyside' | 'showcase' | 'bento' | 'dual_screen' | 'premium_award';
+type LayoutStructure = 'banner' | 'fiverr_split' | 'split' | 'spotlight' | 'certificate' | 'sidebyside' | 'showcase' | 'bento' | 'dual_screen' | 'premium_award' | 'dual_profile';
 type PatternOverlay = 'none' | 'dots' | 'grid' | 'waves';
 type TipsStyle = 'premium_gold' | 'neon_cyberpunk' | 'minimal_glass' | 'playful_bubble' | 'center_floating_arrow' | 'center_elegant_tag' | 'center_neon_glow' | 'center_pill_premium' | 'center_diamond_glass' | 'center_massive_medal';
 type TipsColorTheme = 'yellow' | 'emerald' | 'amethyst' | 'ruby' | 'sapphire' | 'monochrome';
@@ -57,7 +57,8 @@ const STRUCTURES: { value: LayoutStructure; label: string; desc: string }[] = [
   { value: 'showcase', label: 'Premium Showcase', desc: 'Neon circle profile on left, review card on right' },
   { value: 'bento', label: 'Premium Bento Grid', desc: 'Grid block containing photo, screenshot & stats' },
   { value: 'dual_screen', label: 'Dual Glassmorphic Screen', desc: 'Two equal columns: Profile Card + Browser Mockup' },
-  { value: 'premium_award', label: 'Luxury Platinum Award', desc: 'Prestige border, gold details, seal stamp' }
+  { value: 'premium_award', label: 'Luxury Platinum Award', desc: 'Prestige border, gold details, seal stamp' },
+  { value: 'dual_profile', label: 'Dual Profile Spotlight', desc: 'Side-by-side team members layout' }
 ];
 
 const DEFAULT_FIVERR_SCREENSHOT = `data:image/svg+xml;utf8,${encodeURIComponent(`
@@ -157,6 +158,10 @@ export default function MockupPage() {
   const [role, setRole] = useState('Shopify Expert');
   const [memberPhoto, setMemberPhoto] = useState<string>('');
   
+  const [memberName2, setMemberName2] = useState('Team Member');
+  const [role2, setRole2] = useState('Developer');
+  const [memberPhoto2, setMemberPhoto2] = useState<string>('');
+  
   // Custom Screenshots (Base64)
   const [reviewScreenshot, setReviewScreenshot] = useState<string>(DEFAULT_FIVERR_SCREENSHOT);
   const [useNativeLayout, setUseNativeLayout] = useState(false);
@@ -221,7 +226,7 @@ export default function MockupPage() {
   }, [style]);
 
   // Image Upload handler
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, target: 'photo' | 'review') => {
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, target: 'photo' | 'photo2' | 'review') => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -229,6 +234,7 @@ export default function MockupPage() {
     reader.onload = (event) => {
       const base64 = event.target?.result as string;
       if (target === 'photo') setMemberPhoto(base64);
+      else if (target === 'photo2') setMemberPhoto2(base64);
       else if (target === 'review') setReviewScreenshot(base64);
     };
     reader.readAsDataURL(file);
@@ -909,6 +915,64 @@ export default function MockupPage() {
                 )}
               </div>
             </div>
+            </div>
+
+            {/* Second Member for Dual Profile */}
+            {structure === 'dual_profile' && (
+              <div className="pt-4 border-t border-glass-border space-y-3">
+                <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider flex items-center gap-1.5">
+                  <Type className="w-3.5 h-3.5 text-blue-400" />
+                  <span>Second Member Details</span>
+                </span>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-bold text-gray-400 uppercase">Team Name 2</label>
+                    <input
+                      type="text"
+                      value={memberName2}
+                      onChange={(e) => setMemberName2(e.target.value)}
+                      className="w-full px-3 py-1.5 rounded-lg glass-input text-xs"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-bold text-gray-400 uppercase">Member Name 2</label>
+                    <input
+                      type="text"
+                      value={role2}
+                      onChange={(e) => setRole2(e.target.value)}
+                      className="w-full px-3 py-1.5 rounded-lg glass-input text-xs"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[9px] font-bold text-gray-400 uppercase">Member 2 Photo</label>
+                  <div className="flex items-center gap-3">
+                    {memberPhoto2 && (
+                      <img src={memberPhoto2} className="w-10 h-10 rounded-full object-cover border border-glass-border" alt="Profile 2" />
+                    )}
+                    <div className="relative overflow-hidden flex-1">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => handleImageUpload(e, 'photo2')}
+                        className="absolute inset-0 opacity-0 cursor-pointer"
+                      />
+                      <button type="button" className="w-full py-1.5 rounded-lg bg-gray-900 border border-glass-border hover:bg-glass-hover text-white text-xs font-bold flex items-center justify-center gap-1">
+                        <Upload className="w-3.5 h-3.5" />
+                        <span>Upload Image 2</span>
+                      </button>
+                    </div>
+                    {memberPhoto2 && (
+                      <button onClick={() => setMemberPhoto2('')} className="p-2 rounded bg-red-950/20 text-red-400 hover:bg-red-500/10">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Fiverr Native Form Parameters */}
@@ -1820,7 +1884,7 @@ export default function MockupPage() {
                               <span>@{clientName}</span>
                             </div>
                             <p className="text-[11px] text-gray-770 italic font-medium leading-relaxed bg-gray-50 p-2 py-1.5 rounded border border-gray-100 line-clamp-3">
-                              "{reviewText}"
+                              &quot;{reviewText}&quot;
                             </p>
                           </div>
                           <div className="flex items-center justify-between border-t border-gray-100 pt-2 shrink-0">
@@ -1857,11 +1921,92 @@ export default function MockupPage() {
                 </div>
               )}
 
+              {/* STRUCTURE RENDERER 10: Dual Profile Spotlight ('dual_profile') */}
+              {structure === 'dual_profile' && (
+                <div className="flex-1 flex flex-col justify-between h-full p-4 relative z-10">
+                  <div className="flex items-center justify-center gap-8 lg:gap-12 relative mt-4 px-8">
+                    {/* Floating decorative elements */}
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-[400px] h-32 rounded-full blur-[40px] pointer-events-none opacity-40" style={{ background: `linear-gradient(90deg, ${themeColor} 0%, transparent 100%)` }} />
+                    
+                    {/* First Member */}
+                    <div className="flex flex-col items-center z-10 space-y-3 flex-1">
+                      <div className="relative">
+                        <div 
+                          className="w-24 h-24 sm:w-28 sm:h-28 rounded-full overflow-hidden bg-gray-800 flex items-center justify-center border-4 shadow-xl"
+                          style={{ borderColor: themeColor, boxShadow: `0 0 25px ${themeColor}50` }}
+                        >
+                          {memberPhoto ? (
+                            <img src={memberPhoto} className="w-full h-full object-cover" />
+                          ) : (
+                            <Trophy className="w-10 h-10 text-gray-650" />
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-center">
+                        <h3 className="text-sm font-black text-white uppercase tracking-wider truncate max-w-[120px]">{memberName}</h3>
+                        <p className="text-[10px] font-bold tracking-wide truncate max-w-[120px]" style={{ color: themeColor }}>{role}</p>
+                      </div>
+                    </div>
+
+                    {/* Connecting UI */}
+                    <div className="flex flex-col items-center justify-center space-y-1 z-10 shrink-0">
+                       <span className="px-3 py-1 rounded-full bg-white/10 border border-white/20 text-white text-[9px] font-black tracking-widest uppercase shadow-lg backdrop-blur-sm">
+                         Collaboration
+                       </span>
+                       <div className="h-0.5 w-16 bg-gradient-to-r from-transparent via-white/30 to-transparent" />
+                    </div>
+
+                    {/* Second Member */}
+                    <div className="flex flex-col items-center z-10 space-y-3 flex-1">
+                      <div className="relative">
+                        <div 
+                          className="w-24 h-24 sm:w-28 sm:h-28 rounded-full overflow-hidden bg-gray-800 flex items-center justify-center border-4 shadow-xl"
+                          style={{ borderColor: themeColor, boxShadow: `0 0 25px ${themeColor}50` }}
+                        >
+                          {memberPhoto2 ? (
+                            <img src={memberPhoto2} className="w-full h-full object-cover" />
+                          ) : (
+                            <Trophy className="w-10 h-10 text-gray-650" />
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-center">
+                        <h3 className="text-sm font-black text-white uppercase tracking-wider truncate max-w-[120px]">{memberName2}</h3>
+                        <p className="text-[10px] font-bold tracking-wide truncate max-w-[120px]" style={{ color: themeColor }}>{role2}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Bottom details or screenshot */}
+                  <div className="mt-8 relative z-10 w-full max-w-[90%] mx-auto pb-4">
+                    {useNativeLayout ? (
+                        <div className="p-4 rounded-xl bg-white border border-gray-200 text-black space-y-3 shadow-2xl text-left flex flex-col justify-between">
+                          <div className="space-y-1.5">
+                            <div className="flex items-center justify-between border-b border-gray-100 pb-1.5 text-[9px] text-gray-400 font-bold uppercase">
+                              <span>Client Testimony</span>
+                              <span>@{clientName}</span>
+                            </div>
+                            <p className="text-[11px] text-gray-700 italic font-medium leading-relaxed bg-gray-50 p-2 py-1.5 rounded border border-gray-100 line-clamp-3">
+                              &quot;{reviewText}&quot;
+                            </p>
+                          </div>
+                          <div className="flex items-center justify-between border-t border-gray-100 pt-2 shrink-0">
+                            <div className="flex gap-0.5">{renderStars(ratingStars)}</div>
+                            <span className="font-extrabold text-[10px] text-emerald-600">${orderPrice} USD Verified Order</span>
+                          </div>
+                        </div>
+                    ) : (
+                      <div className="w-full flex justify-center drop-shadow-2xl">
+                        {renderScreenshotBrowserFrame("max-h-[190px]")}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
 
       </div>
-    </div>
   );
 }
