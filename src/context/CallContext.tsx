@@ -4,7 +4,7 @@ import React, { createContext, useContext, useState, useEffect, useRef } from 'r
 import { useAuth } from './AuthContext';
 import { db } from '@/lib/firebase';
 import { collection, doc, addDoc, setDoc, updateDoc, onSnapshot, query, where, limit } from 'firebase/firestore';
-import { Phone, PhoneOff, Mic, MicOff, Video, VideoOff, ScreenShare, Volume2 } from 'lucide-react';
+import { Phone, PhoneOff, Mic, MicOff, Video, VideoOff, ScreenShare, Volume2, Maximize } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface CallContextType {
@@ -38,8 +38,10 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [remoteHasVideo, setRemoteHasVideo] = useState(false);
   const [callDuration, setCallDuration] = useState(0);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
+  const videoGridRef = useRef<HTMLDivElement>(null);
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
   const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
@@ -52,6 +54,24 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
 
   // Computed layout state
   const showVideoLayout = activeCall?.type === 'video' || isScreenSharing || remoteHasVideo;
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      videoGridRef.current?.requestFullscreen().catch(err => {
+        console.error(`Error attempting to enable full-screen mode:`, err);
+      });
+    } else {
+      document.exitFullscreen();
+    }
+  };
 
   // 1. Listen for incoming calls
   useEffect(() => {
@@ -699,13 +719,13 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
               </div>
 
               {/* Video Grid Viewport */}
-              <div className="flex-1 bg-black relative flex items-center justify-center overflow-hidden">
+              <div ref={videoGridRef} className="flex-1 bg-black relative flex items-center justify-center overflow-hidden">
                 {/* Remote Video Stream (Main Feed) */}
                 <video
                   ref={remoteVideoRef}
                   autoPlay
                   playsInline
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-contain"
                 />
 
                 {/* Local Video Stream (Floating PIP) */}
@@ -757,6 +777,14 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
                   title={isScreenSharing ? "Stop Sharing Screen" : "Share Screen"}
                 >
                   <ScreenShare className="w-5 h-5" />
+                </button>
+
+                <button
+                  onClick={toggleFullscreen}
+                  className={`p-3 rounded-2xl border transition-all flex items-center justify-center ${isFullscreen ? 'bg-blue-500/20 border-blue-500 text-blue-400' : 'bg-gray-900 border-gray-800 text-gray-400 hover:text-white hover:bg-gray-800'}`}
+                  title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
+                >
+                  <Maximize className="w-5 h-5" />
                 </button>
 
                 <button
