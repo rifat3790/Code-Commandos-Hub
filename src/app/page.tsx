@@ -19,7 +19,8 @@ import {
   Briefcase,
   DollarSign,
   Phone,
-  Video
+  Video,
+  MessageCircle
 } from 'lucide-react';
 import { useWorkspaceStore } from '@/store/workspaceStore';
 import { useAuth } from '@/context/AuthContext';
@@ -398,6 +399,17 @@ export default function HomePage() {
 
                     {u.email !== user?.email && (
                       <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                        <button
+                          onClick={() => {
+                            const uid = u.firebaseUid || 'admin';
+                            const name = u.name || u.email.split('@')[0];
+                            window.dispatchEvent(new CustomEvent('open-chat', { detail: { uid, name } }));
+                          }}
+                          className="p-1.5 bg-gray-900 border border-gray-800 hover:border-purple-500/20 text-gray-400 hover:text-purple-400 rounded-lg transition-all"
+                          title="Message"
+                        >
+                          <MessageCircle className="w-3.5 h-3.5" />
+                        </button>
                         <button
                           onClick={() => startCall(u.firebaseUid || 'admin', u.name || u.email.split('@')[0], 'audio')}
                           className="p-1.5 bg-gray-900 border border-gray-800 hover:border-purple-500/20 text-gray-400 hover:text-purple-400 rounded-lg transition-all"

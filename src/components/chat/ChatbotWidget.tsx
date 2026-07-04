@@ -45,6 +45,18 @@ export default function ChatbotWidget() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    const handleOpenChat = (e: CustomEvent) => {
+      if (e.detail && e.detail.uid) {
+        setIsOpen(true);
+        setActiveChatUser(e.detail.uid);
+        if (e.detail.name) setActiveChatName(e.detail.name);
+      }
+    };
+    window.addEventListener('open-chat' as any, handleOpenChat);
+    return () => window.removeEventListener('open-chat' as any, handleOpenChat);
+  }, []);
+
   const isAdminOrSuperAdmin = dbUser?.role === 'super_admin' || dbUser?.role === 'admin';
 
   useEffect(() => {
