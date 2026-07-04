@@ -36,6 +36,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoMuted, setIsVideoMuted] = useState(false);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const [remoteHasVideo, setRemoteHasVideo] = useState(false);
   const [callDuration, setCallDuration] = useState(0);
 
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
@@ -48,6 +49,9 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   const timerIntervalRef = useRef<any>(null);
 
   const isAdminOrSuperAdmin = dbUser?.role === 'super_admin' || dbUser?.role === 'admin';
+
+  // Computed layout state
+  const showVideoLayout = activeCall?.type === 'video' || isScreenSharing || remoteHasVideo;
 
   // 1. Listen for incoming calls
   useEffect(() => {
@@ -68,7 +72,6 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         return;
       }
       const docData = snapshot.docs[0].data();
-      // Ensure call is recent (45 seconds)
       if (new Date().getTime() - docData.createdAt < 45000) {
         setIncomingCall(docData);
         setCallState('ringing');
@@ -93,12 +96,43 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     };
   }, [callState]);
 
-  // 3. Bind streams to media elements
+  // 3. Track remote video presence (vital for screen share auto-switch)
+  useEffect(() => {
+    if (remoteStream) {
+      const checkVideo = () => {
+        const videoTracks = remoteStream.getVideoTracks();
+        const hasActiveVideo = videoTracks.length > 0 && videoTracks.some(t => t.enabled && !t.muted);
+        setRemoteHasVideo(hasActiveVideo);
+      };
+      
+      checkVideo();
+      
+      remoteStream.getVideoTracks().forEach(track => {
+        track.onunmute = checkVideo;
+        track.onmute = checkVideo;
+        track.onended = checkVideo;
+      });
+
+      remoteStream.onaddtrack = (e) => {
+        if (e.track.kind === 'video') {
+          e.track.onunmute = checkVideo;
+          e.track.onmute = checkVideo;
+          e.track.onended = checkVideo;
+        }
+        checkVideo();
+      };
+      remoteStream.onremovetrack = checkVideo;
+    } else {
+      setRemoteHasVideo(false);
+    }
+  }, [remoteStream]);
+
+  // 4. Bind streams to media elements
   useEffect(() => {
     if (callState === 'connected') {
-      if (activeCall?.type === 'video') {
-        if (localVideoRef.current && localStream) {
-          localVideoRef.current.srcObject = localStream;
+      if (showVideoLayout) {
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = screenStreamRef.current || localStream;
         }
         if (remoteVideoRef.current && remoteStream) {
           remoteVideoRef.current.srcObject = remoteStream;
@@ -110,7 +144,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         }
       }
     }
-  }, [callState, activeCall, localStream, remoteStream]);
+  }, [callState, showVideoLayout, localStream, remoteStream, isScreenSharing]);
 
   const startCall = async (receiverUid: string, receiverName: string, type: 'audio' | 'video') => {
     if (!user) return;
@@ -137,6 +171,12 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     peerConnectionRef.current = pc;
 
     stream.getTracks().forEach(track => pc.addTrack(track, stream));
+
+    // Ensure a video transceiver is negotiated from the start for dynamic additions
+    const videoTransceiver = pc.getTransceivers().find(t => t.receiver.track.kind === 'video');
+    if (!videoTransceiver) {
+      pc.addTransceiver('video', { direction: 'sendrecv' });
+    }
 
     pc.ontrack = (event) => {
       if (event.streams && event.streams[0]) {
@@ -238,6 +278,11 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
 
     stream.getTracks().forEach(track => pc.addTrack(track, stream));
 
+    const videoTransceiver = pc.getTransceivers().find(t => t.receiver.track.kind === 'video');
+    if (!videoTransceiver) {
+      pc.addTransceiver('video', { direction: 'sendrecv' });
+    }
+
     pc.ontrack = (event) => {
       if (event.streams && event.streams[0]) {
         setRemoteStream(event.streams[0]);
@@ -325,17 +370,36 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const toggleVideo = () => {
-    if (localStream) {
-      localStream.getVideoTracks().forEach(track => {
-        track.enabled = !track.enabled;
-      });
-      setIsVideoMuted(!isVideoMuted);
+  const toggleVideo = async () => {
+    if (!peerConnectionRef.current) return;
+
+    const videoTrack = localStream?.getVideoTracks()[0];
+    if (videoTrack) {
+      videoTrack.enabled = !videoTrack.enabled;
+      setIsVideoMuted(!videoTrack.enabled);
+    } else {
+      try {
+        const cameraStream = await navigator.mediaDevices.getUserMedia({ video: true });
+        const cameraTrack = cameraStream.getVideoTracks()[0];
+        
+        if (localStream) {
+          localStream.addTrack(cameraTrack);
+        }
+
+        const videoTransceiver = peerConnectionRef.current.getTransceivers().find(t => t.receiver.track.kind === 'video');
+        if (videoTransceiver?.sender) {
+          await videoTransceiver.sender.replaceTrack(cameraTrack);
+        }
+
+        setIsVideoMuted(false);
+      } catch (err) {
+        console.error("Camera access failed:", err);
+      }
     }
   };
 
   const toggleScreenShare = async () => {
-    if (!peerConnectionRef.current || !localStream) return;
+    if (!peerConnectionRef.current) return;
 
     if (!isScreenSharing) {
       try {
@@ -343,8 +407,8 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         screenStreamRef.current = screenStream;
         const screenTrack = screenStream.getVideoTracks()[0];
 
-        const senders = peerConnectionRef.current.getSenders();
-        const videoSender = senders.find(sender => sender.track?.kind === 'video');
+        const videoTransceiver = peerConnectionRef.current.getTransceivers().find(t => t.receiver.track.kind === 'video');
+        const videoSender = videoTransceiver?.sender;
 
         if (videoSender) {
           await videoSender.replaceTrack(screenTrack);
@@ -368,18 +432,18 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   };
 
   const stopScreenShare = async () => {
-    if (!peerConnectionRef.current || !localStream) return;
+    if (!peerConnectionRef.current) return;
 
     if (screenStreamRef.current) {
       screenStreamRef.current.getTracks().forEach(track => track.stop());
       screenStreamRef.current = null;
     }
 
-    const cameraTrack = localStream.getVideoTracks()[0];
-    const senders = peerConnectionRef.current.getSenders();
-    const videoSender = senders.find(sender => sender.track?.kind === 'video');
+    const videoTransceiver = peerConnectionRef.current.getTransceivers().find(t => t.receiver.track.kind === 'video');
+    const videoSender = videoTransceiver?.sender;
 
-    if (videoSender && cameraTrack) {
+    if (videoSender) {
+      const cameraTrack = localStream?.getVideoTracks()[0] || null;
       await videoSender.replaceTrack(cameraTrack);
     }
 
@@ -415,6 +479,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     setIsMuted(false);
     setIsVideoMuted(false);
     setIsScreenSharing(false);
+    setRemoteHasVideo(false);
     
     if (finalState === 'ended' || finalState === 'declined') {
       setTimeout(() => {
@@ -473,7 +538,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         )}
 
         {/* 2. ACTIVE AUDIO CALL OVERLAY (Small Floating Card) */}
-        {activeCall && callState !== 'idle' && activeCall.type === 'audio' && (
+        {activeCall && callState !== 'idle' && !showVideoLayout && (
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -527,7 +592,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         )}
 
         {/* 3. ACTIVE VIDEO CALL OVERLAY (Zoom/Discord Style Center Screen) */}
-        {activeCall && callState !== 'idle' && activeCall.type === 'video' && (
+        {activeCall && callState !== 'idle' && showVideoLayout && (
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
