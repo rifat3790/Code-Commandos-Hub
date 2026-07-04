@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { ShieldAlert, Check, X, Database, Phone } from 'lucide-react';
+import { ShieldAlert, Check, X, Database, Phone, Video } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useWorkspaceStore } from '@/store/workspaceStore';
 import { useCall } from '@/context/CallContext';
@@ -589,13 +589,22 @@ export default function AdminDashboard() {
                       </span>
                     </div>
                     {u.firebaseUid !== user?.uid && (
-                      <button
-                        onClick={() => startCall(u.firebaseUid, u.name || u.email.split('@')[0])}
-                        className="p-2 bg-purple-500/10 border border-purple-500/20 text-purple-400 hover:bg-purple-500/30 rounded-xl transition-all hover:scale-105 shrink-0"
-                        title="Audio Call"
-                      >
-                        <Phone className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          onClick={() => startCall(u.firebaseUid, u.name || u.email.split('@')[0], 'audio')}
+                          className="p-2 bg-purple-500/10 border border-purple-500/20 text-purple-400 hover:bg-purple-500/30 rounded-xl transition-all hover:scale-105"
+                          title="Audio Call"
+                        >
+                          <Phone className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => startCall(u.firebaseUid, u.name || u.email.split('@')[0], 'video')}
+                          className="p-2 bg-purple-500/10 border border-purple-500/20 text-purple-400 hover:bg-purple-500/30 rounded-xl transition-all hover:scale-105"
+                          title="Video Call"
+                        >
+                          <Video className="w-4 h-4" />
+                        </button>
+                      </div>
                     )}
                   </div>
                 ))}

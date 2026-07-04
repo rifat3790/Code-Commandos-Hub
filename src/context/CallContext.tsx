@@ -4,17 +4,23 @@ import React, { createContext, useContext, useState, useEffect, useRef } from 'r
 import { useAuth } from './AuthContext';
 import { db } from '@/lib/firebase';
 import { collection, doc, addDoc, setDoc, updateDoc, onSnapshot, query, where, limit } from 'firebase/firestore';
-import { Phone, PhoneOff, Mic, MicOff, Volume2 } from 'lucide-react';
+import { Phone, PhoneOff, Mic, MicOff, Video, VideoOff, ScreenShare, Volume2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface CallContextType {
-  startCall: (receiverUid: string, receiverName: string) => Promise<void>;
+  startCall: (receiverUid: string, receiverName: string, type: 'audio' | 'video') => Promise<void>;
   activeCall: any;
   callState: 'idle' | 'calling' | 'ringing' | 'connecting' | 'connected' | 'ended' | 'declined';
   endCall: () => void;
   acceptCall: () => Promise<void>;
   declineCall: () => Promise<void>;
   incomingCall: any;
+  isMuted: boolean;
+  toggleMute: () => void;
+  isVideoMuted: boolean;
+  toggleVideo: () => void;
+  isScreenSharing: boolean;
+  toggleScreenShare: () => Promise<void>;
 }
 
 const CallContext = createContext<CallContextType | undefined>(undefined);
@@ -28,10 +34,15 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
   const [isMuted, setIsMuted] = useState(false);
+  const [isVideoMuted, setIsVideoMuted] = useState(false);
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [callDuration, setCallDuration] = useState(0);
 
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
+  const localVideoRef = useRef<HTMLVideoElement | null>(null);
+  const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
+  const screenStreamRef = useRef<MediaStream | null>(null);
   const unsubscribeCallRef = useRef<(() => void) | null>(null);
   const unsubscribeIceRef = useRef<(() => void) | null>(null);
   const timerIntervalRef = useRef<any>(null);
@@ -57,7 +68,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         return;
       }
       const docData = snapshot.docs[0].data();
-      // Ensure the call offer is fresh (created in the last 45 seconds)
+      // Ensure call is recent (45 seconds)
       if (new Date().getTime() - docData.createdAt < 45000) {
         setIncomingCall(docData);
         setCallState('ringing');
@@ -67,7 +78,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     return () => unsubscribe();
   }, [user, isAdminOrSuperAdmin]);
 
-  // 2. Audio timer ticking
+  // 2. Timer ticking
   useEffect(() => {
     if (callState === 'connected') {
       timerIntervalRef.current = setInterval(() => {
@@ -82,26 +93,41 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     };
   }, [callState]);
 
-  // 3. Bind remote stream to audio element
+  // 3. Bind streams to media elements
   useEffect(() => {
-    if (remoteAudioRef.current && remoteStream) {
-      remoteAudioRef.current.srcObject = remoteStream;
-      remoteAudioRef.current.play().catch(err => console.error("Remote audio play fail:", err));
+    if (callState === 'connected') {
+      if (activeCall?.type === 'video') {
+        if (localVideoRef.current && localStream) {
+          localVideoRef.current.srcObject = localStream;
+        }
+        if (remoteVideoRef.current && remoteStream) {
+          remoteVideoRef.current.srcObject = remoteStream;
+        }
+      } else {
+        if (remoteAudioRef.current && remoteStream) {
+          remoteAudioRef.current.srcObject = remoteStream;
+          remoteAudioRef.current.play().catch(err => console.error("Remote audio play fail:", err));
+        }
+      }
     }
-  }, [remoteStream]);
+  }, [callState, activeCall, localStream, remoteStream]);
 
-  const startCall = async (receiverUid: string, receiverName: string) => {
+  const startCall = async (receiverUid: string, receiverName: string, type: 'audio' | 'video') => {
     if (!user) return;
     setCallState('calling');
+    setIsVideoMuted(type === 'audio');
 
     let stream: MediaStream;
     try {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: true, 
+        video: type === 'video' 
+      });
       setLocalStream(stream);
     } catch (err) {
-      console.error("Mic access denied:", err);
+      console.error("Media access denied:", err);
       setCallState('idle');
-      alert("Microphone permission is required to make calls.");
+      alert("Microphone/Camera permission is required to make calls.");
       return;
     }
 
@@ -146,13 +172,13 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       receiverName,
       status: 'ringing',
       offer,
+      type,
       createdAt: new Date().getTime()
     };
 
     await setDoc(callRef, callData);
     setActiveCall(callData);
 
-    // Watch for status changes
     const unsubscribeCall = onSnapshot(callRef, async (snapshot) => {
       const data = snapshot.data();
       if (!data) return;
@@ -169,7 +195,6 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     });
     unsubscribeCallRef.current = unsubscribeCall;
 
-    // Listen for receiver ICE candidates
     const iceQuery = query(
       collection(db, `calls/${callId}/iceCandidates`),
       where('type', '==', 'receiver')
@@ -190,10 +215,14 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     setCallState('connecting');
     setActiveCall(incomingCall);
     setIncomingCall(null);
+    setIsVideoMuted(incomingCall.type === 'audio');
 
     let stream: MediaStream;
     try {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: true, 
+        video: incomingCall.type === 'video' 
+      });
       setLocalStream(stream);
     } catch (err) {
       console.error("Local stream fetch failed:", err);
@@ -296,6 +325,71 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const toggleVideo = () => {
+    if (localStream) {
+      localStream.getVideoTracks().forEach(track => {
+        track.enabled = !track.enabled;
+      });
+      setIsVideoMuted(!isVideoMuted);
+    }
+  };
+
+  const toggleScreenShare = async () => {
+    if (!peerConnectionRef.current || !localStream) return;
+
+    if (!isScreenSharing) {
+      try {
+        const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+        screenStreamRef.current = screenStream;
+        const screenTrack = screenStream.getVideoTracks()[0];
+
+        const senders = peerConnectionRef.current.getSenders();
+        const videoSender = senders.find(sender => sender.track?.kind === 'video');
+
+        if (videoSender) {
+          await videoSender.replaceTrack(screenTrack);
+        }
+
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = screenStream;
+        }
+
+        screenTrack.onended = () => {
+          stopScreenShare();
+        };
+
+        setIsScreenSharing(true);
+      } catch (err) {
+        console.error("Screen share fail:", err);
+      }
+    } else {
+      await stopScreenShare();
+    }
+  };
+
+  const stopScreenShare = async () => {
+    if (!peerConnectionRef.current || !localStream) return;
+
+    if (screenStreamRef.current) {
+      screenStreamRef.current.getTracks().forEach(track => track.stop());
+      screenStreamRef.current = null;
+    }
+
+    const cameraTrack = localStream.getVideoTracks()[0];
+    const senders = peerConnectionRef.current.getSenders();
+    const videoSender = senders.find(sender => sender.track?.kind === 'video');
+
+    if (videoSender && cameraTrack) {
+      await videoSender.replaceTrack(cameraTrack);
+    }
+
+    if (localVideoRef.current) {
+      localVideoRef.current.srcObject = localStream;
+    }
+
+    setIsScreenSharing(false);
+  };
+
   const cleanupCall = (finalState: 'idle' | 'calling' | 'ringing' | 'connecting' | 'connected' | 'ended' | 'declined') => {
     if (unsubscribeCallRef.current) unsubscribeCallRef.current();
     if (unsubscribeIceRef.current) unsubscribeIceRef.current();
@@ -303,6 +397,11 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     if (peerConnectionRef.current) {
       peerConnectionRef.current.close();
       peerConnectionRef.current = null;
+    }
+
+    if (screenStreamRef.current) {
+      screenStreamRef.current.getTracks().forEach(track => track.stop());
+      screenStreamRef.current = null;
     }
 
     if (localStream) {
@@ -314,8 +413,9 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     setActiveCall(null);
     setCallState(finalState);
     setIsMuted(false);
+    setIsVideoMuted(false);
+    setIsScreenSharing(false);
     
-    // Automatically revert to idle after 3 seconds for call states like ended or declined
     if (finalState === 'ended' || finalState === 'declined') {
       setTimeout(() => {
         setCallState('idle');
@@ -330,11 +430,10 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <CallContext.Provider value={{ startCall, activeCall, callState, endCall, acceptCall, declineCall, incomingCall }}>
+    <CallContext.Provider value={{ startCall, activeCall, callState, endCall, acceptCall, declineCall, incomingCall, isMuted, toggleMute, isVideoMuted, toggleVideo, isScreenSharing, toggleScreenShare }}>
       {children}
       <audio ref={remoteAudioRef} style={{ display: 'none' }} />
 
-      {/* Floating Calls UI Render overlays */}
       <AnimatePresence>
         {/* 1. INCOMING CALL OVERLAY */}
         {incomingCall && callState === 'ringing' && (
@@ -347,11 +446,13 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
             <div className="relative flex items-center justify-center">
               <span className="absolute inset-0 w-16 h-16 bg-purple-500/20 rounded-full animate-ping"></span>
               <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-purple-600 to-indigo-800 border-2 border-purple-500 flex items-center justify-center">
-                <Phone className="w-7 h-7 text-white" />
+                {incomingCall.type === 'video' ? <Video className="w-7 h-7 text-white" /> : <Phone className="w-7 h-7 text-white" />}
               </div>
             </div>
             <div>
-              <p className="text-[10px] text-purple-400 font-extrabold uppercase tracking-widest">Incoming Audio Call</p>
+              <p className="text-[10px] text-purple-400 font-extrabold uppercase tracking-widest">
+                Incoming {incomingCall.type === 'video' ? 'Video' : 'Audio'} Call
+              </p>
               <h3 className="text-white font-bold mt-1 text-base">{incomingCall.callerName}</h3>
             </div>
             <div className="flex gap-4 w-full mt-1">
@@ -371,8 +472,8 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
           </motion.div>
         )}
 
-        {/* 2. ACTIVE CALL & OUTGOING DIALING FLOATING OVERLAY */}
-        {activeCall && callState !== 'idle' && (
+        {/* 2. ACTIVE AUDIO CALL OVERLAY (Small Floating Card) */}
+        {activeCall && callState !== 'idle' && activeCall.type === 'audio' && (
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -421,6 +522,99 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
               >
                 <PhoneOff className="w-4 h-4" /> Hang Up
               </button>
+            </div>
+          </motion.div>
+        )}
+
+        {/* 3. ACTIVE VIDEO CALL OVERLAY (Zoom/Discord Style Center Screen) */}
+        {activeCall && callState !== 'idle' && activeCall.type === 'video' && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="fixed inset-0 bg-black/85 backdrop-blur-md z-[100] flex items-center justify-center p-4 md:p-6"
+          >
+            <div className="bg-gray-950 border border-purple-500/20 rounded-3xl w-full max-w-4xl h-[80vh] flex flex-col overflow-hidden relative shadow-[0_0_50px_rgba(168,85,247,0.25)]">
+              {/* Top Banner Info */}
+              <div className="absolute top-4 left-4 z-20 bg-black/60 backdrop-blur-md px-3.5 py-2 rounded-xl flex items-center gap-2 border border-glass-border">
+                <div className="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse" />
+                <span className="text-xs font-bold text-white">
+                  {activeCall.callerUid === (isAdminOrSuperAdmin ? 'admin' : user?.uid) ? activeCall.receiverName : activeCall.callerName}
+                </span>
+                <span className="text-[10px] text-purple-400 font-mono pl-1.5 border-l border-white/20">
+                  {formatDuration(callDuration)}
+                </span>
+              </div>
+
+              {/* Video Grid Viewport */}
+              <div className="flex-1 bg-black relative flex items-center justify-center overflow-hidden">
+                {/* Remote Video Stream (Main Feed) */}
+                <video
+                  ref={remoteVideoRef}
+                  autoPlay
+                  playsInline
+                  className="w-full h-full object-cover"
+                />
+
+                {/* Local Video Stream (Floating PIP) */}
+                <div className="absolute bottom-4 right-4 w-40 h-28 md:w-52 md:h-36 bg-gray-900 border border-purple-500/30 rounded-2xl overflow-hidden shadow-2xl z-10">
+                  <video
+                    ref={localVideoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    className="w-full h-full object-cover scale-x-[-1]"
+                  />
+                  {isVideoMuted && (
+                    <div className="absolute inset-0 bg-gray-950/80 flex flex-col items-center justify-center gap-1.5">
+                      <VideoOff className="w-6 h-6 text-gray-500" />
+                      <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Cam Off</span>
+                    </div>
+                  )}
+                </div>
+
+                {isScreenSharing && (
+                  <div className="absolute top-4 right-4 z-20 bg-purple-600/90 text-white text-[10px] font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 animate-pulse">
+                    <ScreenShare className="w-3.5 h-3.5" />
+                    <span>Screen Sharing Active</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Bottom Controls Bar */}
+              <div className="p-4 bg-gray-950 border-t border-glass-border flex justify-center gap-4 items-center shrink-0">
+                <button
+                  onClick={toggleMute}
+                  className={`p-3 rounded-2xl border transition-all flex items-center justify-center ${isMuted ? 'bg-red-500/10 border-red-500 text-red-400 animate-pulse' : 'bg-gray-900 border-gray-800 text-gray-400 hover:text-white hover:bg-gray-800'}`}
+                  title={isMuted ? "Unmute Mic" : "Mute Mic"}
+                >
+                  {isMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+                </button>
+
+                <button
+                  onClick={toggleVideo}
+                  className={`p-3 rounded-2xl border transition-all flex items-center justify-center ${isVideoMuted ? 'bg-red-500/10 border-red-500 text-red-400' : 'bg-gray-900 border-gray-800 text-gray-400 hover:text-white hover:bg-gray-800'}`}
+                  title={isVideoMuted ? "Enable Camera" : "Disable Camera"}
+                >
+                  {isVideoMuted ? <VideoOff className="w-5 h-5" /> : <Video className="w-5 h-5" />}
+                </button>
+
+                <button
+                  onClick={toggleScreenShare}
+                  className={`p-3 rounded-2xl border transition-all flex items-center justify-center ${isScreenSharing ? 'bg-purple-500/20 border-purple-500 text-purple-400' : 'bg-gray-900 border-gray-800 text-gray-400 hover:text-white hover:bg-gray-800'}`}
+                  title={isScreenSharing ? "Stop Sharing Screen" : "Share Screen"}
+                >
+                  <ScreenShare className="w-5 h-5" />
+                </button>
+
+                <button
+                  onClick={endCall}
+                  className="p-3 rounded-2xl bg-red-600 hover:bg-red-500 text-white font-bold transition-all shadow-[0_0_15px_rgba(239,68,68,0.25)]"
+                  title="Hang Up"
+                >
+                  <PhoneOff className="w-5 h-5" />
+                </button>
+              </div>
             </div>
           </motion.div>
         )}

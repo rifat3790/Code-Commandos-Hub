@@ -13,10 +13,10 @@ export async function GET(req: Request) {
 
     await connectToDatabase();
 
-    // Verify if requesting user is admin/super_admin
+    // Verify if requesting user exists
     const requester = await User.findOne({ firebaseUid });
-    if (!requester || (requester.role !== 'admin' && requester.role !== 'super_admin')) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    if (!requester) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     // Query users active in the last 2 minutes (excluding banned)
@@ -24,7 +24,7 @@ export async function GET(req: Request) {
     const activeUsers = await User.find({
       lastActiveAt: { $gte: threshold },
       role: { $ne: 'banned' }
-    }).select('name email role photoURL');
+    }).select('name email role photoURL firebaseUid');
 
     return NextResponse.json({
       success: true,

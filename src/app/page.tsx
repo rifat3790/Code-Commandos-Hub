@@ -17,10 +17,13 @@ import {
   Plus,
   Zap,
   Briefcase,
-  DollarSign
+  DollarSign,
+  Phone,
+  Video
 } from 'lucide-react';
 import { useWorkspaceStore } from '@/store/workspaceStore';
 import { useAuth } from '@/context/AuthContext';
+import { useCall } from '@/context/CallContext';
 
 function StarBackground() {
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
@@ -96,8 +99,11 @@ function StarBackground() {
 export default function HomePage() {
   const store = useWorkspaceStore();
   const { user } = useAuth();
+  const { startCall } = useCall();
   
   const [pinnedTools, setPinnedTools] = useState<string[]>(['msg-helper', 'congrats-studio']);
+  const [activeVisitors, setActiveVisitors] = useState<{count: number, list: any[]}>({ count: 0, list: [] });
+  const [loadingActive, setLoadingActive] = useState(false);
   
   // Real DB Data states
   const [totalProjects, setTotalProjects] = useState(0);
@@ -111,9 +117,28 @@ export default function HomePage() {
     store.hydrate();
   }, []);
 
+  const fetchActiveVisitors = async () => {
+    if (!user?.uid) return;
+    setLoadingActive(true);
+    try {
+      const res = await fetch(`/api/users/active?uid=${user.uid}`);
+      if (res.ok) {
+        const data = await res.json();
+        setActiveVisitors({ count: data.count, list: data.activeUsers || [] });
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingActive(false);
+    }
+  };
+
   useEffect(() => {
     if (user?.uid) {
       fetchDashboardData();
+      fetchActiveVisitors();
+      const interval = setInterval(fetchActiveVisitors, 10000);
+      return () => clearInterval(interval);
     }
   }, [user]);
 
@@ -332,6 +357,69 @@ export default function HomePage() {
         {/* Right Side: Recent Activity, Pinned, Keep Notes */}
         <div className="space-y-8">
           
+          {/* Active Members Online */}
+          <div className="p-5 rounded-2xl border border-purple-500/20 bg-purple-950/5 space-y-4 shadow-[0_0_20px_rgba(168,85,247,0.05)] relative overflow-hidden group/active">
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-purple-500 to-indigo-500" />
+            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 bg-green-500 rounded-full animate-ping" />
+                Active Visitors ({activeVisitors.count})
+              </span>
+              <button 
+                onClick={fetchActiveVisitors} 
+                disabled={loadingActive}
+                className="text-[10px] text-purple-400 hover:text-purple-300 font-bold uppercase transition-colors"
+              >
+                {loadingActive ? '...' : 'Refresh'}
+              </button>
+            </h3>
+
+            <div className="space-y-3 max-h-[220px] overflow-y-auto pr-1">
+              {activeVisitors.list.length === 0 ? (
+                <p className="text-xs text-gray-500 text-center py-4">No active visitors online.</p>
+              ) : (
+                activeVisitors.list.map((u, i) => (
+                  <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-gray-950/60 border border-glass-border hover:border-purple-500/25 transition-all text-left">
+                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                      <div className="w-8.5 h-8.5 rounded-full bg-gradient-to-tr from-purple-500 to-indigo-800 flex items-center justify-center font-bold text-xs text-white border border-purple-500/20 overflow-hidden shrink-0">
+                        {u.photoURL ? (
+                          <img src={u.photoURL} alt={u.name || u.email} className="w-full h-full object-cover" />
+                        ) : (
+                          (u.name || u.email).split(' ').map((n: string) => n[0]).join('').substring(0,2).toUpperCase()
+                        )}
+                      </div>
+                      <div className="overflow-hidden">
+                        <p className="text-xs font-bold text-white truncate">{u.name || u.email.split('@')[0]}</p>
+                        <span className="inline-block text-[8px] font-extrabold uppercase tracking-wider text-purple-400/80 bg-purple-500/10 px-1.5 py-0.2 rounded font-mono">
+                          {u.role}
+                        </span>
+                      </div>
+                    </div>
+
+                    {u.email !== user?.email && (
+                      <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                        <button
+                          onClick={() => startCall(u.firebaseUid || 'admin', u.name || u.email.split('@')[0], 'audio')}
+                          className="p-1.5 bg-gray-900 border border-gray-800 hover:border-purple-500/20 text-gray-400 hover:text-purple-400 rounded-lg transition-all"
+                          title="Audio Call"
+                        >
+                          <Phone className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => startCall(u.firebaseUid || 'admin', u.name || u.email.split('@')[0], 'video')}
+                          className="p-1.5 bg-gray-900 border border-gray-800 hover:border-purple-500/20 text-gray-400 hover:text-purple-400 rounded-lg transition-all"
+                          title="Video Call"
+                        >
+                          <Video className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
           {/* Pinned Tools */}
           <div className="p-5 rounded-2xl border border-glass-border bg-gray-950/30 space-y-4 shadow-lg">
             <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center justify-between">

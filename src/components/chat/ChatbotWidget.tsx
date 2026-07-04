@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { db } from '@/lib/firebase';
 import { collection, query, where, or, onSnapshot, addDoc, orderBy, serverTimestamp, getDocs, doc, updateDoc } from 'firebase/firestore';
-import { MessageCircle, X, Send, User, ChevronLeft, Phone } from 'lucide-react';
+import { MessageCircle, X, Send, User, ChevronLeft, Phone, Video } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useWorkspaceStore } from '@/store/workspaceStore';
 import { useCall } from '@/context/CallContext';
@@ -209,19 +209,32 @@ export default function ChatbotWidget() {
                   {isAdminOrSuperAdmin ? (activeChatUser ? activeChatName : 'Active Chats') : 'Support Chat'}
                 </span>
               </div>
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex items-center gap-1.5 shrink-0">
                 {(!isAdminOrSuperAdmin || (isAdminOrSuperAdmin && activeChatUser)) && (
-                  <button
-                    onClick={() => {
-                      const targetUid = isAdminOrSuperAdmin ? activeChatUser! : 'admin';
-                      const targetName = isAdminOrSuperAdmin ? activeChatName : 'Support Team';
-                      startCall(targetUid, targetName);
-                    }}
-                    className="p-1 hover:bg-brand-green-hover rounded transition-all hover:scale-105 text-black"
-                    title="Audio Call"
-                  >
-                    <Phone className="w-5 h-5" />
-                  </button>
+                  <>
+                    <button
+                      onClick={() => {
+                        const targetUid = isAdminOrSuperAdmin ? activeChatUser! : 'admin';
+                        const targetName = isAdminOrSuperAdmin ? activeChatName : 'Support Team';
+                        startCall(targetUid, targetName, 'audio');
+                      }}
+                      className="p-1 hover:bg-brand-green-hover rounded transition-all hover:scale-105 text-black"
+                      title="Audio Call"
+                    >
+                      <Phone className="w-4.5 h-4.5" />
+                    </button>
+                    <button
+                      onClick={() => {
+                        const targetUid = isAdminOrSuperAdmin ? activeChatUser! : 'admin';
+                        const targetName = isAdminOrSuperAdmin ? activeChatName : 'Support Team';
+                        startCall(targetUid, targetName, 'video');
+                      }}
+                      className="p-1 hover:bg-brand-green-hover rounded transition-all hover:scale-105 text-black"
+                      title="Video Call"
+                    >
+                      <Video className="w-4.5 h-4.5" />
+                    </button>
+                  </>
                 )}
                 <button onClick={() => setIsOpen(false)} className="text-black/80 hover:text-black hover:bg-brand-green p-1 rounded transition-colors">
                   <X className="w-5 h-5" />
