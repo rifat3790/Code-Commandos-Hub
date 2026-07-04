@@ -3,10 +3,11 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import Papa from 'papaparse';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Clock, CheckCircle2, FileSpreadsheet, ExternalLink, Filter, ChevronDown, Columns, DollarSign, Save } from 'lucide-react';
+import { Search, Clock, CheckCircle2, FileSpreadsheet, ExternalLink, Filter, ChevronDown, Columns, DollarSign, Save, Download } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import toast from 'react-hot-toast';
+import { toPng } from 'html-to-image';
 
 function parseTimeline(timelineStr: string): number | null {
   if (!timelineStr) return null;
@@ -162,6 +163,7 @@ export default function OrdersDashboard({ csvData }: { csvData: string }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [now, setNow] = useState(Date.now());
   const router = useRouter();
+  const tableRef = useRef<HTMLDivElement>(null);
 
   // Filters State
   const [visibleColumns, setVisibleColumns] = useState<string[]>([]);
@@ -336,6 +338,22 @@ export default function OrdersDashboard({ csvData }: { csvData: string }) {
       toast.error("Failed to save filters.");
     } finally {
       setIsSavingFilter(false);
+    }
+  };
+
+  const handleDownloadPNG = async () => {
+    if (tableRef.current) {
+      try {
+        const dataUrl = await toPng(tableRef.current, { backgroundColor: '#111827' });
+        const link = document.createElement('a');
+        link.download = 'orders-tracker.png';
+        link.href = dataUrl;
+        link.click();
+        toast.success("Downloaded as PNG");
+      } catch (err) {
+        console.error(err);
+        toast.error("Failed to download image");
+      }
     }
   };
 
@@ -595,7 +613,14 @@ export default function OrdersDashboard({ csvData }: { csvData: string }) {
           searchable={true}
         />
 
-        <div className="ml-auto">
+        <div className="ml-auto flex gap-2">
+          <button 
+            onClick={handleDownloadPNG} 
+            className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl text-sm font-semibold transition-colors border border-glass-border"
+          >
+            <Download className="w-4 h-4" />
+            Download PNG
+          </button>
           <button 
             onClick={handleSaveFilters} 
             disabled={isSavingFilter}
@@ -608,7 +633,7 @@ export default function OrdersDashboard({ csvData }: { csvData: string }) {
       </div>
 
       {/* Main Table */}
-      <div className="glass-panel overflow-hidden border border-glass-border rounded-xl">
+      <div ref={tableRef} className="glass-panel overflow-hidden border border-glass-border rounded-xl">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm whitespace-nowrap">
             <thead className="bg-gray-900/90 text-gray-300 font-medium border-b border-glass-border">

@@ -3,8 +3,11 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import Papa from 'papaparse';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, CheckCircle2, FileSpreadsheet, ExternalLink, Filter, ChevronDown, Columns } from 'lucide-react';
+import { Search, CheckCircle2, FileSpreadsheet, ExternalLink, Filter, ChevronDown, Columns, Save, Download } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/context/AuthContext';
+import toast from 'react-hot-toast';
+import { toPng } from 'html-to-image';
 
 function MultiSelectDropdown({ 
   label, 
@@ -123,10 +126,14 @@ function MultiSelectDropdown({
 }
 
 export default function IssuesDashboard({ csvData }: { csvData: string }) {
+  const { user, dbUser } = useAuth();
   const [data, setData] = useState<any[]>([]);
   const [allColumns, setAllColumns] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const router = useRouter();
+  const tableRef = useRef<HTMLDivElement>(null);
+
+  const [isSavingFilter, setIsSavingFilter] = useState(false);
 
   // Filters State
   const [visibleColumns, setVisibleColumns] = useState<string[]>([]);
@@ -149,15 +156,40 @@ export default function IssuesDashboard({ csvData }: { csvData: string }) {
         const validData = results.data.filter((row: any) => Object.keys(row).length > 1 && row['Date']);
         setData(validData);
 
+        const tf = dbUser?.issuesFilters || {};
+
         setVisibleColumns(prev => {
           if (prev.length > 0) return prev;
+          if (tf.visibleColumns) return tf.visibleColumns;
           return extractedColumns; // By default show all columns for Issues
         });
         
-        setAssignTeamFilter(prev => prev.length > 0 ? prev : ['CC']);
+        setAssignTeamFilter(prev => {
+          if (prev.length > 0) return prev;
+          if (tf.assignTeamFilter) return tf.assignTeamFilter;
+          return ['CC'];
+        });
+
+        setTeamFilter(prev => {
+          if (prev.length > 0) return prev;
+          if (tf.teamFilter) return tf.teamFilter;
+          return [];
+        });
+
+        setStatusFilter(prev => {
+          if (prev.length > 0) return prev;
+          if (tf.statusFilter) return tf.statusFilter;
+          return [];
+        });
+
+        setNameFilter(prev => {
+          if (prev.length > 0) return prev;
+          if (tf.nameFilter) return tf.nameFilter;
+          return [];
+        });
       }
     });
-  }, [csvData]);
+  }, [csvData, dbUser]);
 
   // Extract unique filter options dynamically from data
   const filterOptions = useMemo(() => {
@@ -241,6 +273,57 @@ export default function IssuesDashboard({ csvData }: { csvData: string }) {
 
     return result;
   }, [data, searchQuery, teamFilter, statusFilter, assignTeamFilter, nameFilter]);
+
+  const handleSaveFilters = async () => {
+    if (!user) {
+      toast.error("You must be logged in to save filters.");
+      return;
+    }
+    
+    setIsSavingFilter(true);
+    try {
+      const filtersToSave = {
+        visibleColumns,
+        teamFilter,
+        statusFilter,
+        assignTeamFilter,
+        nameFilter
+      };
+
+      const res = await fetch(`/api/users/me?uid=${user.uid}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ issuesFilters: filtersToSave })
+      });
+
+      if (res.ok) {
+        toast.success("Your custom filters have been saved successfully!");
+      } else {
+        toast.error("Failed to save filters.");
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to save filters.");
+    } finally {
+      setIsSavingFilter(false);
+    }
+  };
+
+  const handleDownloadPNG = async () => {
+    if (tableRef.current) {
+      try {
+        const dataUrl = await toPng(tableRef.current, { backgroundColor: '#111827' });
+        const link = document.createElement('a');
+        link.download = 'issues-tracker.png';
+        link.href = dataUrl;
+        link.click();
+        toast.success("Downloaded as PNG");
+      } catch (err) {
+        console.error(err);
+        toast.error("Failed to download image");
+      }
+    }
+  };
 
   const getStatusColor = (status: string) => {
     const s = (status || "").toLowerCase();
@@ -335,9 +418,27 @@ export default function IssuesDashboard({ csvData }: { csvData: string }) {
           onChange={setVisibleColumns} 
           searchable={true}
         />
+
+        <div className="ml-auto flex gap-2">
+          <button 
+            onClick={handleDownloadPNG} 
+            className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl text-sm font-semibold transition-colors border border-glass-border"
+          >
+            <Download className="w-4 h-4" />
+            Download PNG
+          </button>
+          <button 
+            onClick={handleSaveFilters} 
+            disabled={isSavingFilter}
+            className="flex items-center gap-2 px-4 py-2 bg-brand-green hover:bg-brand-green-hover text-black rounded-xl text-sm font-semibold transition-colors glow-green"
+          >
+            <Save className="w-4 h-4" />
+            {isSavingFilter ? 'Saving...' : 'Save Filters'}
+          </button>
+        </div>
       </div>
 
-      <div className="glass-panel overflow-hidden border border-glass-border rounded-xl">
+      <div ref={tableRef} className="glass-panel overflow-hidden border border-glass-border rounded-xl">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm whitespace-nowrap">
             <thead className="bg-gray-900/90 text-gray-300 font-medium border-b border-glass-border">

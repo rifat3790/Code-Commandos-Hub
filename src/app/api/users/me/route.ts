@@ -35,6 +35,9 @@ export async function PUT(req: Request) {
     if (body.trackerFilters !== undefined) {
       updateData.trackerFilters = body.trackerFilters;
     }
+    if (body.issuesFilters !== undefined) {
+      updateData.issuesFilters = body.issuesFilters;
+    }
     if (body.skills !== undefined) {
       updateData.skills = body.skills;
     }
