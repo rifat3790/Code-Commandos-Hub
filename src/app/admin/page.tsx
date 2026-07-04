@@ -7,6 +7,12 @@ import { useRouter } from 'next/navigation';
 import { useWorkspaceStore } from '@/store/workspaceStore';
 import { useCall } from '@/context/CallContext';
 
+const allAvailableMenus = [
+  'Home', 'Workspace', 'Order Tracker', 'Personal Projects', 'Message Helper', 'Templates', 'Schema Builder',
+  'Audit Suite', 'Projects', 'Mockup Studio', 'AI Assistant', 
+  'Team Notes', 'Downloads', 'Member Profile', 'Shopify Codes', 'Settings'
+];
+
 export default function AdminDashboard() {
   const { user, dbUser, loading } = useAuth();
   const { startCall } = useCall();
@@ -30,6 +36,9 @@ export default function AdminDashboard() {
   const [isCreatingUser, setIsCreatingUser] = useState(false);
   const [adminEnabledMenus, setAdminEnabledMenus] = useState<string[]>([]);
   const [userEnabledMenus, setUserEnabledMenus] = useState<string[]>([]);
+
+  const [editingUserPermissionsId, setEditingUserPermissionsId] = useState<string | null>(null);
+  const [editingUserMenus, setEditingUserMenus] = useState<string[]>([]);
 
   useEffect(() => {
     if (storeSettings) {
@@ -161,6 +170,16 @@ export default function AdminDashboard() {
     fetchUsers();
   };
 
+  const handleSaveUserPermissions = async (userId: string, menus: string[] | null) => {
+    await fetch('/api/users/roles', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ promoterUid: user?.uid, targetUserId: userId, allowedMenus: menus })
+    });
+    setEditingUserPermissionsId(null);
+    fetchUsers();
+  };
+
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newUserEmail || !newUserPass) return;
@@ -227,12 +246,6 @@ export default function AdminDashboard() {
       await updateSettings({ userEnabledMenus: newMenus });
     }
   };
-
-  const allAvailableMenus = [
-    'Home', 'Workspace', 'Order Tracker', 'Personal Projects', 'Message Helper', 'Templates', 'Schema Builder',
-    'Audit Suite', 'Projects', 'Mockup Studio', 'AI Assistant', 
-    'Team Notes', 'Downloads', 'Member Profile', 'Shopify Codes', 'Settings'
-  ];
 
   if (loading || !dbUser) return null;
 
@@ -399,6 +412,69 @@ export default function AdminDashboard() {
                       {u.callingAllowed !== false ? 'Allowed' : 'Blocked'}
                     </button>
                   </div>
+                  <div className="flex items-center justify-between text-xs text-gray-500 mt-2 pt-2 border-t border-white/5">
+                    <span>Page Permissions:</span>
+                    <button
+                      onClick={() => {
+                        if (editingUserPermissionsId === u._id) {
+                          setEditingUserPermissionsId(null);
+                        } else {
+                          setEditingUserPermissionsId(u._id);
+                          setEditingUserMenus(u.allowedMenus || []);
+                        }
+                      }}
+                      className="px-2 py-0.5 rounded font-extrabold text-[9px] border bg-blue-500/10 border-blue-500/20 text-blue-400 hover:bg-blue-500/20 transition-colors uppercase"
+                    >
+                      {u.allowedMenus ? 'Custom' : 'Global'}
+                    </button>
+                  </div>
+                  
+                  {editingUserPermissionsId === u._id && (
+                    <div className="mt-3 p-3 bg-black/50 border border-blue-500/20 rounded-lg space-y-3">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-xs font-bold text-blue-400 uppercase">Specific Pages</span>
+                        <button 
+                          onClick={() => handleSaveUserPermissions(u._id, null)}
+                          className="text-[10px] px-2 py-1 bg-red-500/10 text-red-400 rounded hover:bg-red-500/20 transition-colors"
+                        >
+                          Reset to Global
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
+                        {allAvailableMenus.map(menu => (
+                          <label key={`user-${u._id}-${menu}`} className="flex items-center gap-2 cursor-pointer">
+                            <input 
+                              type="checkbox" 
+                              className="w-3 h-3 text-blue-500 bg-gray-800 border-gray-600 rounded"
+                              checked={editingUserMenus.includes(menu)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setEditingUserMenus([...editingUserMenus, menu]);
+                                } else {
+                                  setEditingUserMenus(editingUserMenus.filter(m => m !== menu));
+                                }
+                              }}
+                            />
+                            <span className="text-[10px] text-gray-300 truncate">{menu}</span>
+                          </label>
+                        ))}
+                      </div>
+                      <div className="flex justify-end gap-2 pt-2 border-t border-white/5">
+                        <button 
+                          onClick={() => setEditingUserPermissionsId(null)}
+                          className="px-3 py-1 text-xs bg-gray-800 text-gray-300 rounded hover:bg-gray-700"
+                        >
+                          Cancel
+                        </button>
+                        <button 
+                          onClick={() => handleSaveUserPermissions(u._id, editingUserMenus)}
+                          className="px-3 py-1 text-xs bg-blue-600 text-white font-bold rounded hover:bg-blue-500"
+                        >
+                          Save Override
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
                 {u.role !== 'super_admin' && (
                   <div className="flex gap-2 flex-wrap">

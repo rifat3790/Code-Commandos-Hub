@@ -85,10 +85,15 @@ function ProtectedMainContent({ children }: { children: React.ReactNode }) {
        isAuthorized = false;
     } else if (!isSuperAdmin && currentMenuName) {
        // Check settings based on role
-       const userMenus = storeSettings?.userEnabledMenus?.length ? storeSettings.userEnabledMenus : (storeSettings?.enabledMenus || Object.values(routeToMenuMap));
-       const adminMenus = storeSettings?.adminEnabledMenus?.length ? storeSettings.adminEnabledMenus : (storeSettings?.enabledMenus || Object.values(routeToMenuMap));
-       
-       const enabledMenus = dbUser?.role === 'admin' ? adminMenus : userMenus;
+       // Check settings based on role or specific user allowedMenus
+       let enabledMenus = [];
+       if (dbUser?.allowedMenus && dbUser.allowedMenus.length > 0) {
+         enabledMenus = dbUser.allowedMenus;
+       } else {
+         const userMenus = storeSettings?.userEnabledMenus?.length ? storeSettings.userEnabledMenus : (storeSettings?.enabledMenus || Object.values(routeToMenuMap));
+         const adminMenus = storeSettings?.adminEnabledMenus?.length ? storeSettings.adminEnabledMenus : (storeSettings?.enabledMenus || Object.values(routeToMenuMap));
+         enabledMenus = dbUser?.role === 'admin' ? adminMenus : userMenus;
+       }
 
        if (!enabledMenus.includes(currentMenuName)) {
          isAuthorized = false;

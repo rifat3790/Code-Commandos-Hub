@@ -14,7 +14,7 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const { promoterUid, targetUserId, newRole, callingAllowed } = await req.json();
+    const { promoterUid, targetUserId, newRole, callingAllowed, allowedMenus } = await req.json();
 
     if (!promoterUid || !targetUserId) {
       return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });
@@ -37,8 +37,18 @@ export async function POST(req: Request) {
     if (callingAllowed !== undefined) {
       updateObj.callingAllowed = callingAllowed;
     }
+    if (allowedMenus !== undefined) {
+      updateObj.allowedMenus = allowedMenus === null ? undefined : allowedMenus;
+      // If allowedMenus is null, we unset it from the document, so mongoose $unset could be needed,
+      // but in mongoose, setting to undefined or null will unset if we configure it, or we can use $unset explicitly
+    }
 
-    await User.findByIdAndUpdate(targetUserId, updateObj);
+    if (allowedMenus === null) {
+      await User.findByIdAndUpdate(targetUserId, { $unset: { allowedMenus: 1 }, $set: updateObj });
+    } else {
+      await User.findByIdAndUpdate(targetUserId, updateObj);
+    }
+    
     return NextResponse.json({ success: true, message: 'User settings updated' }, { status: 200 });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });

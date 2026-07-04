@@ -87,6 +87,9 @@ export default function Sidebar({ isMobileOpen = false, onCloseMobile }: Sidebar
   // For non-super_admin users, filter out disabled menus
   const baseNavItems = baseNavItemsRaw.filter(item => {
     if (dbUser?.role === 'super_admin') return true;
+    if (dbUser?.allowedMenus && dbUser.allowedMenus.length > 0) {
+      return dbUser.allowedMenus.includes(item.name);
+    }
     if (dbUser?.role === 'admin') return adminMenus.includes(item.name);
     return userMenus.includes(item.name);
   });
