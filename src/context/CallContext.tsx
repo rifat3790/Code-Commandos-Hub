@@ -159,10 +159,25 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       });
       setLocalStream(stream);
     } catch (err) {
-      console.error("Media access denied:", err);
-      setCallState('idle');
-      alert("Microphone/Camera permission is required to make calls.");
-      return;
+      console.warn("Media access failed, trying fallback:", err);
+      if (type === 'video') {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+          setLocalStream(stream);
+          type = 'audio';
+          setIsVideoMuted(true);
+          alert("No camera device found or access denied. Falling back to audio-only call.");
+        } catch (fallbackErr) {
+          console.error("Audio fallback failed:", fallbackErr);
+          setCallState('idle');
+          alert("Microphone permission is required to make calls.");
+          return;
+        }
+      } else {
+        setCallState('idle');
+        alert("Microphone permission is required to make calls.");
+        return;
+      }
     }
 
     const pc = new RTCPeerConnection({
@@ -253,22 +268,37 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   const acceptCall = async () => {
     if (!incomingCall) return;
     setCallState('connecting');
-    setActiveCall(incomingCall);
     setIncomingCall(null);
     setIsVideoMuted(incomingCall.type === 'audio');
 
     let stream: MediaStream;
+    let callType = incomingCall.type;
     try {
       stream = await navigator.mediaDevices.getUserMedia({ 
         audio: true, 
-        video: incomingCall.type === 'video' 
+        video: callType === 'video' 
       });
       setLocalStream(stream);
     } catch (err) {
-      console.error("Local stream fetch failed:", err);
-      await updateDoc(doc(db, 'calls', incomingCall.id), { status: 'declined' });
-      setCallState('idle');
-      return;
+      console.warn("Accept stream fetch failed, trying fallback:", err);
+      if (callType === 'video') {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+          setLocalStream(stream);
+          callType = 'audio';
+          setIsVideoMuted(true);
+          alert("No camera device found or access denied. Falling back to audio-only call.");
+        } catch (fallbackErr) {
+          console.error("Accept audio fallback failed:", fallbackErr);
+          await updateDoc(doc(db, 'calls', incomingCall.id), { status: 'declined' });
+          setCallState('idle');
+          return;
+        }
+      } else {
+        await updateDoc(doc(db, 'calls', incomingCall.id), { status: 'declined' });
+        setCallState('idle');
+        return;
+      }
     }
 
     const pc = new RTCPeerConnection({
@@ -308,6 +338,9 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       sdp: answerDescription.sdp,
       type: answerDescription.type
     };
+
+    const updatedCall = { ...incomingCall, type: callType };
+    setActiveCall(updatedCall);
 
     await updateDoc(doc(db, 'calls', incomingCall.id), {
       status: 'accepted',
