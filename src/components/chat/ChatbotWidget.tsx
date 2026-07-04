@@ -25,8 +25,22 @@ export default function ChatbotWidget() {
   const [newMessage, setNewMessage] = useState('');
   const [activeChatUser, setActiveChatUser] = useState<string | null>(null);
   const [activeChatName, setActiveChatName] = useState<string>('');
-  const [adminChats, setAdminChats] = useState<{uid: string, name: string, unread: number}[]>([]);
+  const [adminChats, setAdminChats] = useState<{uid: string, name: string, unread: number, lastMessage?: string, lastTimestamp?: number}[]>([]);
+  const [isEmojiOpen, setIsEmojiOpen] = useState(false);
+  const emojiRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const POPULAR_EMOJIS = ['😊', '😂', '❤️', '👍', '🔥', '😍', '💻', '🤔', '🎉', '🙌', '🚀', '⚠️', '✅', '❌', '👀', '💡', '💬', '📌', '⚡', '🤝'];
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (emojiRef.current && !emojiRef.current.contains(event.target as Node)) {
+        setIsEmojiOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const isAdminOrSuperAdmin = dbUser?.role === 'super_admin' || dbUser?.role === 'admin';
 
@@ -44,23 +58,32 @@ export default function ChatbotWidget() {
         const msgs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ChatMessage));
         
         // Group by user for the admin list
-        const chatMap = new Map<string, {uid: string, name: string, unread: number}>();
+        const chatMap = new Map<string, {uid: string, name: string, unread: number, lastMessage?: string, lastTimestamp: number}>();
         msgs.forEach(m => {
           const isFromAdmin = m.senderUid === user.uid || m.senderUid === 'admin';
           const otherUid = isFromAdmin ? m.receiverUid : m.senderUid;
           const otherName = isFromAdmin ? 'User' : m.senderName; // simplified
           
           if (otherUid && otherUid !== 'admin') {
-            const existing = chatMap.get(otherUid) || { uid: otherUid, name: otherName, unread: 0 };
+            const existing = chatMap.get(otherUid) || { uid: otherUid, name: otherName, unread: 0, lastMessage: '', lastTimestamp: 0 };
             if (!m.readStatus && m.receiverUid === 'admin') {
               existing.unread += 1;
             }
             if (!isFromAdmin) existing.name = m.senderName; // keep latest name
+            
+            const msgTime = m.timestamp?.seconds || m.timestamp?.toMillis?.() || 0;
+            if (msgTime > existing.lastTimestamp) {
+              existing.lastTimestamp = msgTime;
+              existing.lastMessage = m.text;
+            }
+            
             chatMap.set(otherUid, existing);
           }
         });
         
-        setAdminChats(Array.from(chatMap.values()));
+        // Sort descending by lastTimestamp
+        const sortedChats = Array.from(chatMap.values()).sort((a, b) => b.lastTimestamp - a.lastTimestamp);
+        setAdminChats(sortedChats);
         setMessages(msgs);
       });
       return () => unsubscribe();
@@ -209,7 +232,9 @@ export default function ChatbotWidget() {
                           </div>
                           <div>
                             <p className="text-white font-medium text-sm">{c.name}</p>
-                            <p className="text-gray-400 text-xs">Tap to reply</p>
+                            <p className="text-gray-400 text-xs truncate max-w-[180px]">
+                              {c.lastMessage || 'Tap to reply'}
+                            </p>
                           </div>
                         </div>
                         {c.unread > 0 && (
@@ -253,22 +278,62 @@ export default function ChatbotWidget() {
 
             {/* Footer Input */}
             {(!isAdminOrSuperAdmin || (isAdminOrSuperAdmin && activeChatUser)) && (
-              <form onSubmit={handleSendMessage} className="p-3 bg-gray-900 border-t border-glass-border flex gap-2">
-                <input
-                  type="text"
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                  placeholder="Type a message..."
-                  className="flex-1 bg-gray-950 border border-gray-800 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-brand-green transition-colors"
-                />
-                <button
-                  type="submit"
-                  disabled={!newMessage.trim()}
-                  className="bg-brand-green hover:bg-brand-green-hover disabled:opacity-50 disabled:cursor-not-allowed text-black p-2 rounded-xl transition-colors glow-green flex items-center justify-center w-10 h-10"
-                >
-                  <Send className="w-4 h-4" />
-                </button>
-              </form>
+              <div className="relative">
+                {/* Emoji Picker Popover */}
+                <AnimatePresence>
+                  {isEmojiOpen && (
+                    <motion.div
+                      ref={emojiRef}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 10 }}
+                      className="absolute bottom-full right-3 mb-2 bg-gray-950 border border-glass-border p-2.5 rounded-xl shadow-[0_-5px_30px_rgba(0,0,0,0.5)] z-50 w-56 flex flex-wrap gap-1.5 justify-center max-h-[140px] overflow-y-auto"
+                    >
+                      {POPULAR_EMOJIS.map(emoji => (
+                        <button
+                          key={emoji}
+                          type="button"
+                          onClick={() => {
+                            setNewMessage(prev => prev + emoji);
+                            setIsEmojiOpen(false);
+                          }}
+                          className="hover:bg-gray-800 p-1.5 rounded text-sm transition-colors duration-150"
+                        >
+                          {emoji}
+                        </button>
+                      ))}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                <form onSubmit={handleSendMessage} className="p-3 bg-gray-900 border-t border-glass-border flex gap-2 items-center">
+                  <input
+                    type="text"
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    placeholder="Type a message..."
+                    className="flex-1 bg-gray-950 border border-gray-800 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-brand-green transition-colors"
+                  />
+                  
+                  {/* Emoji Trigger Button */}
+                  <button
+                    type="button"
+                    onClick={() => setIsEmojiOpen(!isEmojiOpen)}
+                    className={`p-2 rounded-xl border transition-all text-xs flex items-center justify-center w-10 h-10 shrink-0 ${isEmojiOpen ? 'bg-purple-500/20 border-purple-500 text-purple-400' : 'bg-gray-950 border-gray-800 text-gray-400 hover:text-white'}`}
+                    title="Insert Emoji"
+                  >
+                    😊
+                  </button>
+
+                  <button
+                    type="submit"
+                    disabled={!newMessage.trim()}
+                    className="bg-brand-green hover:bg-brand-green-hover disabled:opacity-50 disabled:cursor-not-allowed text-black p-2 rounded-xl transition-colors glow-green flex items-center justify-center w-10 h-10 shrink-0"
+                  >
+                    <Send className="w-4 h-4" />
+                  </button>
+                </form>
+              </div>
             )}
           </motion.div>
         )}
