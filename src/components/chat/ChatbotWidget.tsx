@@ -27,7 +27,8 @@ export default function ChatbotWidget() {
   const [newMessage, setNewMessage] = useState('');
   const [activeChatUser, setActiveChatUser] = useState<string | null>(null);
   const [activeChatName, setActiveChatName] = useState<string>('');
-  const [adminChats, setAdminChats] = useState<{uid: string, name: string, unread: number, lastMessage?: string, lastTimestamp?: number}[]>([]);
+  const [chatList, setChatList] = useState<{uid: string, name: string, unread: number, lastMessage?: string, lastTimestamp?: number}[]>([]);
+  const [allUsers, setAllUsers] = useState<any[]>([]);
   const [isEmojiOpen, setIsEmojiOpen] = useState(false);
   const emojiRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -47,73 +48,114 @@ export default function ChatbotWidget() {
   const isAdminOrSuperAdmin = dbUser?.role === 'super_admin' || dbUser?.role === 'admin';
 
   useEffect(() => {
+    if (isOpen && allUsers.length === 0) {
+      fetch('/api/users')
+        .then(res => res.json())
+        .then(data => {
+          if (data.users) setAllUsers(data.users);
+        })
+        .catch(console.error);
+    }
+  }, [isOpen, allUsers.length]);
+
+  useEffect(() => {
     if (!user) return;
 
+    let q;
     if (isAdminOrSuperAdmin) {
-      // Admin: Listen to all messages (orderBy uses default timestamp index)
-      const q = query(
+      // Admin: Listen to all messages
+      q = query(
         collection(db, 'chats'),
         orderBy('timestamp', 'asc')
       );
-      
-      const unsubscribe = onSnapshot(q, (snapshot) => {
-        const msgs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ChatMessage));
-        
-        // Group by user for the admin list
-        const chatMap = new Map<string, {uid: string, name: string, unread: number, lastMessage?: string, lastTimestamp: number}>();
-        msgs.forEach(m => {
-          const isFromAdmin = m.senderUid === user.uid || m.senderUid === 'admin';
-          const otherUid = isFromAdmin ? m.receiverUid : m.senderUid;
-          const otherName = isFromAdmin ? 'User' : m.senderName; // simplified
-          
-          if (otherUid && otherUid !== 'admin') {
-            const existing = chatMap.get(otherUid) || { uid: otherUid, name: otherName, unread: 0, lastMessage: '', lastTimestamp: 0 };
-            if (!m.readStatus && m.receiverUid === 'admin') {
-              existing.unread += 1;
-            }
-            if (!isFromAdmin) existing.name = m.senderName; // keep latest name
-            
-            const msgTime = m.timestamp?.seconds || m.timestamp?.toMillis?.() || 0;
-            if (msgTime > existing.lastTimestamp) {
-              existing.lastTimestamp = msgTime;
-              existing.lastMessage = m.text;
-            }
-            
-            chatMap.set(otherUid, existing);
-          }
-        });
-        
-        // Sort descending by lastTimestamp
-        const sortedChats = Array.from(chatMap.values()).sort((a, b) => b.lastTimestamp - a.lastTimestamp);
-        setAdminChats(sortedChats);
-        setMessages(msgs);
-      });
-      return () => unsubscribe();
     } else {
-      // Regular User: Use 'or' query without orderBy to avoid composite index requirement
-      const q = query(
+      // Regular User: Listen to their messages and support messages
+      q = query(
         collection(db, 'chats'),
         or(
           where('senderUid', '==', user.uid),
           where('receiverUid', '==', user.uid)
         )
       );
+    }
+    
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      let msgs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ChatMessage));
       
-      const unsubscribe = onSnapshot(q, (snapshot) => {
-        let msgs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ChatMessage));
-        
-        // Sort manually client-side
+      if (!isAdminOrSuperAdmin) {
         msgs.sort((a, b) => {
           const timeA = a.timestamp?.seconds || 0;
           const timeB = b.timestamp?.seconds || 0;
           return timeA - timeB;
         });
-
-        setMessages(msgs);
-      });
-      return () => unsubscribe();
-    }
+      }
+      setMessages(msgs);
+    });
+    
+    return () => unsubscribe();
   }, [user, isAdminOrSuperAdmin]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const listMap = new Map<string, {uid: string, name: string, unread: number, lastMessage?: string, lastTimestamp: number}>();
+    
+    // Add Support Team for everyone
+    listMap.set('admin', { uid: 'admin', name: 'Support Team', unread: 0, lastMessage: '', lastTimestamp: 0 });
+
+    // Add all fetched users
+    allUsers.forEach(u => {
+      if (u.firebaseUid === user.uid) return;
+      listMap.set(u.firebaseUid, { 
+        uid: u.firebaseUid, 
+        name: u.name || u.email || 'User', 
+        unread: 0, 
+        lastMessage: '', 
+        lastTimestamp: 0 
+      });
+    });
+
+    // Update with message history
+    messages.forEach(m => {
+      const myId = isAdminOrSuperAdmin ? 'admin' : user.uid;
+      const amISender = m.senderUid === myId || m.senderUid === user.uid;
+      const amIReceiver = m.receiverUid === myId || m.receiverUid === user.uid;
+      
+      if (!amISender && !amIReceiver) return;
+      
+      let otherId = amISender ? m.receiverUid : m.senderUid;
+      if (otherId === user.uid) otherId = 'admin'; // Fallback for self
+      
+      if (!listMap.has(otherId)) {
+        listMap.set(otherId, { uid: otherId, name: m.senderName || 'User', unread: 0, lastMessage: '', lastTimestamp: 0 });
+      }
+      
+      const existing = listMap.get(otherId)!;
+      
+      // Calculate unread
+      if (!m.readStatus && amIReceiver && m.senderUid !== user.uid) {
+        existing.unread += 1;
+      }
+      
+      if (!amISender && m.senderName) {
+        existing.name = m.senderName;
+      }
+      
+      const msgTime = m.timestamp?.seconds || m.timestamp?.toMillis?.() || 0;
+      if (msgTime > existing.lastTimestamp) {
+        existing.lastTimestamp = msgTime;
+        existing.lastMessage = m.text;
+      }
+    });
+
+    // For admin, hide 'admin' from list
+    if (isAdminOrSuperAdmin) {
+      listMap.delete('admin');
+    }
+
+    const sortedChats = Array.from(listMap.values()).sort((a, b) => b.lastTimestamp - a.lastTimestamp);
+    setChatList(sortedChats);
+  }, [messages, allUsers, user, isAdminOrSuperAdmin]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -123,15 +165,13 @@ export default function ChatbotWidget() {
   useEffect(() => {
     if (!user || !isOpen) return;
 
-    if (isAdminOrSuperAdmin && !activeChatUser) return;
+    if (!activeChatUser) return;
 
     const msgsToUpdate = messages.filter(m => {
       if (m.readStatus) return false;
-      if (isAdminOrSuperAdmin) {
-        return m.receiverUid === 'admin' && m.senderUid === activeChatUser;
-      } else {
-        return m.receiverUid === user.uid;
-      }
+      const amIReceiver = isAdminOrSuperAdmin ? (m.receiverUid === 'admin' || m.receiverUid === user.uid) : m.receiverUid === user.uid;
+      const isFromActive = m.senderUid === activeChatUser;
+      return amIReceiver && isFromActive;
     });
 
     if (msgsToUpdate.length > 0) {
@@ -155,16 +195,13 @@ export default function ChatbotWidget() {
     const msgText = newMessage.trim();
     setNewMessage('');
 
-    let receiver = 'admin';
-    if (isAdminOrSuperAdmin) {
-      if (!activeChatUser) return; // Admin must select a user
-      receiver = activeChatUser;
-    }
+    if (!activeChatUser) return;
+    let receiver = activeChatUser;
 
     try {
       await addDoc(collection(db, 'chats'), {
-        senderUid: isAdminOrSuperAdmin ? 'admin' : user.uid, // Admin sends as 'admin' 
-        senderName: isAdminOrSuperAdmin ? 'Support Team' : (dbUser?.name || user.email || 'User'),
+        senderUid: (isAdminOrSuperAdmin && receiver !== 'admin') ? 'admin' : user.uid, 
+        senderName: (isAdminOrSuperAdmin && receiver !== 'admin') ? 'Support Team' : (dbUser?.name || user.email || 'User'),
         receiverUid: receiver,
         text: msgText,
         timestamp: serverTimestamp(),
@@ -178,13 +215,18 @@ export default function ChatbotWidget() {
   if (!user) return null;
 
   // Filter messages for the current view
-  const displayMessages = isAdminOrSuperAdmin && activeChatUser
-    ? messages.filter(m => m.senderUid === activeChatUser || m.receiverUid === activeChatUser)
-    : messages;
+  const displayMessages = activeChatUser
+    ? messages.filter(m => {
+        const myId = isAdminOrSuperAdmin ? 'admin' : user.uid;
+        const amISender = m.senderUid === myId || m.senderUid === user.uid;
+        const amIReceiver = m.receiverUid === myId || m.receiverUid === user.uid;
+        const isOtherSender = m.senderUid === activeChatUser;
+        const isOtherReceiver = m.receiverUid === activeChatUser;
+        return (amISender && isOtherReceiver) || (amIReceiver && isOtherSender);
+      })
+    : [];
 
-  const totalUnread = isAdminOrSuperAdmin 
-    ? adminChats.reduce((acc, c) => acc + c.unread, 0)
-    : messages.filter(m => m.receiverUid === user.uid && !m.readStatus).length;
+  const totalUnread = chatList.reduce((acc, c) => acc + c.unread, 0);
 
   return (
     <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end">
@@ -199,24 +241,22 @@ export default function ChatbotWidget() {
             {/* Header */}
             <div className="bg-brand-green p-4 flex items-center justify-between text-black shadow-md">
               <div className="flex items-center gap-2 overflow-hidden flex-1">
-                {isAdminOrSuperAdmin && activeChatUser && (
+                {activeChatUser && (
                   <button onClick={() => setActiveChatUser(null)} className="p-1 hover:bg-brand-green rounded transition-colors shrink-0">
                     <ChevronLeft className="w-5 h-5" />
                   </button>
                 )}
                 <MessageCircle className="w-5 h-5 shrink-0" />
                 <span className="font-bold truncate">
-                  {isAdminOrSuperAdmin ? (activeChatUser ? activeChatName : 'Active Chats') : 'Support Chat'}
+                  {activeChatUser ? activeChatName : 'Directory'}
                 </span>
               </div>
               <div className="flex items-center gap-1.5 shrink-0">
-                {(!isAdminOrSuperAdmin || (isAdminOrSuperAdmin && activeChatUser)) && (
+                {activeChatUser && (
                   <>
                     <button
                       onClick={() => {
-                        const targetUid = isAdminOrSuperAdmin ? activeChatUser! : 'admin';
-                        const targetName = isAdminOrSuperAdmin ? activeChatName : 'Support Team';
-                        startCall(targetUid, targetName, 'audio');
+                        startCall(activeChatUser, activeChatName, 'audio');
                       }}
                       className="p-1 hover:bg-brand-green-hover rounded transition-all hover:scale-105 text-black"
                       title="Audio Call"
@@ -225,9 +265,7 @@ export default function ChatbotWidget() {
                     </button>
                     <button
                       onClick={() => {
-                        const targetUid = isAdminOrSuperAdmin ? activeChatUser! : 'admin';
-                        const targetName = isAdminOrSuperAdmin ? activeChatName : 'Support Team';
-                        startCall(targetUid, targetName, 'video');
+                        startCall(activeChatUser, activeChatName, 'video');
                       }}
                       className="p-1 hover:bg-brand-green-hover rounded transition-all hover:scale-105 text-black"
                       title="Video Call"
@@ -244,13 +282,13 @@ export default function ChatbotWidget() {
 
             {/* Body */}
             <div className="flex-1 overflow-y-auto bg-gray-950/50 p-4 flex flex-col gap-3">
-              {isAdminOrSuperAdmin && !activeChatUser ? (
-                // Admin User List
+              {!activeChatUser ? (
+                // User Directory
                 <div className="flex flex-col gap-2">
-                  {adminChats.length === 0 ? (
-                    <p className="text-gray-500 text-center text-sm mt-10">No active chats.</p>
+                  {chatList.length === 0 ? (
+                    <p className="text-gray-500 text-center text-sm mt-10">No users found.</p>
                   ) : (
-                    adminChats.map(c => (
+                    chatList.map(c => (
                       <button 
                         key={c.uid}
                         onClick={() => { setActiveChatUser(c.uid); setActiveChatName(c.name); }}
@@ -281,11 +319,12 @@ export default function ChatbotWidget() {
                 <>
                   {displayMessages.length === 0 && (
                     <div className="text-center text-gray-500 text-sm mt-10">
-                      {isAdminOrSuperAdmin ? 'No messages yet.' : 'Send a message to our support team!'}
+                      No messages yet.
                     </div>
                   )}
                   {displayMessages.map((msg, i) => {
-                    const isMe = isAdminOrSuperAdmin ? msg.senderUid === 'admin' : msg.senderUid === user.uid;
+                    const myId = isAdminOrSuperAdmin ? 'admin' : user.uid;
+                    const isMe = msg.senderUid === myId || msg.senderUid === user.uid;
                     return (
                       <div key={msg.id || i} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
                         <div className={`max-w-[80%] rounded-2xl px-4 py-2 ${
@@ -307,7 +346,7 @@ export default function ChatbotWidget() {
             </div>
 
             {/* Footer Input */}
-            {(!isAdminOrSuperAdmin || (isAdminOrSuperAdmin && activeChatUser)) && (
+            {activeChatUser && (
               <div className="relative">
                 {/* Emoji Picker Popover */}
                 <AnimatePresence>
