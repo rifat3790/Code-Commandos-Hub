@@ -33,6 +33,7 @@ import GlobalPendingModal from './GlobalPendingModal';
 import ChatbotWidget from './chat/ChatbotWidget';
 import CommandMenu from './CommandMenu';
 import FocusTimer from './FocusTimer';
+import NotificationBell from './NotificationBell';
 
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -188,14 +189,16 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
                 <span className="font-bold text-sm tracking-wider text-white hidden sm:inline-block">CODE COMMANDOS HUB</span>
               </Link>
             </div>
-            <div className="flex items-center">
+            <div className="flex items-center gap-2">
+              <NotificationBell />
               <FocusTimer />
             </div>
           </header>
 
           {/* Main page content scroll viewport */}
           <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 relative bg-radial-[circle_at_top_right,rgba(16,185,129,0.03),transparent_40%]">
-            <div className="hidden md:flex absolute top-6 right-8 z-50">
+            <div className="hidden md:flex absolute top-6 right-8 z-50 items-center gap-4">
+              <NotificationBell />
               <FocusTimer />
             </div>
             <ProtectedMainContent>{children}</ProtectedMainContent>

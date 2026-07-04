@@ -96,6 +96,17 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     };
   }, [callState]);
 
+  // 2.5 Caller auto-timeout
+  useEffect(() => {
+    let timeoutId: any;
+    if (callState === 'calling') {
+      timeoutId = setTimeout(() => {
+        endCall();
+      }, 45000);
+    }
+    return () => clearTimeout(timeoutId);
+  }, [callState, activeCall]);
+
   // 3. Track remote video presence (vital for screen share auto-switch)
   useEffect(() => {
     if (remoteStream) {
@@ -391,6 +402,22 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     if (targetCall) {
       try {
         await updateDoc(doc(db, 'calls', targetCall.id), { status: 'ended' });
+
+        const myUid = isAdminOrSuperAdmin ? 'admin' : user?.uid;
+        if (callState === 'calling' && targetCall.callerUid === myUid) {
+          await addDoc(collection(db, 'notifications'), {
+            userId: targetCall.receiverUid,
+            title: 'Missed Call',
+            message: `You missed a call from ${targetCall.callerName}`,
+            type: 'missed_call',
+            read: false,
+            createdAt: new Date().getTime(),
+            actionData: {
+              callerUid: targetCall.callerUid,
+              callerName: targetCall.callerName,
+            }
+          });
+        }
       } catch (err) {
         console.error(err);
       }
