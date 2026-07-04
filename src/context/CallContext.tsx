@@ -148,6 +148,10 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
 
   const startCall = async (receiverUid: string, receiverName: string, type: 'audio' | 'video') => {
     if (!user) return;
+    if (dbUser && dbUser.callingAllowed === false) {
+      alert("Your calling and screen sharing permissions have been disabled by an administrator.");
+      return;
+    }
     setCallState('calling');
     setIsVideoMuted(type === 'audio');
 
@@ -433,6 +437,10 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
 
   const toggleScreenShare = async () => {
     if (!peerConnectionRef.current) return;
+    if (dbUser && dbUser.callingAllowed === false) {
+      alert("Your calling and screen sharing permissions have been disabled by an administrator.");
+      return;
+    }
 
     if (!isScreenSharing) {
       try {
@@ -604,21 +612,40 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
               </div>
             </div>
 
-            <div className="flex gap-3 mt-2 w-full">
+            <div className="flex gap-2 mt-2 w-full justify-between items-center">
               {callState === 'connected' && (
-                <button
-                  onClick={toggleMute}
-                  className={`p-2.5 rounded-xl border transition-all text-xs flex items-center justify-center flex-1 gap-1.5 ${isMuted ? 'bg-red-500/10 border-red-500 text-red-400' : 'bg-gray-900 border-gray-800 text-gray-400 hover:text-white'}`}
-                >
-                  {isMuted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-                  <span>{isMuted ? 'Muted' : 'Mute'}</span>
-                </button>
+                <>
+                  <button
+                    onClick={toggleMute}
+                    className={`p-2.5 rounded-xl border transition-all text-xs flex items-center justify-center flex-1 ${isMuted ? 'bg-red-500/10 border-red-500 text-red-400' : 'bg-gray-900 border-gray-800 text-gray-400 hover:text-white'}`}
+                    title={isMuted ? "Unmute Mic" : "Mute Mic"}
+                  >
+                    {isMuted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                  </button>
+
+                  <button
+                    onClick={toggleVideo}
+                    className="p-2.5 rounded-xl border border-gray-800 bg-gray-900 text-gray-400 hover:text-white hover:bg-gray-800 transition-all flex items-center justify-center flex-1"
+                    title="Enable Video Camera"
+                  >
+                    <Video className="w-4 h-4" />
+                  </button>
+
+                  <button
+                    onClick={toggleScreenShare}
+                    className="p-2.5 rounded-xl border border-gray-800 bg-gray-900 text-gray-400 hover:text-white hover:bg-gray-800 transition-all flex items-center justify-center flex-1"
+                    title="Share Screen"
+                  >
+                    <ScreenShare className="w-4 h-4" />
+                  </button>
+                </>
               )}
               <button
                 onClick={endCall}
-                className="p-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-xs transition-all flex items-center justify-center flex-1 gap-1.5"
+                className="p-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-xs transition-all flex items-center justify-center flex-1"
+                title="Hang Up"
               >
-                <PhoneOff className="w-4 h-4" /> Hang Up
+                <PhoneOff className="w-4 h-4" />
               </button>
             </div>
           </motion.div>

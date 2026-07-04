@@ -14,22 +14,32 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const { promoterUid, targetUserId, newRole } = await req.json();
+    const { promoterUid, targetUserId, newRole, callingAllowed } = await req.json();
 
-    if (!promoterUid || !targetUserId || !newRole) {
+    if (!promoterUid || !targetUserId) {
       return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });
     }
 
     await connectToDatabase();
     
-    // Only super_admin can promote to admin
     const promoter = await User.findOne({ firebaseUid: promoterUid });
-    if (promoter?.role !== 'super_admin') {
-      return NextResponse.json({ error: 'Only super_admin can change roles' }, { status: 403 });
+    if (!promoter || (promoter.role !== 'super_admin' && promoter.role !== 'admin')) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
-    await User.findByIdAndUpdate(targetUserId, { role: newRole });
-    return NextResponse.json({ success: true, message: 'Role updated' }, { status: 200 });
+    const updateObj: any = {};
+    if (newRole) {
+      if (promoter.role !== 'super_admin') {
+        return NextResponse.json({ error: 'Only super_admin can change roles' }, { status: 403 });
+      }
+      updateObj.role = newRole;
+    }
+    if (callingAllowed !== undefined) {
+      updateObj.callingAllowed = callingAllowed;
+    }
+
+    await User.findByIdAndUpdate(targetUserId, updateObj);
+    return NextResponse.json({ success: true, message: 'User settings updated' }, { status: 200 });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

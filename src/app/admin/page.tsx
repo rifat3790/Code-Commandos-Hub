@@ -152,6 +152,15 @@ export default function AdminDashboard() {
     fetchUsers();
   };
 
+  const handleToggleCallingPermission = async (userId: string, currentAllowed: boolean) => {
+    await fetch('/api/users/roles', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ promoterUid: user?.uid, targetUserId: userId, callingAllowed: !currentAllowed })
+    });
+    fetchUsers();
+  };
+
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newUserEmail || !newUserPass) return;
@@ -380,6 +389,16 @@ export default function AdminDashboard() {
                   <p className="text-xs text-gray-400 mt-1">Role: <span className="text-green-400 font-bold uppercase">{u.role}</span></p>
                   {u.name && <p className="text-xs text-gray-500">Name: {u.name}</p>}
                   {u.teamName && <p className="text-xs text-gray-500">Team: {u.teamName}</p>}
+                  
+                  <div className="flex items-center justify-between text-xs text-gray-500 mt-2 pt-2 border-t border-white/5">
+                    <span>Call/Share Screen:</span>
+                    <button
+                      onClick={() => handleToggleCallingPermission(u._id, u.callingAllowed !== false)}
+                      className={`px-2 py-0.5 rounded font-extrabold uppercase text-[9px] border transition-colors ${u.callingAllowed !== false ? 'bg-green-500/10 border-green-500/20 text-green-400 hover:bg-green-500/20' : 'bg-red-500/10 border-red-500/20 text-red-400 hover:bg-red-500/20'}`}
+                    >
+                      {u.callingAllowed !== false ? 'Allowed' : 'Blocked'}
+                    </button>
+                  </div>
                 </div>
                 {u.role !== 'super_admin' && (
                   <div className="flex gap-2 flex-wrap">

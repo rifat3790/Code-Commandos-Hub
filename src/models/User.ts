@@ -9,6 +9,7 @@ export interface IUser extends Document {
   photoURL?: string;
   skills?: string[];
   role: 'super_admin' | 'admin' | 'user' | 'banned';
+  callingAllowed?: boolean;
   trackerFilters?: any;
   issuesFilters?: any;
   calculatorSettings?: {
@@ -32,6 +33,7 @@ const UserSchema: Schema = new Schema({
   photoURL: { type: String },
   skills: { type: [String], default: [] },
   role: { type: String, enum: ['super_admin', 'admin', 'user', 'banned'], default: 'user' },
+  callingAllowed: { type: Boolean, default: true },
   trackerFilters: { type: Object },
   issuesFilters: { type: Object },
   calculatorSettings: {
