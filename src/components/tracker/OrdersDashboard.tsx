@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import toast from 'react-hot-toast';
 import { toPng } from 'html-to-image';
+import { jsPDF } from 'jspdf';
 
 function parseTimeline(timelineStr: string): number | null {
   if (!timelineStr) return null;
@@ -357,6 +358,43 @@ export default function OrdersDashboard({ csvData }: { csvData: string }) {
     }
   };
 
+  const handleDownloadPDF = async () => {
+    if (tableRef.current) {
+      const toastId = toast.loading("Generating PDF...");
+      try {
+        const width = tableRef.current.scrollWidth;
+        const height = tableRef.current.scrollHeight;
+        
+        const dataUrl = await toPng(tableRef.current, { 
+          backgroundColor: '#111827',
+          width,
+          height,
+          style: {
+            width: `${width}px`,
+            height: `${height}px`,
+            transform: 'none'
+          }
+        });
+        
+        const pdf = new jsPDF({
+          orientation: width > height ? 'landscape' : 'portrait',
+          unit: 'px',
+          format: [width, height]
+        });
+        
+        pdf.addImage(dataUrl, 'PNG', 0, 0, width, height);
+        pdf.save('orders-tracker.pdf');
+        
+        toast.dismiss(toastId);
+        toast.success("Downloaded as PDF");
+      } catch (err) {
+        console.error(err);
+        toast.dismiss(toastId);
+        toast.error("Failed to download PDF");
+      }
+    }
+  };
+
   // Extract unique filter options dynamically from data
   const filterOptions = useMemo(() => {
     const serviceLines = new Set<string>();
@@ -620,6 +658,13 @@ export default function OrdersDashboard({ csvData }: { csvData: string }) {
           >
             <Download className="w-4 h-4" />
             Download PNG
+          </button>
+          <button 
+            onClick={handleDownloadPDF} 
+            className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-sm font-semibold transition-colors border border-purple-500/50 glow-purple"
+          >
+            <Download className="w-4 h-4" />
+            Download PDF
           </button>
           <button 
             onClick={handleSaveFilters} 

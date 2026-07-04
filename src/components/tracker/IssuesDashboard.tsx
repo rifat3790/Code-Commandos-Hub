@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import toast from 'react-hot-toast';
 import { toPng } from 'html-to-image';
+import { jsPDF } from 'jspdf';
 
 function MultiSelectDropdown({ 
   label, 
@@ -325,6 +326,43 @@ export default function IssuesDashboard({ csvData }: { csvData: string }) {
     }
   };
 
+  const handleDownloadPDF = async () => {
+    if (tableRef.current) {
+      const toastId = toast.loading("Generating PDF...");
+      try {
+        const width = tableRef.current.scrollWidth;
+        const height = tableRef.current.scrollHeight;
+        
+        const dataUrl = await toPng(tableRef.current, { 
+          backgroundColor: '#111827',
+          width,
+          height,
+          style: {
+            width: `${width}px`,
+            height: `${height}px`,
+            transform: 'none'
+          }
+        });
+        
+        const pdf = new jsPDF({
+          orientation: width > height ? 'landscape' : 'portrait',
+          unit: 'px',
+          format: [width, height]
+        });
+        
+        pdf.addImage(dataUrl, 'PNG', 0, 0, width, height);
+        pdf.save('project-issues.pdf');
+        
+        toast.dismiss(toastId);
+        toast.success("Downloaded as PDF");
+      } catch (err) {
+        console.error(err);
+        toast.dismiss(toastId);
+        toast.error("Failed to download PDF");
+      }
+    }
+  };
+
   const getStatusColor = (status: string) => {
     const s = (status || "").toLowerCase();
     if (s.includes('open')) return 'bg-green-500/20 text-green-400 border-green-500/30';
@@ -426,6 +464,13 @@ export default function IssuesDashboard({ csvData }: { csvData: string }) {
           >
             <Download className="w-4 h-4" />
             Download PNG
+          </button>
+          <button 
+            onClick={handleDownloadPDF} 
+            className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-xl text-sm font-semibold transition-colors border border-red-500/50 glow-red"
+          >
+            <Download className="w-4 h-4" />
+            Download PDF
           </button>
           <button 
             onClick={handleSaveFilters} 
