@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Sidebar from './Sidebar';
 import { Menu, Terminal, ShieldAlert } from 'lucide-react';
 import Link from 'next/link';
+import { CallProvider } from '@/context/CallContext';
 
 // Intercept hydration warnings in development to prevent browser-extension-induced overlay crashes
 if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
@@ -162,8 +163,9 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   return (
     <AuthProvider>
       <ThemeProvider>
-        <HeartbeatTrigger />
-        <div className="flex flex-col md:flex-row h-screen w-screen overflow-hidden bg-[#030712]">
+        <CallProvider>
+          <HeartbeatTrigger />
+          <div className="flex flex-col md:flex-row h-screen w-screen overflow-hidden bg-[#030712]">
         {/* Sidebar - responsive built-in mobile/desktop */}
         <Sidebar isMobileOpen={isMobileOpen} onCloseMobile={() => setIsMobileOpen(false)} />
         
@@ -205,6 +207,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
         <CommandMenu />
         <GlobalPendingModal />
         <ChatbotWidget />
+        </CallProvider>
       </ThemeProvider>
     </AuthProvider>
   );

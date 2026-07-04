@@ -4,9 +4,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { db } from '@/lib/firebase';
 import { collection, query, where, or, onSnapshot, addDoc, orderBy, serverTimestamp, getDocs, doc, updateDoc } from 'firebase/firestore';
-import { MessageCircle, X, Send, User, ChevronLeft } from 'lucide-react';
+import { MessageCircle, X, Send, User, ChevronLeft, Phone } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useWorkspaceStore } from '@/store/workspaceStore';
+import { useCall } from '@/context/CallContext';
 
 interface ChatMessage {
   id: string;
@@ -20,6 +21,7 @@ interface ChatMessage {
 
 export default function ChatbotWidget() {
   const { user, dbUser } = useAuth();
+  const { startCall } = useCall();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
@@ -196,20 +198,35 @@ export default function ChatbotWidget() {
           >
             {/* Header */}
             <div className="bg-brand-green p-4 flex items-center justify-between text-black shadow-md">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 overflow-hidden flex-1">
                 {isAdminOrSuperAdmin && activeChatUser && (
-                  <button onClick={() => setActiveChatUser(null)} className="p-1 hover:bg-brand-green rounded transition-colors">
+                  <button onClick={() => setActiveChatUser(null)} className="p-1 hover:bg-brand-green rounded transition-colors shrink-0">
                     <ChevronLeft className="w-5 h-5" />
                   </button>
                 )}
-                <MessageCircle className="w-5 h-5" />
-                <span className="font-bold">
+                <MessageCircle className="w-5 h-5 shrink-0" />
+                <span className="font-bold truncate">
                   {isAdminOrSuperAdmin ? (activeChatUser ? activeChatName : 'Active Chats') : 'Support Chat'}
                 </span>
               </div>
-              <button onClick={() => setIsOpen(false)} className="text-black/80 hover:text-black hover:bg-brand-green p-1 rounded transition-colors">
-                <X className="w-5 h-5" />
-              </button>
+              <div className="flex items-center gap-2 shrink-0">
+                {(!isAdminOrSuperAdmin || (isAdminOrSuperAdmin && activeChatUser)) && (
+                  <button
+                    onClick={() => {
+                      const targetUid = isAdminOrSuperAdmin ? activeChatUser! : 'admin';
+                      const targetName = isAdminOrSuperAdmin ? activeChatName : 'Support Team';
+                      startCall(targetUid, targetName);
+                    }}
+                    className="p-1 hover:bg-brand-green-hover rounded transition-all hover:scale-105 text-black"
+                    title="Audio Call"
+                  >
+                    <Phone className="w-5 h-5" />
+                  </button>
+                )}
+                <button onClick={() => setIsOpen(false)} className="text-black/80 hover:text-black hover:bg-brand-green p-1 rounded transition-colors">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
             {/* Body */}

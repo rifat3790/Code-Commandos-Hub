@@ -2,12 +2,14 @@
 
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { ShieldAlert, Check, X, Database } from 'lucide-react';
+import { ShieldAlert, Check, X, Database, Phone } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useWorkspaceStore } from '@/store/workspaceStore';
+import { useCall } from '@/context/CallContext';
 
 export default function AdminDashboard() {
   const { user, dbUser, loading } = useAuth();
+  const { startCall } = useCall();
   const router = useRouter();
   
   const [activeTab, setActiveTab] = useState<'pending' | 'shopify' | 'users' | 'menus' | 'storage' | 'active-users'>('pending');
@@ -579,13 +581,22 @@ export default function AdminDashboard() {
                         (u.name || u.email).split(' ').map((n: string) => n[0]).join('').substring(0,2).toUpperCase()
                       )}
                     </div>
-                    <div className="overflow-hidden">
+                    <div className="overflow-hidden flex-1">
                       <p className="text-sm font-semibold text-white truncate">{u.name || u.email.split('@')[0]}</p>
                       <p className="text-xs text-gray-500 truncate">{u.email}</p>
                       <span className="inline-block mt-1 text-[9px] font-bold uppercase tracking-wider text-green-400 bg-green-500/10 px-2 py-0.5 rounded">
                         {u.role}
                       </span>
                     </div>
+                    {u.firebaseUid !== user?.uid && (
+                      <button
+                        onClick={() => startCall(u.firebaseUid, u.name || u.email.split('@')[0])}
+                        className="p-2 bg-purple-500/10 border border-purple-500/20 text-purple-400 hover:bg-purple-500/30 rounded-xl transition-all hover:scale-105 shrink-0"
+                        title="Audio Call"
+                      >
+                        <Phone className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
