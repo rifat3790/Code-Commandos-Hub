@@ -10,7 +10,9 @@ export default function AdminDashboard() {
   const { user, dbUser, loading } = useAuth();
   const router = useRouter();
   
-  const [activeTab, setActiveTab] = useState<'pending' | 'shopify' | 'users' | 'menus' | 'storage'>('pending');
+  const [activeTab, setActiveTab] = useState<'pending' | 'shopify' | 'users' | 'menus' | 'storage' | 'active-users'>('pending');
+  const [activeVisitors, setActiveVisitors] = useState<{count: number, list: any[]}>({ count: 0, list: [] });
+  const [loadingActive, setLoadingActive] = useState(false);
   const [pendingChanges, setPendingChanges] = useState<any[]>([]);
   const [pendingShopify, setPendingShopify] = useState<any[]>([]);
   const [storageStats, setStorageStats] = useState<any>(null);
@@ -90,6 +92,30 @@ export default function AdminDashboard() {
       fetchStorageStats();
     }
   }, [activeTab]);
+
+  const fetchActiveVisitors = async () => {
+    if (!user) return;
+    setLoadingActive(true);
+    try {
+      const res = await fetch(`/api/users/active?uid=${user.uid}`);
+      if (res.ok) {
+        const data = await res.json();
+        setActiveVisitors({ count: data.count, list: data.activeUsers || [] });
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingActive(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'active-users') {
+      fetchActiveVisitors();
+      const interval = setInterval(fetchActiveVisitors, 10000);
+      return () => clearInterval(interval);
+    }
+  }, [activeTab, user]);
 
   const fetchUsers = async () => {
     const res = await fetch('/api/users/roles');
@@ -217,6 +243,12 @@ export default function AdminDashboard() {
           className={`px-5 py-3 text-xs uppercase font-extrabold ${activeTab === 'shopify' ? 'text-green-400 border-b-2 border-green-500' : 'text-gray-500 hover:text-white'}`}
         >
           Shopify Approvals
+        </button>
+        <button
+          onClick={() => setActiveTab('active-users')}
+          className={`px-5 py-3 text-xs uppercase font-extrabold ${activeTab === 'active-users' ? 'text-green-400 border-b-2 border-green-500' : 'text-gray-500 hover:text-white'}`}
+        >
+          Active Visitors
         </button>
         {dbUser.role === 'super_admin' && (
           <>
@@ -510,6 +542,54 @@ export default function AdminDashboard() {
 
               </div>
             ) : null}
+          </div>
+        </div>
+      ) : activeTab === 'active-users' ? (
+        <div className="space-y-6">
+          <div className="bg-gray-900 border border-glass-border p-6 rounded-xl space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-white font-bold text-sm uppercase tracking-wider text-green-400 flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 bg-green-500 rounded-full animate-ping"></span>
+                  Active Visitors ({activeVisitors.count})
+                </h2>
+                <p className="text-xs text-gray-400 mt-1">Users actively browsing the dashboard right now (active within the last 2 minutes)</p>
+              </div>
+              <button 
+                onClick={fetchActiveVisitors} 
+                disabled={loadingActive}
+                className="px-4 py-2 bg-gray-800 border border-glass-border rounded-lg text-xs font-bold hover:bg-gray-700 disabled:opacity-50"
+              >
+                {loadingActive ? 'Refreshing...' : 'Refresh'}
+              </button>
+            </div>
+
+            {loadingActive && activeVisitors.list.length === 0 ? (
+              <div className="text-center py-8 text-gray-500 text-sm font-semibold">Loading active visitors...</div>
+            ) : activeVisitors.list.length === 0 ? (
+              <div className="text-center py-8 text-gray-500 text-sm font-semibold">No active visitors online.</div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {activeVisitors.list.map((u, i) => (
+                  <div key={i} className="p-4 bg-black/40 border border-glass-border rounded-xl flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-green-500 to-emerald-800 flex items-center justify-center font-bold text-sm text-white border border-green-500/30 overflow-hidden shrink-0">
+                      {u.photoURL ? (
+                        <img src={u.photoURL} alt={u.name || u.email} className="w-full h-full object-cover" />
+                      ) : (
+                        (u.name || u.email).split(' ').map((n: string) => n[0]).join('').substring(0,2).toUpperCase()
+                      )}
+                    </div>
+                    <div className="overflow-hidden">
+                      <p className="text-sm font-semibold text-white truncate">{u.name || u.email.split('@')[0]}</p>
+                      <p className="text-xs text-gray-500 truncate">{u.email}</p>
+                      <span className="inline-block mt-1 text-[9px] font-bold uppercase tracking-wider text-green-400 bg-green-500/10 px-2 py-0.5 rounded">
+                        {u.role}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       ) : null}
