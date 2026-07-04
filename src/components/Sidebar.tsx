@@ -48,6 +48,29 @@ export default function Sidebar({ isMobileOpen = false, onCloseMobile }: Sidebar
     hydrate();
   }, [hydrate]);
 
+  const isAdminOrSuperAdmin = dbUser?.role === 'super_admin' || dbUser?.role === 'admin';
+  const [activeVisitors, setActiveVisitors] = useState<{count: number, list: any[]}>({ count: 0, list: [] });
+
+  useEffect(() => {
+    if (!isAdminOrSuperAdmin || !user?.uid) return;
+
+    const fetchActive = async () => {
+      try {
+        const res = await fetch(`/api/users/active?uid=${user.uid}`);
+        if (res.ok) {
+          const data = await res.json();
+          setActiveVisitors({ count: data.count, list: data.activeUsers || [] });
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    };
+
+    fetchActive();
+    const interval = setInterval(fetchActive, 15000);
+    return () => clearInterval(interval);
+  }, [isAdminOrSuperAdmin, user]);
+
   const displayName = user?.displayName || (user?.email ? user.email.split('@')[0] : profile?.name) || 'Developer';
   const initials = displayName.split(' ').map(n => n[0]).join('').substring(0,2).toUpperCase();
 
@@ -83,7 +106,6 @@ export default function Sidebar({ isMobileOpen = false, onCloseMobile }: Sidebar
   const adminMenus = storeSettings?.adminEnabledMenus?.length ? storeSettings.adminEnabledMenus : (storeSettings?.enabledMenus || baseNavItemsRaw.map(n => n.name));
 
   // For non-super_admin users, filter out disabled menus
-  const isAdminOrSuperAdmin = dbUser?.role === 'super_admin' || dbUser?.role === 'admin';
   const baseNavItems = baseNavItemsRaw.filter(item => {
     if (dbUser?.role === 'super_admin') return true;
     if (dbUser?.role === 'admin') return adminMenus.includes(item.name);
@@ -184,6 +206,35 @@ export default function Sidebar({ isMobileOpen = false, onCloseMobile }: Sidebar
           {renderNavLinks(true)}
         </div>
 
+        {/* Active Visitors widget for Admin (Mobile) */}
+        {isAdminOrSuperAdmin && (
+          <div className="px-4 py-2 border-t border-glass-border">
+            <div className="p-3 bg-purple-950/20 border border-purple-500/20 rounded-xl flex flex-col gap-2 relative text-left">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] text-purple-400 font-extrabold uppercase tracking-wider flex items-center gap-1.5">
+                  <span className="w-2 h-2 bg-purple-500 rounded-full animate-ping"></span>
+                  Active Visitors
+                </span>
+                <span className="text-xs font-bold text-white bg-purple-500/30 px-2 py-0.5 rounded-full">
+                  {activeVisitors.count}
+                </span>
+              </div>
+              
+              {activeVisitors.list.length > 0 && (
+                <div className="text-[11px] text-gray-400 flex flex-col gap-1 max-h-[80px] overflow-y-auto pr-1">
+                  {activeVisitors.list.map((u, i) => (
+                    <div key={i} className="flex items-center gap-2 py-0.5 border-b border-purple-500/5 last:border-0">
+                      <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
+                      <span className="truncate text-gray-300 font-medium">{u.name || u.email.split('@')[0]}</span>
+                      <span className="ml-auto text-[9px] text-purple-400/80 bg-purple-500/10 px-1.5 py-0.2 rounded font-bold uppercase">{u.role === 'super_admin' ? 'S.Admin' : u.role}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* User profile footer */}
         <div className="p-4 pb-16 border-t border-glass-border flex items-center gap-3">
           <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-green-500 to-emerald-800 flex items-center justify-center font-bold text-sm text-white border border-green-500/30 overflow-hidden shrink-0">
@@ -245,6 +296,60 @@ export default function Sidebar({ isMobileOpen = false, onCloseMobile }: Sidebar
           {/* Navigation Links */}
           {renderNavLinks(false)}
         </div>
+
+        {/* Active Visitors widget for Admin (Desktop) */}
+        {isAdminOrSuperAdmin && (
+          <div className="border-t border-glass-border pt-3">
+            {!isCollapsed ? (
+              <div className="mx-3 my-1.5 p-3 bg-purple-950/20 border border-purple-500/20 rounded-xl flex flex-col gap-2 relative text-left">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-purple-400 font-extrabold uppercase tracking-wider flex items-center gap-1.5">
+                    <span className="w-2 h-2 bg-purple-500 rounded-full animate-ping"></span>
+                    Active Visitors
+                  </span>
+                  <span className="text-xs font-bold text-white bg-purple-500/30 px-2 py-0.5 rounded-full">
+                    {activeVisitors.count}
+                  </span>
+                </div>
+                
+                {activeVisitors.list.length > 0 && (
+                  <div className="text-[11px] text-gray-400 flex flex-col gap-1 max-h-[80px] overflow-y-auto pr-1">
+                    {activeVisitors.list.map((u, i) => (
+                      <div key={i} className="flex items-center gap-2 py-0.5 border-b border-purple-500/5 last:border-0">
+                        <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
+                        <span className="truncate text-gray-300 font-medium">{u.name || u.email.split('@')[0]}</span>
+                        <span className="ml-auto text-[9px] text-purple-400/80 bg-purple-500/10 px-1.5 py-0.2 rounded font-bold uppercase">{u.role === 'super_admin' ? 'S.Admin' : u.role}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="relative group flex justify-center py-2">
+                <div className="w-8 h-8 rounded-lg bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-xs font-bold text-purple-400 relative cursor-pointer">
+                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-[#030712]"></span>
+                  {activeVisitors.count}
+                </div>
+                {/* Tooltip on hover */}
+                <div className="absolute left-[70px] top-1/2 -translate-y-1/2 bg-gray-950 border border-purple-500/25 p-3 rounded-xl shadow-[0_0_20px_rgba(168,85,247,0.15)] opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50 min-w-[150px] flex flex-col gap-2 text-left">
+                  <span className="text-[9px] text-purple-400 font-bold uppercase tracking-wider">Active Visitors ({activeVisitors.count})</span>
+                  <div className="flex flex-col gap-1">
+                    {activeVisitors.list.length > 0 ? (
+                      activeVisitors.list.map((u, i) => (
+                        <div key={i} className="flex items-center gap-2 text-[10px] text-gray-300">
+                          <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
+                          <span>{u.name || u.email.split('@')[0]}</span>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-[10px] text-gray-500">No active users</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Bottom Profile Section */}
         <div className="p-3 pb-16 border-t border-glass-border">

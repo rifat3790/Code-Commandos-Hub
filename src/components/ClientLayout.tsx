@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Sidebar from './Sidebar';
 import { Menu, Terminal, ShieldAlert } from 'lucide-react';
 import Link from 'next/link';
@@ -120,6 +120,32 @@ function ProtectedMainContent({ children }: { children: React.ReactNode }) {
   );
 }
 
+function HeartbeatTrigger() {
+  const { user } = useAuth();
+  
+  useEffect(() => {
+    if (!user?.uid) return;
+    
+    const sendHeartbeat = async () => {
+      try {
+        await fetch('/api/users/active', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ firebaseUid: user.uid })
+        });
+      } catch (err) {
+        console.error("Heartbeat error:", err);
+      }
+    };
+    
+    sendHeartbeat();
+    const interval = setInterval(sendHeartbeat, 30000);
+    return () => clearInterval(interval);
+  }, [user]);
+
+  return null;
+}
+
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const pathname = usePathname();
@@ -136,6 +162,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   return (
     <AuthProvider>
       <ThemeProvider>
+        <HeartbeatTrigger />
         <div className="flex flex-col md:flex-row h-screen w-screen overflow-hidden bg-[#030712]">
         {/* Sidebar - responsive built-in mobile/desktop */}
         <Sidebar isMobileOpen={isMobileOpen} onCloseMobile={() => setIsMobileOpen(false)} />

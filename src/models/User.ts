@@ -19,6 +19,7 @@ export interface IUser extends Document {
   };
   themeColor?: string;
   lastLoginAt?: Date;
+  lastActiveAt?: Date;
   createdAt: Date;
 }
 
@@ -41,6 +42,7 @@ const UserSchema: Schema = new Schema({
   },
   themeColor: { type: String, default: '#00C950' },
   lastLoginAt: { type: Date },
+  lastActiveAt: { type: Date },
   createdAt: { type: Date, default: Date.now }
 });
 
