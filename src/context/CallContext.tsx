@@ -25,6 +25,54 @@ interface CallContextType {
 
 const CallContext = createContext<CallContextType | undefined>(undefined);
 
+class RingtonePlayer {
+  audioCtx: AudioContext | null = null;
+  interval: any = null;
+
+  start() {
+    if (typeof window === 'undefined') return;
+    if (!this.audioCtx) {
+      this.audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    }
+    const ctx = this.audioCtx;
+    if (ctx.state === 'suspended') {
+      ctx.resume();
+    }
+    
+    const playTone = () => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(440, ctx.currentTime);
+      osc.frequency.setValueAtTime(480, ctx.currentTime + 0.2);
+      
+      gain.gain.setValueAtTime(0, ctx.currentTime);
+      gain.gain.linearRampToValueAtTime(0.2, ctx.currentTime + 0.1);
+      gain.gain.setValueAtTime(0.2, ctx.currentTime + 1);
+      gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 1.2);
+      
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 1.2);
+    };
+
+    playTone();
+    this.interval = setInterval(playTone, 2000);
+  }
+
+  stop() {
+    if (this.interval) {
+      clearInterval(this.interval);
+      this.interval = null;
+    }
+  }
+}
+
+const ringtonePlayer = typeof window !== 'undefined' ? new RingtonePlayer() : null;
+
 export function CallProvider({ children }: { children: React.ReactNode }) {
   const { user, dbUser } = useAuth();
   const [activeCall, setActiveCall] = useState<any>(null);
@@ -72,6 +120,39 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       document.exitFullscreen();
     }
   };
+
+  // Request notification permission
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      if (Notification.permission !== 'granted' && Notification.permission !== 'denied') {
+        Notification.requestPermission();
+      }
+    }
+  }, []);
+
+  // Handle ringing side-effects (sound & notification)
+  useEffect(() => {
+    if (callState === 'ringing') {
+      ringtonePlayer?.start();
+      
+      if (incomingCall && typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+        const notification = new Notification(`Incoming ${incomingCall.type === 'video' ? 'Video' : 'Audio'} Call`, {
+          body: `From: ${incomingCall.callerName}`,
+          requireInteraction: true,
+        });
+        notification.onclick = () => {
+          window.focus();
+          notification.close();
+        };
+      }
+    } else {
+      ringtonePlayer?.stop();
+    }
+    
+    return () => {
+      ringtonePlayer?.stop();
+    };
+  }, [callState, incomingCall]);
 
   // 1. Listen for incoming calls
   useEffect(() => {
