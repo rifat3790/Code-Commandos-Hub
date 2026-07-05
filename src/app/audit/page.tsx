@@ -51,7 +51,7 @@ const AUDIT_CHECKLIST: AuditItem[] = [
 
 export default function AuditSuitePage() {
   const store = useWorkspaceStore();
-  const [activeTab, setActiveTab] = useState<'speed' | 'inspect'>('speed');
+  const [activeTab, setActiveTab] = useState<'speed' | 'inspect'>('inspect');
   
   // Speed Audit states
   const [storeUrl, setStoreUrl] = useState('fitestore-2.myshopify.com');
@@ -66,7 +66,7 @@ export default function AuditSuitePage() {
   const [inspectUrl, setInspectUrl] = useState('');
   const [scanStatus, setScanStatus] = useState<'idle' | 'detecting' | 'fetching_products' | 'mapping_collections' | 'completed' | 'error'>('idle');
   const [scanError, setScanError] = useState('');
-  const [techInfo, setTechInfo] = useState<{ technology: string; isShopify: boolean; domain: string } | null>(null);
+  const [techInfo, setTechInfo] = useState<{ technology: string; isShopify: boolean; domain: string; theme?: {name: string, id: string, role: string}; apps?: string[] } | null>(null);
   const [collections, setCollections] = useState<any[]>([]);
   const [allProducts, setAllProducts] = useState<any[]>([]);
   const [scanLogs, setScanLogs] = useState<string[]>([]);
@@ -165,8 +165,13 @@ Report generated on Code Commandos Speed Audit Suite.`;
       setTechInfo({
         technology: detectData.technology,
         isShopify: detectData.isShopify,
-        domain: detectData.domain
+        domain: detectData.domain,
+        theme: detectData.theme,
+        apps: detectData.apps
       });
+
+      if (detectData.theme?.name) addLog(`Theme detected: ${detectData.theme.name}`, 'success');
+      if (detectData.apps?.length > 0) addLog(`Detected ${detectData.apps.length} Shopify apps`, 'success');
 
       addLog(`Normalized domain: ${detectData.domain}`, 'success');
       addLog(`Technology detected: ${detectData.technology}`, 'success');
@@ -434,35 +439,38 @@ Report generated on Code Commandos Speed Audit Suite.`;
     <div className="space-y-6 pb-12 text-left">
       {/* Header */}
       <div>
-        <h1 className="text-2xl lg:text-3xl font-extrabold tracking-tight text-white uppercase">Shopify Audit & Inspector Suite</h1>
-        <p className="text-gray-400 text-sm font-medium">
-          Generate PageSpeed performance reports and inspect store technologies or export products.
+        <h1 className="text-2xl lg:text-3xl font-extrabold tracking-tight text-white uppercase flex items-center gap-3">
+          <Sparkles className="w-6 h-6 text-green-400" />
+          Store Intelligence & Audit Suite
+        </h1>
+        <p className="text-gray-400 text-sm font-medium mt-1">
+          Generate PageSpeed performance reports, uncover store technology stacks, and export product catalogs in a flash.
         </p>
       </div>
 
       {/* Tabs */}
       <div className="flex border-b border-glass-border">
         <button
+          onClick={() => setActiveTab('inspect')}
+          className={`px-5 py-3 text-xs uppercase font-extrabold tracking-wider transition-all border-b-2 flex items-center gap-1.5 ${
+            activeTab === 'inspect' 
+              ? 'border-green-500 text-green-400 shadow-[0_4px_20px_-10px_rgba(34,197,94,0.4)]' 
+              : 'border-transparent text-gray-500 hover:text-white'
+          }`}
+        >
+          <Globe className="w-4 h-4" />
+          <span>Store Intelligence Inspector</span>
+        </button>
+        <button
           onClick={() => setActiveTab('speed')}
           className={`px-5 py-3 text-xs uppercase font-extrabold tracking-wider transition-all border-b-2 flex items-center gap-1.5 ${
             activeTab === 'speed' 
-              ? 'border-green-500 text-green-400' 
+              ? 'border-green-500 text-green-400 shadow-[0_4px_20px_-10px_rgba(34,197,94,0.4)]' 
               : 'border-transparent text-gray-500 hover:text-white'
           }`}
         >
           <Gauge className="w-4 h-4" />
           <span>Shopify Speed Audit Planner</span>
-        </button>
-        <button
-          onClick={() => setActiveTab('inspect')}
-          className={`px-5 py-3 text-xs uppercase font-extrabold tracking-wider transition-all border-b-2 flex items-center gap-1.5 ${
-            activeTab === 'inspect' 
-              ? 'border-green-500 text-green-400' 
-              : 'border-transparent text-gray-500 hover:text-white'
-          }`}
-        >
-          <Globe className="w-4 h-4" />
-          <span>Store Tech & Product Inspector</span>
         </button>
       </div>
 
@@ -663,7 +671,7 @@ Report generated on Code Commandos Speed Audit Suite.`;
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
-                      <div className="p-3 bg-white/5 border border-glass-border rounded-lg text-center">
+                      <div className="p-3 bg-white/5 border border-glass-border rounded-lg text-center shadow-[inset_0_0_15px_rgba(255,255,255,0.02)]">
                         <span className="text-[10px] text-gray-500 font-bold block uppercase tracking-wider">Technology</span>
                         <div className="mt-1 inline-flex items-center gap-1 bg-green-500/10 border border-green-500/20 px-2 py-0.5 rounded text-[11px] text-green-400 font-bold">
                           <Zap className="w-3 h-3 fill-green-400" />
@@ -671,11 +679,42 @@ Report generated on Code Commandos Speed Audit Suite.`;
                         </div>
                       </div>
 
-                      <div className="p-3 bg-white/5 border border-glass-border rounded-lg text-center">
+                      <div className="p-3 bg-white/5 border border-glass-border rounded-lg text-center shadow-[inset_0_0_15px_rgba(255,255,255,0.02)]">
                         <span className="text-[10px] text-gray-500 font-bold block uppercase tracking-wider">Total Products</span>
                         <span className="text-lg font-black text-white block mt-0.5">{allProducts.length}</span>
                       </div>
                     </div>
+
+                    {techInfo.theme && (
+                      <div className="p-3 bg-black/40 border border-glass-border rounded-lg flex justify-between items-center relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-16 h-16 bg-brand-green/10 blur-2xl rounded-full pointer-events-none" />
+                        <div>
+                          <span className="text-[10px] text-gray-500 font-bold block uppercase tracking-wider flex items-center gap-1">
+                            <Code className="w-3 h-3 text-brand-green" /> Active Theme
+                          </span>
+                          <span className="text-sm font-black text-white mt-0.5 block">{techInfo.theme.name}</span>
+                        </div>
+                        <div className="text-[10px] text-gray-500 font-mono text-right">
+                          <p>ID: {techInfo.theme.id}</p>
+                          <p>Role: {techInfo.theme.role}</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {techInfo.apps && techInfo.apps.length > 0 && (
+                      <div className="space-y-2 pt-1">
+                        <span className="text-[10px] text-gray-500 font-bold block uppercase tracking-wider flex items-center gap-1">
+                          <Zap className="w-3 h-3 text-brand-green" /> Detected App Stack
+                        </span>
+                        <div className="flex flex-wrap gap-2">
+                          {techInfo.apps.map(app => (
+                            <span key={app} className="px-2 py-1 bg-white/5 border border-white/10 rounded text-[10px] font-bold text-gray-300 hover:text-white hover:border-green-500/50 hover:bg-green-500/10 hover:shadow-[0_0_10px_rgba(34,197,94,0.2)] cursor-default transition-all">
+                              {app}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
                     {techInfo.isShopify && (
                       <div className="space-y-3 pt-2 border-t border-glass-border">

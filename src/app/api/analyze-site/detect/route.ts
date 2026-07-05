@@ -27,59 +27,7 @@ export async function GET(request: Request) {
     const domain = urlObj.hostname;
     const origin = urlObj.origin;
 
-    // Check Shopify directly by hitting products.json
-    let isShopify = false;
-    let collections: any[] = [];
-    let detectedTech = 'Custom Web Application';
-
-    try {
-      const prodCheckRes = await fetch(`${origin}/products.json?limit=1`, {
-        headers: { 'User-Agent': USER_AGENT },
-        next: { revalidate: 60 } // Cache for 60 seconds
-      });
-
-      if (prodCheckRes.ok) {
-        const prodData = await prodCheckRes.json();
-        if (prodData && Array.isArray(prodData.products)) {
-          isShopify = true;
-          detectedTech = 'Shopify';
-        }
-      }
-    } catch (err) {
-      console.warn('Direct products.json check failed, falling back to homepage scrape.', err);
-    }
-
-    // If direct check succeeded, load collections too
-    if (isShopify) {
-      try {
-        const collectionsRes = await fetch(`${origin}/collections.json?limit=250`, {
-          headers: { 'User-Agent': USER_AGENT }
-        });
-        if (collectionsRes.ok) {
-          const collectionsData = await collectionsRes.json();
-          if (collectionsData && Array.isArray(collectionsData.collections)) {
-            collections = collectionsData.collections.map((c: any) => ({
-              id: c.id,
-              title: c.title,
-              handle: c.handle,
-              description: c.body_html || ''
-            }));
-          }
-        }
-      } catch (err) {
-        console.warn('Failed to fetch collections for Shopify store', err);
-      }
-
-      return NextResponse.json({
-        success: true,
-        isShopify: true,
-        technology: 'Shopify',
-        domain,
-        collections
-      });
-    }
-
-    // Fetch homepage to detect other tech
+    // Fetch homepage to detect tech, theme, and apps
     let html = '';
     let headers: Record<string, string> = {};
 
@@ -100,7 +48,13 @@ export async function GET(request: Request) {
       }, { status: 500 });
     }
 
-    // Check Shopify headers
+    let isShopify = false;
+    let detectedTech = 'Custom Web Application';
+    let collections: any[] = [];
+    let themeInfo = null;
+    let detectedApps: string[] = [];
+
+    // Check Shopify headers & html
     if (headers['x-shopify-stage'] || headers['x-shopid'] || html.includes('cdn.shopify.com') || html.includes('Shopify.shop')) {
       isShopify = true;
       detectedTech = 'Shopify';
@@ -128,8 +82,55 @@ export async function GET(request: Request) {
       detectedTech = 'Nuxt.js (Vue)';
     }
 
-    // Secondary Shopify verification
+    // Advanced Shopify Extractions
     if (isShopify) {
+      // 1. Theme Extraction
+      const themeMatch = html.match(/Shopify\.theme\s*=\s*(\{.*?\});/);
+      if (themeMatch && themeMatch[1]) {
+        try {
+          const themeData = JSON.parse(themeMatch[1]);
+          themeInfo = {
+            name: themeData.name || 'Unknown',
+            id: themeData.id || '',
+            role: themeData.role || ''
+          };
+        } catch (e) {}
+      }
+
+      // Fallback theme extraction if Shopify.theme is slightly different
+      if (!themeInfo) {
+        const fallbackMatch = html.match(/"themeId":\s*(\d+).*?"themeName":\s*"([^"]+)"/);
+        if (fallbackMatch) {
+          themeInfo = { id: fallbackMatch[1], name: fallbackMatch[2], role: 'main' };
+        }
+      }
+
+      // 2. App Stack Extraction
+      const appSignatures: Record<string, string[]> = {
+        'Klaviyo': ['klaviyo.com', 'onsite/js/klaviyo.js'],
+        'Yotpo': ['yotpo.com', 'yotpo_app_key'],
+        'Judge.me': ['judge.me', 'jdgm-widget'],
+        'Loox': ['loox.io', 'loox-reviews'],
+        'Gorgias': ['gorgias.chat', 'gorgias-chat'],
+        'Recharge': ['rechargepayments.com', 'recharge-subscription'],
+        'Skio': ['skio.com', 'skio-plan-picker'],
+        'Smile.io': ['smile.io', 'smile-ui'],
+        'LoyaltyLion': ['loyaltylion.net', 'lion-loyalty'],
+        'PageFly': ['pagefly.io', 'pagefly-core'],
+        'Shogun': ['getshogun.com', 'shogun-frontend'],
+        'GemPages': ['gempages.net', 'gem-page'],
+        'Nosto': ['nosto.com', 'nosto-tag'],
+        'Sezzle': ['sezzle.com'],
+        'Afterpay': ['afterpay.com']
+      };
+
+      for (const [appName, signatures] of Object.entries(appSignatures)) {
+        if (signatures.some(sig => html.includes(sig))) {
+          detectedApps.push(appName);
+        }
+      }
+
+      // 3. Fetch Collections
       try {
         const collectionsRes = await fetch(`${origin}/collections.json?limit=250`, {
           headers: { 'User-Agent': USER_AGENT }
@@ -146,7 +147,7 @@ export async function GET(request: Request) {
           }
         }
       } catch (err) {
-        console.warn('Failed to fetch collections for Shopify store (after page parse)', err);
+        console.warn('Failed to fetch collections for Shopify store', err);
       }
     }
 
@@ -155,7 +156,9 @@ export async function GET(request: Request) {
       isShopify,
       technology: detectedTech,
       domain,
-      collections
+      collections,
+      theme: themeInfo,
+      apps: detectedApps
     });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
