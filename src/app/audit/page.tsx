@@ -380,10 +380,15 @@ Report generated on Code Commandos Speed Audit Suite.`;
     
     try {
       if (exportMethod === 'extension') {
-        if (!isExtensionInstalled) {
-           throw new Error("Theme Exporter Chrome Extension is not installed or active.");
-        }
         window.dispatchEvent(new CustomEvent('START_SHOPIFY_EXPORT', { detail: { url: inspectUrl.trim() } }));
+        // If extension is not installed, it won't respond, so we set a timeout to reset the UI and show error
+        setTimeout(() => {
+          if (isExportingTheme) {
+             // If it's still exporting after 3 seconds with no progress, it probably failed to connect
+             addLog("Extension didn't respond. Ensure it's reloaded and active.", "error");
+             setIsExportingTheme(false);
+          }
+        }, 5000);
         return;
       }
 
@@ -1120,10 +1125,10 @@ Report generated on Code Commandos Speed Audit Suite.`;
                               </>
                             ) : (
                               <>
-                                <p className="text-red-400 font-bold flex items-center gap-1.5">
-                                  <AlertCircle className="w-4 h-4 text-red-400" /> Extension Not Found
+                                <p className="text-yellow-400 font-bold flex items-center gap-1.5">
+                                  <AlertCircle className="w-4 h-4 text-yellow-400" /> Extension Not Detected Automatically
                                 </p>
-                                <p className="text-gray-400">Please install and enable the Theme Exporter Chrome Extension to use this feature.</p>
+                                <p className="text-gray-400">If you just updated the extension in <span className="text-white bg-black/50 px-1 rounded">chrome://extensions</span>, it might still work! Click the button below to try forcing the connection.</p>
                               </>
                             )}
                           </div>
@@ -1137,7 +1142,7 @@ Report generated on Code Commandos Speed Audit Suite.`;
                           
                           <button
                             onClick={handleExportTheme}
-                            disabled={isExportingTheme || (exportMethod === 'extension' && !isExtensionInstalled)}
+                            disabled={isExportingTheme}
                             className={`px-2.5 py-1 font-extrabold text-[10px] uppercase tracking-wider rounded transition-all flex items-center gap-1 disabled:opacity-50 ${exportMethod === 'admin' ? 'bg-yellow-500 hover:bg-yellow-600 text-black' : exportMethod === 'extension' ? 'bg-purple-500 hover:bg-purple-600 text-white' : 'bg-brand-green hover:bg-brand-green-hover text-black'}`}
                           >
                             {isExportingTheme ? (
