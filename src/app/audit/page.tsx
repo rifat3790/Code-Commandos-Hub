@@ -66,6 +66,8 @@ export default function AuditSuitePage() {
   const [inspectUrl, setInspectUrl] = useState('');
   const [scanStatus, setScanStatus] = useState<'idle' | 'detecting' | 'fetching_products' | 'mapping_collections' | 'completed' | 'error'>('idle');
   const [scanError, setScanError] = useState('');
+  const [storePassword, setStorePassword] = useState('');
+  const [isPasswordProtected, setIsPasswordProtected] = useState(false);
   const [techInfo, setTechInfo] = useState<{ technology: string; isShopify: boolean; domain: string; theme?: {name: string, id: string, role: string, originalName?: string}; apps?: string[]; pixels?: string[]; socials?: string[]; emails?: string[] } | null>(null);
   const [collections, setCollections] = useState<any[]>([]);
   const [allProducts, setAllProducts] = useState<any[]>([]);
@@ -155,11 +157,27 @@ Report generated on Code Commandos Speed Audit Suite.`;
 
     try {
       addLog('Probing website technology and headers...');
-      const detectRes = await fetch(`/api/analyze-site/detect?url=${encodeURIComponent(inspectUrl.trim())}`);
+      
+      let apiUrl = `/api/analyze-site/detect?url=${encodeURIComponent(inspectUrl.trim())}`;
+      if (storePassword) {
+        apiUrl += `&storePassword=${encodeURIComponent(storePassword)}`;
+        addLog('Attempting password bypass...', 'info');
+      }
+
+      const detectRes = await fetch(apiUrl);
       const detectData = await detectRes.json();
 
       if (!detectRes.ok || !detectData.success) {
         throw new Error(detectData.error || 'Failed to detect technology.');
+      }
+
+      if (detectData.isPasswordProtected) {
+        setIsPasswordProtected(true);
+        addLog('Store is password protected. Please enter the storefront password to continue scanning.', 'info');
+        setScanStatus('idle');
+        return;
+      } else {
+        setIsPasswordProtected(false);
       }
 
       setTechInfo({
@@ -619,6 +637,26 @@ Report generated on Code Commandos Speed Audit Suite.`;
                       <AlertCircle className="w-3.5 h-3.5" />
                       <span>{scanError}</span>
                     </p>
+                  )}
+
+                  {isPasswordProtected && (
+                    <div className="space-y-1 mt-3 p-4 rounded-xl border border-yellow-500/30 bg-yellow-500/5 relative overflow-hidden animate-in fade-in slide-in-from-top-2">
+                      <div className="absolute top-0 right-0 w-24 h-24 bg-yellow-500/10 blur-3xl rounded-full pointer-events-none" />
+                      <label className="text-[10px] text-yellow-500 font-extrabold uppercase tracking-wider flex items-center gap-1.5">
+                        <ShieldCheck className="w-3.5 h-3.5" /> Password Protected Store
+                      </label>
+                      <p className="text-[11px] text-yellow-500/80 mb-2 font-medium">Enter the storefront password to bypass the lock screen and extract hidden data.</p>
+                      <div className="flex gap-2">
+                        <input
+                          type="password"
+                          value={storePassword}
+                          onChange={(e) => setStorePassword(e.target.value)}
+                          placeholder="Enter storefront password..."
+                          className="w-full px-3 py-2 rounded-lg bg-black/40 text-xs border border-yellow-500/30 focus:border-yellow-400 focus:outline-none text-white placeholder-gray-600 transition-all"
+                          onKeyDown={(e) => e.key === 'Enter' && handleStartScan()}
+                        />
+                      </div>
+                    </div>
                   )}
                 </div>
 

@@ -6,6 +6,7 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const rawUrl = searchParams.get('url');
+    const storePassword = searchParams.get('storePassword');
 
     if (!rawUrl) {
       return NextResponse.json({ success: false, error: 'URL parameter is required.' }, { status: 400 });
@@ -26,20 +27,57 @@ export async function GET(request: Request) {
 
     const domain = urlObj.hostname;
     const origin = urlObj.origin;
+    let fetchHeaders: Record<string, string> = { 'User-Agent': USER_AGENT };
+    let sessionCookie = '';
+
+    // Password Bypass Auth Flow
+    if (storePassword) {
+      const authBody = new URLSearchParams();
+      authBody.append('form_type', 'storefront_password');
+      authBody.append('password', storePassword);
+
+      try {
+        const authRes = await fetch(`${origin}/password`, {
+          method: 'POST',
+          headers: { 
+            'User-Agent': USER_AGENT, 
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
+          body: authBody.toString(),
+          redirect: 'manual'
+        });
+        
+        // Extract all Set-Cookie headers
+        const cookies = authRes.headers.getSetCookie ? authRes.headers.getSetCookie() : [];
+        if (cookies.length > 0) {
+          sessionCookie = cookies.map(c => c.split(';')[0]).join('; ');
+          fetchHeaders['Cookie'] = sessionCookie;
+        } else {
+          // Fallback if getSetCookie isn't available
+          const rawCookies = authRes.headers.get('set-cookie');
+          if (rawCookies) {
+            sessionCookie = rawCookies;
+            fetchHeaders['Cookie'] = sessionCookie;
+          }
+        }
+      } catch (err) {
+        console.warn('Password authentication failed', err);
+      }
+    }
 
     // Fetch homepage to detect tech, theme, and apps
     let html = '';
-    let headers: Record<string, string> = {};
+    let responseHeaders: Record<string, string> = {};
 
     try {
       const homeRes = await fetch(origin, {
-        headers: { 'User-Agent': USER_AGENT },
-        next: { revalidate: 60 }
+        headers: fetchHeaders,
+        next: { revalidate: 0 } // Don't cache so we don't serve password page html to authenticated requests
       });
       
       html = await homeRes.text();
       homeRes.headers.forEach((val, key) => {
-        headers[key.toLowerCase()] = val.toLowerCase();
+        responseHeaders[key.toLowerCase()] = val.toLowerCase();
       });
     } catch (err: any) {
       return NextResponse.json({
@@ -58,7 +96,7 @@ export async function GET(request: Request) {
     let emails: string[] = [];
 
     // Check Shopify headers & html
-    if (headers['x-shopify-stage'] || headers['x-shopid'] || html.includes('cdn.shopify.com') || html.includes('Shopify.shop')) {
+    if (responseHeaders['x-shopify-stage'] || responseHeaders['x-shopid'] || html.includes('cdn.shopify.com') || html.includes('Shopify.shop')) {
       isShopify = true;
       detectedTech = 'Shopify';
     } else if (html.includes('wp-content/plugins/woocommerce') || html.includes('wc-ajax')) {
@@ -85,8 +123,21 @@ export async function GET(request: Request) {
       detectedTech = 'Nuxt.js (Vue)';
     }
 
+    // Is it password protected?
+    if (isShopify && (html.includes('id="password"') || html.includes('class="template-password"') || html.includes('action="/password"') || html.includes('password-page'))) {
+      if (!storePassword) {
+        return NextResponse.json({
+          success: true,
+          isShopify: true,
+          technology: 'Shopify',
+          domain,
+          isPasswordProtected: true
+        });
+      }
+    }
+
     // Advanced Shopify Extractions
-    if (isShopify) {
+    if (isShopify && !html.includes('class="template-password"')) {
       // 1. Theme Extraction
       const SHOPIFY_THEMES: Record<number, string> = {
         887: 'Dawn', 796: 'Prestige', 857: 'Impulse', 838: 'Symmetry', 840: 'Focal',
@@ -94,6 +145,22 @@ export async function GET(request: Request) {
         862: 'Envy', 877: 'Warehouse', 843: 'District', 1285: 'Sense', 1286: 'Craft',
         1348: 'Refresh', 1351: 'Studio', 1369: 'Taste', 1352: 'Publisher', 1370: 'Colorblock',
         1349: 'Crave', 1350: 'Origin', 1402: 'Trade', 1401: 'Spotlight', 712: 'Turbo'
+      };
+
+      const CUSTOM_THEME_KEYWORDS: Record<string, string> = {
+        'minimog': 'Minimog',
+        'kalles': 'Kalles',
+        'gecko': 'Gecko',
+        'ella': 'Ella',
+        'wokiee': 'Wokiee',
+        'shella': 'Shella',
+        'fastor': 'Fastor',
+        'porto': 'Porto',
+        'basel': 'Basel',
+        'woodmart': 'Woodmart',
+        'halo': 'Halo',
+        'avone': 'Avone',
+        'belle': 'Belle'
       };
 
       const themeMatch = html.match(/Shopify\.theme\s*=\s*(\{.*?\});/);
@@ -123,9 +190,23 @@ export async function GET(request: Request) {
       }
 
       if (themeInfo) {
-        themeInfo.originalName = themeInfo.theme_store_id && SHOPIFY_THEMES[themeInfo.theme_store_id] 
-          ? SHOPIFY_THEMES[themeInfo.theme_store_id]
-          : (themeInfo.theme_store_id ? 'Premium/Other' : 'Custom Built (No ID)');
+        if (themeInfo.theme_store_id && SHOPIFY_THEMES[themeInfo.theme_store_id]) {
+          themeInfo.originalName = SHOPIFY_THEMES[themeInfo.theme_store_id];
+        } else {
+          // Fallback keyword search for custom themes
+          let foundCustom = false;
+          const lowerName = themeInfo.name.toLowerCase();
+          for (const [key, name] of Object.entries(CUSTOM_THEME_KEYWORDS)) {
+            if (lowerName.includes(key)) {
+              themeInfo.originalName = name;
+              foundCustom = true;
+              break;
+            }
+          }
+          if (!foundCustom) {
+            themeInfo.originalName = themeInfo.theme_store_id ? 'Premium/Other' : 'Custom Built (No ID)';
+          }
+        }
       }
 
       // 2. App Stack Extraction
@@ -201,10 +282,10 @@ export async function GET(request: Request) {
         emails = Array.from(emailSet);
       }
 
-      // 3. Fetch Collections
+      // 5. Fetch Collections
       try {
         const collectionsRes = await fetch(`${origin}/collections.json?limit=250`, {
-          headers: { 'User-Agent': USER_AGENT }
+          headers: fetchHeaders
         });
         if (collectionsRes.ok) {
           const collectionsData = await collectionsRes.json();
@@ -232,7 +313,9 @@ export async function GET(request: Request) {
       apps: detectedApps,
       pixels: detectedPixels,
       socials: socialLinks,
-      emails
+      emails,
+      isPasswordProtected: false,
+      sessionCookie
     });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
