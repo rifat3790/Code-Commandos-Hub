@@ -108,13 +108,11 @@ export default function AuditSuitePage() {
       setIsExportingTheme(false);
       setExtensionProgress(null);
       addLog('Theme downloaded successfully via Extension!', 'success');
-      toast.success('Theme successfully exported via Extension');
     };
     const handleError = (e: any) => {
       setIsExportingTheme(false);
       setExtensionProgress(null);
       addLog('Extension Export Error: ' + e.detail.message, 'error');
-      toast.error(e.detail.message || 'Extension export failed');
     };
 
     window.addEventListener('SHOPIFY_EXPORT_PROGRESS', handleProgress);
