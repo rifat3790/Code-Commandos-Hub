@@ -71,6 +71,9 @@ export default function AuditSuitePage() {
   const [isExportingTheme, setIsExportingTheme] = useState(false);
   const [exportMethod, setExportMethod] = useState<'public' | 'admin'>('public');
   const [adminToken, setAdminToken] = useState('');
+  const [detectedImages, setDetectedImages] = useState<string[]>([]);
+  const [isLoadingImages, setIsLoadingImages] = useState(false);
+  const [isZippingImages, setIsZippingImages] = useState(false);
   const [techInfo, setTechInfo] = useState<{ technology: string; isShopify: boolean; domain: string; theme?: {name: string, id: string, role: string, originalName?: string}; apps?: string[]; pixels?: string[]; socials?: string[]; emails?: string[] } | null>(null);
   const [collections, setCollections] = useState<any[]>([]);
   const [allProducts, setAllProducts] = useState<any[]>([]);
@@ -361,6 +364,106 @@ Report generated on Code Commandos Speed Audit Suite.`;
       alert(`Export Failed: ${error.message}`);
     } finally {
       setIsExportingTheme(false);
+    }
+  };
+
+  // LOAD IMAGES UTILITY
+  const handleLoadImages = async () => {
+    if (!inspectUrl.trim()) {
+      alert('Please enter a website URL first.');
+      return;
+    }
+    setIsLoadingImages(true);
+    setDetectedImages([]);
+    addLog('Initiating media asset scraping from storefront HTML...', 'info');
+
+    try {
+      let apiUrl = `/api/analyze-site/images?url=${encodeURIComponent(inspectUrl.trim())}`;
+      if (storePassword) {
+        apiUrl += `&storePassword=${encodeURIComponent(storePassword)}`;
+      }
+
+      const res = await fetch(apiUrl);
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to scrape images.');
+      }
+
+      setDetectedImages(data.images || []);
+      addLog(`Media Scrape Complete! Discovered ${data.images?.length || 0} unique images.`, 'success');
+    } catch (err: any) {
+      addLog(`Image loading failed: ${err.message}`, 'error');
+      alert(`Failed to load images: ${err.message}`);
+    } finally {
+      setIsLoadingImages(false);
+    }
+  };
+
+  // DOWNLOAD SINGLE IMAGE UTILITY
+  const handleDownloadSingleImage = async (imgUrl: string) => {
+    try {
+      const res = await fetch(imgUrl);
+      if (!res.ok) throw new Error('Network error');
+      const blob = await res.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      
+      const filename = imgUrl.split('/').pop()?.split('?')[0] || 'image.png';
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(downloadUrl);
+    } catch (e) {
+      window.open(imgUrl, '_blank');
+    }
+  };
+
+  // DOWNLOAD ALL IMAGES (ZIP) UTILITY
+  const handleDownloadAllImages = async () => {
+    if (detectedImages.length === 0) return;
+    setIsZippingImages(true);
+    addLog(`Compiling batch ZIP archive for ${detectedImages.length} images...`, 'info');
+    
+    try {
+      const JSZip = (await import('jszip')).default;
+      const zip = new JSZip();
+      
+      const imagesToZip = detectedImages.slice(0, 80);
+      
+      await Promise.all(imagesToZip.map(async (url, idx) => {
+        try {
+          const res = await fetch(url);
+          if (res.ok) {
+            const blob = await res.blob();
+            let filename = url.split('/').pop()?.split('?')[0] || `image_${idx}.png`;
+            if (!filename.includes('.')) filename += '.png';
+            zip.file(filename, blob);
+          }
+        } catch (e) {
+          console.warn('CORS or fetch issue skipping zip index: ', url);
+        }
+      }));
+      
+      const content = await zip.generateAsync({ type: 'blob' });
+      const downloadUrl = window.URL.createObjectURL(content);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      
+      const cleanDomain = techInfo?.domain || 'store';
+      link.setAttribute('download', `images_export_${cleanDomain}.zip`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(downloadUrl);
+      addLog('Image archive compiled and downloaded successfully!', 'success');
+    } catch (error: any) {
+      addLog(`ZIP compilation failed: ${error.message}`, 'error');
+      alert(`Failed to compile ZIP: ${error.message}`);
+    } finally {
+      setIsZippingImages(false);
     }
   };
 
@@ -968,6 +1071,86 @@ Report generated on Code Commandos Speed Audit Suite.`;
                       </div>
                     ))}
                   </div>
+                </div>
+              )}
+
+              {/* Media Asset Inspector */}
+              {techInfo && (
+                <div className="p-5 rounded-xl border border-glass-border bg-gray-950/20 space-y-4">
+                  <span className="text-[10px] text-gray-500 font-extrabold uppercase tracking-wider flex items-center justify-between border-b border-glass-border pb-1.5">
+                    <span className="flex items-center gap-1"><Sparkles className="w-3 h-3 text-yellow-400" /> Media Asset Inspector</span>
+                    {detectedImages.length > 0 && (
+                      <span className="text-yellow-400 font-mono">{detectedImages.length} images</span>
+                    )}
+                  </span>
+
+                  {detectedImages.length === 0 ? (
+                    <button
+                      onClick={handleLoadImages}
+                      disabled={isLoadingImages}
+                      className="w-full flex items-center justify-center gap-2 bg-white/5 hover:bg-white/10 text-white font-extrabold text-xs uppercase tracking-wider py-2.5 px-4 rounded-lg border border-glass-border transition-all cursor-pointer"
+                    >
+                      {isLoadingImages ? (
+                        <Loader2 className="w-4 h-4 animate-spin text-yellow-400" />
+                      ) : (
+                        <FolderSync className="w-4 h-4 text-yellow-400" />
+                      )}
+                      <span>Load Store Images</span>
+                    </button>
+                  ) : (
+                    <div className="space-y-4">
+                      {/* Controls */}
+                      <div className="flex justify-between items-center gap-2">
+                        <button
+                          onClick={handleLoadImages}
+                          disabled={isLoadingImages}
+                          className="px-3 py-1.5 bg-white/5 border border-glass-border hover:bg-white/10 rounded-md text-[10px] font-bold text-gray-300 transition-all flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <RefreshCw className={`w-3.5 h-3.5 ${isLoadingImages ? 'animate-spin' : ''}`} />
+                          <span>Reload</span>
+                        </button>
+                        <button
+                          onClick={handleDownloadAllImages}
+                          disabled={isZippingImages}
+                          className="px-3 py-1.5 bg-yellow-500 hover:bg-yellow-600 rounded-md text-[10px] font-black text-black transition-all flex items-center gap-1.5 cursor-pointer"
+                        >
+                          {isZippingImages ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <Download className="w-3.5 h-3.5 stroke-[3]" />
+                          )}
+                          <span>Download All (ZIP)</span>
+                        </button>
+                      </div>
+
+                      {/* Image Grid */}
+                      <div className="grid grid-cols-3 gap-2.5 max-h-[250px] overflow-y-auto pr-1">
+                        {detectedImages.map((img, idx) => (
+                          <div 
+                            key={idx}
+                            className="group relative aspect-square bg-black/40 rounded-lg overflow-hidden border border-glass-border hover:border-yellow-500/30 transition-all"
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img 
+                              src={img} 
+                              alt="Store asset" 
+                              className="w-full h-full object-cover group-hover:scale-105 transition-all duration-300"
+                              loading="lazy"
+                            />
+                            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all duration-200">
+                              <button
+                                onClick={() => handleDownloadSingleImage(img)}
+                                className="p-1.5 bg-yellow-500 rounded text-black hover:scale-110 active:scale-95 transition-all cursor-pointer"
+                                title="Download image"
+                              >
+                                <Download className="w-3.5 h-3.5 stroke-[3]" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
