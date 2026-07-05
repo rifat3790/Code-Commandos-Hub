@@ -228,7 +228,7 @@ Report generated on Code Commandos Speed Audit Suite.`;
 
       while (hasMore) {
         addLog(`Scraping products page ${page}...`);
-        const prodRes = await fetch(`/api/analyze-site/products?domain=${detectData.domain}&page=${page}&limit=250`);
+        const prodRes = await fetch(`/api/analyze-site/products?domain=${detectData.domain}&page=${page}&limit=250&storePassword=${encodeURIComponent(storePassword)}&sessionCookie=${encodeURIComponent(detectData.sessionCookie || '')}`);
         if (!prodRes.ok) {
           addLog(`Error fetching products page ${page}. Stopping.`, 'error');
           break;
@@ -271,7 +271,7 @@ Report generated on Code Commandos Speed Audit Suite.`;
           let collProducts: any[] = [];
 
           while (collHasMore) {
-            const collProdRes = await fetch(`/api/analyze-site/products?domain=${detectData.domain}&collection=${collection.handle}&page=${collPage}&limit=250`);
+            const collProdRes = await fetch(`/api/analyze-site/products?domain=${detectData.domain}&collection=${collection.handle}&page=${collPage}&limit=250&storePassword=${encodeURIComponent(storePassword)}&sessionCookie=${encodeURIComponent(detectData.sessionCookie || '')}`);
             if (!collProdRes.ok) {
               addLog(`Error fetching products for collection "${collection.title}".`, 'error');
               break;

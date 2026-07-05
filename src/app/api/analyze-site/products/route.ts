@@ -9,6 +9,8 @@ export async function GET(request: Request) {
     const page = searchParams.get('page') || '1';
     const limit = searchParams.get('limit') || '250';
     const collection = searchParams.get('collection');
+    const storePassword = searchParams.get('storePassword');
+    const sessionCookie = searchParams.get('sessionCookie');
 
     if (!rawDomain) {
       return NextResponse.json({ success: false, error: 'Domain parameter is required.' }, { status: 400 });
@@ -19,6 +21,39 @@ export async function GET(request: Request) {
       domain = 'https://' + domain;
     }
 
+    let fetchHeaders: Record<string, string> = { 'User-Agent': USER_AGENT };
+
+    // Use sessionCookie if passed, or fall back to storePassword login
+    if (sessionCookie) {
+      fetchHeaders['Cookie'] = sessionCookie;
+    } else if (storePassword) {
+      const authBody = new URLSearchParams();
+      authBody.append('form_type', 'storefront_password');
+      authBody.append('password', storePassword);
+
+      try {
+        const authRes = await fetch(`${domain}/password`, {
+          method: 'POST',
+          headers: { 
+            'User-Agent': USER_AGENT, 
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
+          body: authBody.toString(),
+          redirect: 'manual'
+        });
+        
+        const cookies = authRes.headers.getSetCookie ? authRes.headers.getSetCookie() : [];
+        if (cookies.length > 0) {
+          fetchHeaders['Cookie'] = cookies.map(c => c.split(';')[0]).join('; ');
+        } else {
+          const rawCookies = authRes.headers.get('set-cookie');
+          if (rawCookies) fetchHeaders['Cookie'] = rawCookies;
+        }
+      } catch (err) {
+        console.warn('Products auth failed', err);
+      }
+    }
+
     let url = '';
     if (collection) {
       url = `${domain}/collections/${collection}/products.json?limit=${limit}&page=${page}`;
@@ -27,7 +62,7 @@ export async function GET(request: Request) {
     }
 
     const res = await fetch(url, {
-      headers: { 'User-Agent': USER_AGENT },
+      headers: fetchHeaders,
       next: { revalidate: 0 }
     });
 
