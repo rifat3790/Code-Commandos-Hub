@@ -68,6 +68,7 @@ export default function AuditSuitePage() {
   const [scanError, setScanError] = useState('');
   const [storePassword, setStorePassword] = useState('');
   const [isPasswordProtected, setIsPasswordProtected] = useState(false);
+  const [isExportingTheme, setIsExportingTheme] = useState(false);
   const [techInfo, setTechInfo] = useState<{ technology: string; isShopify: boolean; domain: string; theme?: {name: string, id: string, role: string, originalName?: string}; apps?: string[]; pixels?: string[]; socials?: string[]; emails?: string[] } | null>(null);
   const [collections, setCollections] = useState<any[]>([]);
   const [allProducts, setAllProducts] = useState<any[]>([]);
@@ -313,6 +314,41 @@ Report generated on Code Commandos Speed Audit Suite.`;
       addLog(`Scan failed: ${err.message}`, 'error');
       setScanStatus('error');
       setScanError(err.message || 'Scan failed.');
+    }
+  };
+
+  // EXPORT THEME ASSETS UTILITY
+  const handleExportTheme = async () => {
+    if (!techInfo || !techInfo.domain) return;
+    setIsExportingTheme(true);
+    addLog(`Initiating theme asset compilation for ${techInfo.domain}...`, 'info');
+    
+    try {
+      let exportUrl = `/api/analyze-site/export-theme?url=${encodeURIComponent(inspectUrl.trim())}`;
+      if (storePassword) {
+        exportUrl += `&storePassword=${encodeURIComponent(storePassword)}`;
+      }
+      
+      const response = await fetch(exportUrl);
+      if (!response.ok) throw new Error('Theme asset export failed.');
+      
+      const blob = await response.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      
+      const cleanDomain = techInfo.domain.replace(/[^a-zA-Z0-9]/g, '_');
+      link.setAttribute('download', `${cleanDomain}_theme_assets.zip`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(downloadUrl);
+      
+      addLog('Theme assets exported and downloaded successfully!', 'success');
+    } catch (error: any) {
+      addLog(`Failed to export theme assets: ${error.message}`, 'error');
+    } finally {
+      setIsExportingTheme(false);
     }
   };
 
@@ -745,9 +781,24 @@ Report generated on Code Commandos Speed Audit Suite.`;
                             <span className="text-xs font-bold text-gray-300">{techInfo.theme.name}</span>
                           </div>
                         </div>
-                        <div className="mt-3 pt-3 border-t border-glass-border/50 flex justify-between text-[10px] text-gray-500 font-mono">
-                          <span>ID: {techInfo.theme.id}</span>
-                          <span>Role: {techInfo.theme.role}</span>
+                        <div className="mt-3 pt-3 border-t border-glass-border/50 flex justify-between items-center text-[10px] text-gray-500 font-mono">
+                          <div className="flex flex-col gap-0.5">
+                            <span>ID: {techInfo.theme.id}</span>
+                            <span>Role: {techInfo.theme.role}</span>
+                          </div>
+                          
+                          <button
+                            onClick={handleExportTheme}
+                            disabled={isExportingTheme}
+                            className="px-2.5 py-1 bg-brand-green hover:bg-brand-green-hover text-black font-extrabold text-[10px] uppercase tracking-wider rounded transition-all flex items-center gap-1 disabled:opacity-50"
+                          >
+                            {isExportingTheme ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <Download className="w-3.5 h-3.5 text-black" />
+                            )}
+                            <span>Export ZIP</span>
+                          </button>
                         </div>
                       </div>
                     )}
