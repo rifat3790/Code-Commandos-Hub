@@ -110,6 +110,12 @@ export default function AuditSuitePage() {
     }, 1000);
 
     // Listen for extension bridge events
+    const handleStarted = () => {
+       if ((window as any).extensionTimeout) {
+         clearTimeout((window as any).extensionTimeout);
+       }
+       addLog('Extension connected. Starting export...', 'success');
+    };
     const handleProgress = (e: any) => setExtensionProgress({ percent: e.detail.percent, message: e.detail.message });
     const handleComplete = () => {
       setIsExportingTheme(false);
@@ -122,6 +128,7 @@ export default function AuditSuitePage() {
       addLog('Extension Export Error: ' + e.detail.message, 'error');
     };
 
+    window.addEventListener('SHOPIFY_EXPORT_STARTED', handleStarted);
     window.addEventListener('SHOPIFY_EXPORT_PROGRESS', handleProgress);
     window.addEventListener('SHOPIFY_EXPORT_COMPLETE', handleComplete);
     window.addEventListener('SHOPIFY_EXPORT_ERROR', handleError);
@@ -129,6 +136,7 @@ export default function AuditSuitePage() {
     return () => {
       clearInterval(pingInterval);
       window.removeEventListener('message', handleMessage);
+      window.removeEventListener('SHOPIFY_EXPORT_STARTED', handleStarted);
       window.removeEventListener('SHOPIFY_EXPORT_PROGRESS', handleProgress);
       window.removeEventListener('SHOPIFY_EXPORT_COMPLETE', handleComplete);
       window.removeEventListener('SHOPIFY_EXPORT_ERROR', handleError);
@@ -382,12 +390,14 @@ Report generated on Code Commandos Speed Audit Suite.`;
       if (exportMethod === 'extension') {
         window.dispatchEvent(new CustomEvent('START_SHOPIFY_EXPORT', { detail: { url: inspectUrl.trim() } }));
         // If extension is not installed, it won't respond, so we set a timeout to reset the UI and show error
-        setTimeout(() => {
-          if (isExportingTheme) {
-             // If it's still exporting after 3 seconds with no progress, it probably failed to connect
-             addLog("Extension didn't respond. Ensure it's reloaded and active.", "error");
-             setIsExportingTheme(false);
-          }
+        (window as any).extensionTimeout = setTimeout(() => {
+           setIsExportingTheme((prev) => {
+             if (prev) {
+               addLog("Extension didn't respond. Please ensure it is updated and reloaded in chrome://extensions.", "error");
+               return false;
+             }
+             return prev;
+           });
         }, 5000);
         return;
       }
