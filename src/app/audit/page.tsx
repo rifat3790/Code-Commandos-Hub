@@ -388,7 +388,7 @@ Report generated on Code Commandos Speed Audit Suite.`;
         row.push(''); row.push(''); row.push(''); row.push('');
 
         row.push(variant?.featured_image?.src || ''); // Variant Image
-        row.push(variant?.weight_unit || 'weight' in variant ? (variant.weight_unit || 'kg') : 'kg'); // Variant Weight Unit
+        row.push(variant ? (variant.weight_unit || 'kg') : ''); // Variant Weight Unit
         row.push(''); // Variant Tax Code
         row.push(''); // Cost per item
         row.push(isFirstRow ? status : ''); // Status
