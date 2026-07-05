@@ -399,7 +399,8 @@ Report generated on Code Commandos Speed Audit Suite.`;
 
     const csvContent = rows
       .map(r => r.map(val => {
-        let cleanVal = String(val);
+        let cleanVal = val == null ? '' : String(val);
+        if (cleanVal === 'undefined') cleanVal = '';
         if (cleanVal.includes('"') || cleanVal.includes(',') || cleanVal.includes('\n') || cleanVal.includes('\r')) {
           cleanVal = '"' + cleanVal.replace(/"/g, '""') + '"';
         }
@@ -407,17 +408,26 @@ Report generated on Code Commandos Speed Audit Suite.`;
       }).join(','))
       .join('\n');
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', filename);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    try {
+      const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+      
+      setTimeout(() => {
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      }, 100);
 
-    store.logActivity('Products Exported', 'download', `Exported ${products.length} products to CSV: ${filename}`);
+      store.logActivity('Products Exported', 'download', `Exported ${products.length} products to CSV: ${filename}`);
+    } catch (err) {
+      console.error('Download error:', err);
+      alert('Error generating CSV download. Please check console.');
+    }
   };
 
   return (
