@@ -114,8 +114,7 @@ export async function GET(request: Request) {
       }
     }, null, 2));
 
-    // Placeholders to preserve empty folders in ZIP
-    zip.file("sections/placeholder.liquid", "{% comment %}Placeholder section{% endcomment %}");
+    // Placeholders to preserve empty folders/snippets in ZIP
     zip.file("snippets/placeholder.liquid", "{% comment %}Placeholder snippet{% endcomment %}");
 
     // Regex to extract asset paths
@@ -229,15 +228,139 @@ export async function GET(request: Request) {
   </body>
 </html>`;
 
-    // Build templates/index.liquid (holds homepage layout)
-    const indexLiquid = `{% comment %}
+    // Modern Shopify OS 2.0 Templates Scaffolding (JSON Templates pointing to sections)
+    zip.file("templates/index.json", JSON.stringify({
+      "sections": {
+        "main": {
+          "type": "main-index",
+          "settings": {}
+        }
+      },
+      "order": ["main"]
+    }, null, 2));
+
+    zip.file("templates/product.json", JSON.stringify({
+      "sections": {
+        "main": {
+          "type": "main-product",
+          "settings": {}
+        }
+      },
+      "order": ["main"]
+    }, null, 2));
+
+    zip.file("templates/collection.json", JSON.stringify({
+      "sections": {
+        "main": {
+          "type": "main-collection",
+          "settings": {}
+        }
+      },
+      "order": ["main"]
+    }, null, 2));
+
+    zip.file("templates/404.json", JSON.stringify({
+      "sections": {
+        "main": {
+          "type": "main-404",
+          "settings": {}
+        }
+      },
+      "order": ["main"]
+    }, null, 2));
+
+    zip.file("templates/cart.json", JSON.stringify({
+      "sections": {
+        "main": {
+          "type": "main-cart",
+          "settings": {}
+        }
+      },
+      "order": ["main"]
+    }, null, 2));
+
+    // Compile section codes holding the scraped pages
+    const mainIndexLiquid = `{% comment %}
   Homepage reconstructed from scraped storefront HTML
 {% endcomment %}
 
-${bodyContent}`;
+<div class="scraped-homepage-section">
+  ${bodyContent}
+</div>
+
+{% schema %}
+{
+  "name": "Scraped Homepage Content",
+  "settings": [],
+  "presets": [
+    {
+      "name": "Default"
+    }
+  ]
+}
+{% endschema %}`;
+
+    const mainProductLiquid = `<div class="product-page-placeholder" style="padding: 80px 20px; text-align: center; max-width: 1200px; margin: 0 auto;">
+  <h1 style="font-size: 2.5rem; margin-bottom: 1rem;">{{ product.title }}</h1>
+  <div style="font-size: 1.5rem; color: #666; margin-bottom: 2rem;">{{ product.price | money }}</div>
+  <button style="padding: 12px 30px; font-weight: bold; background: #000; color: #fff; border: none; cursor: pointer;">Add to Cart</button>
+</div>
+{% schema %}
+{
+  "name": "Product Details Placeholder",
+  "settings": []
+}
+{% endschema %}`;
+
+    const mainCollectionLiquid = `<div class="collection-page-placeholder" style="padding: 80px 20px; text-align: center; max-width: 1200px; margin: 0 auto;">
+  <h1 style="font-size: 2.5rem; margin-bottom: 2rem;">Collection: {{ collection.title }}</h1>
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px;">
+    {% for product in collection.products %}
+      <div style="border: 1px solid #eee; padding: 15px; text-align: center;">
+        <div style="height: 200px; background: #fafafa; margin-bottom: 10px; display: flex; align-items: center; justify-content: center; color: #ccc;">[Product Image]</div>
+        <h3>{{ product.title }}</h3>
+        <p>{{ product.price | money }}</p>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+{% schema %}
+{
+  "name": "Collection Products Placeholder",
+  "settings": []
+}
+{% endschema %}`;
+
+    const main404Liquid = `<div style="padding: 120px 20px; text-align: center; max-width: 600px; margin: 0 auto;">
+  <h1 style="font-size: 3rem; margin-bottom: 1rem;">404 Page Not Found</h1>
+  <p style="color: #666; margin-bottom: 2rem;">The page you are looking for does not exist.</p>
+  <a href="/" style="display: inline-block; padding: 10px 25px; background: #000; color: #fff; text-decoration: none; font-weight: bold;">Back to Home</a>
+</div>
+{% schema %}
+{
+  "name": "404 Main Content",
+  "settings": []
+}
+{% endschema %}`;
+
+    const mainCartLiquid = `<div style="padding: 80px 20px; max-width: 800px; margin: 0 auto;">
+  <h1 style="font-size: 2.5rem; margin-bottom: 2rem;">Your Shopping Cart</h1>
+  <p style="color: #666;">Your cart is currently empty.</p>
+  <a href="/" style="display: inline-block; margin-top: 1.5rem; padding: 10px 25px; background: #000; color: #fff; text-decoration: none; font-weight: bold;">Continue Shopping</a>
+</div>
+{% schema %}
+{
+  "name": "Cart Main Content",
+  "settings": []
+}
+{% endschema %}`;
 
     zip.file("layout/theme.liquid", themeLiquid);
-    zip.file("templates/index.liquid", indexLiquid);
+    zip.file("sections/main-index.liquid", mainIndexLiquid);
+    zip.file("sections/main-product.liquid", mainProductLiquid);
+    zip.file("sections/main-collection.liquid", mainCollectionLiquid);
+    zip.file("sections/main-404.liquid", main404Liquid);
+    zip.file("sections/main-cart.liquid", mainCartLiquid);
 
     // Generate standard zip output
     const zipBlob = await zip.generateAsync({ type: 'blob' });
