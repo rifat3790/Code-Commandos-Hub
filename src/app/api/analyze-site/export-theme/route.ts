@@ -3,6 +3,11 @@ import JSZip from 'jszip';
 
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
+const EXCLUDED_EXTENSIONS = [
+  '.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg',
+  '.mp4', '.mov', '.webm', '.ogg', '.mp3', '.wav'
+];
+
 async function fetchAssetWithRetry(key: string, themeId: number, domain: string, token: string, retries = 3): Promise<any> {
   for (let i = 0; i < retries; i++) {
     try {
@@ -16,14 +21,14 @@ async function fetchAssetWithRetry(key: string, themeId: number, domain: string,
         return await res.json();
       }
       if (res.status === 429) {
-        // Wait 1.5 seconds on 429 rate limit
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        // Wait 1 second on 429 rate limit
+        await new Promise(resolve => setTimeout(resolve, 1000));
         continue;
       }
       throw new Error(`Status ${res.status}`);
     } catch (e) {
       if (i === retries - 1) throw e;
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise(resolve => setTimeout(resolve, 800));
     }
   }
 }
@@ -100,10 +105,17 @@ export async function GET(request: Request) {
       const assetsData = await assetsRes.json();
       const assetsList = assetsData.assets || [];
 
+      // Filter out images, videos, and SVGs inside theme assets to avoid bulk size and timeouts
+      const filteredAssets = assetsList.filter((asset: any) => {
+        const lowerKey = asset.key.toLowerCase();
+        return !EXCLUDED_EXTENSIONS.some(ext => lowerKey.endsWith(ext));
+      });
+
       // 3. Batch download assets to stay within Shopify API rate limit limits
-      const batchSize = 15;
-      for (let i = 0; i < assetsList.length; i += batchSize) {
-        const batch = assetsList.slice(i, i + batchSize);
+      // We increased the batch size to 25 to reduce total round-trips and avoid Vercel 10s timeout
+      const batchSize = 25;
+      for (let i = 0; i < filteredAssets.length; i += batchSize) {
+        const batch = filteredAssets.slice(i, i + batchSize);
         await Promise.all(batch.map(async (asset: any) => {
           try {
             const data = await fetchAssetWithRetry(asset.key, themeId, domain, adminToken);
@@ -119,8 +131,8 @@ export async function GET(request: Request) {
             console.warn(`Admin API asset download failed for key: ${asset.key}`, err);
           }
         }));
-        // Cool-down period between batches to prevent rate limits
-        await new Promise(resolve => setTimeout(resolve, 150));
+        // Reduced sleep delay to speed up execution
+        await new Promise(resolve => setTimeout(resolve, 80));
       }
 
       const zipBlob = await zip.generateAsync({ type: 'blob' });
@@ -224,12 +236,11 @@ export async function GET(request: Request) {
     // Placeholders to preserve empty folders/snippets in ZIP
     zip.file("snippets/placeholder.liquid", "{% comment %}Placeholder snippet{% endcomment %}");
 
-    // Regex to extract asset paths
+    // Regex to extract asset paths (Excluding images/videos in cloner ZIP assets as requested!)
     const cssRegex = /<link [^>]*href=["']([^"']+\.css(?:\?[^"']*)?)["']/gi;
     const jsRegex = /<script [^>]*src=["']([^"']+\.js(?:\?[^"']*)?)["']/gi;
-    const imgRegex = /<img [^>]*src=["']([^"']+\.(?:png|jpg|jpeg|gif|webp|svg)(?:\?[^"']*)?)["']/gi;
 
-    const assetsToDownload: { url: string; type: 'css' | 'js' | 'img' }[] = [];
+    const assetsToDownload: { url: string; type: 'css' | 'js' }[] = [];
     let match;
 
     // CSS
@@ -245,14 +256,6 @@ export async function GET(request: Request) {
       const url = match[1];
       if (!url.startsWith('data:')) {
         assetsToDownload.push({ url, type: 'js' });
-      }
-    }
-
-    // Images
-    while ((match = imgRegex.exec(html)) !== null) {
-      const url = match[1];
-      if (!url.startsWith('data:')) {
-        assetsToDownload.push({ url, type: 'img' });
       }
     }
 
@@ -273,7 +276,7 @@ export async function GET(request: Request) {
       bodyContent = html;
     }
 
-    // Limit download batch to 60 to prevent long await or timeout
+    // Limit download batch to 60
     const limitedAssets = uniqueAssets.slice(0, 60);
 
     const downloadPromises = limitedAssets.map(async (asset) => {
@@ -297,8 +300,7 @@ export async function GET(request: Request) {
 
           if (!filename.includes('.')) {
             if (asset.type === 'css') filename += '.css';
-            else if (asset.type === 'js') filename += '.js';
-            else filename += '.png';
+            else filename += '.js';
           }
 
           // In Shopify themes, assets must be placed FLAT under the assets directory!

@@ -848,6 +848,93 @@ Report generated on Code Commandos Speed Audit Suite.`;
                   </div>
                 </div>
               </div>
+
+              {/* Media Asset Inspector */}
+              {techInfo && (
+                <div className="p-5 rounded-xl border border-glass-border bg-gray-950/20 relative overflow-hidden space-y-4">
+                  <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-yellow-500 via-amber-500 to-orange-500" />
+                  
+                  <div className="flex justify-between items-center border-b border-glass-border pb-2.5">
+                    <span className="text-[10px] text-yellow-500 font-extrabold uppercase tracking-wider flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-yellow-500 animate-pulse" />
+                      <span>Media Asset Inspector</span>
+                    </span>
+                    {detectedImages.length > 0 && (
+                      <span className="text-[10px] font-black text-yellow-400 font-mono bg-yellow-500/10 border border-yellow-500/20 px-2 py-0.5 rounded">
+                        {detectedImages.length} IMAGES
+                      </span>
+                    )}
+                  </div>
+
+                  {detectedImages.length === 0 ? (
+                    <button
+                      onClick={handleLoadImages}
+                      disabled={isLoadingImages}
+                      className="w-full flex items-center justify-center gap-2 bg-yellow-500/5 hover:bg-yellow-500/10 text-yellow-400 font-extrabold text-xs uppercase tracking-wider py-2.5 px-4 rounded-lg border border-yellow-500/20 transition-all cursor-pointer shadow-[inset_0_0_15px_rgba(234,179,8,0.02)]"
+                    >
+                      {isLoadingImages ? (
+                        <Loader2 className="w-4 h-4 animate-spin text-yellow-500" />
+                      ) : (
+                        <FolderSync className="w-4 h-4 text-yellow-500" />
+                      )}
+                      <span>Load Store Images</span>
+                    </button>
+                  ) : (
+                    <div className="space-y-4 animate-in fade-in duration-300">
+                      {/* Controls */}
+                      <div className="flex justify-between items-center gap-2">
+                        <button
+                          onClick={handleLoadImages}
+                          disabled={isLoadingImages}
+                          className="px-3.5 py-1.5 bg-white/5 border border-glass-border hover:bg-white/10 rounded-lg text-[10px] font-bold text-gray-300 transition-all flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <RefreshCw className={`w-3.5 h-3.5 text-yellow-500 ${isLoadingImages ? 'animate-spin' : ''}`} />
+                          <span>Reload Gallery</span>
+                        </button>
+                        <button
+                          onClick={handleDownloadAllImages}
+                          disabled={isZippingImages}
+                          className="px-4 py-1.5 bg-yellow-500 hover:bg-yellow-600 rounded-lg text-[10px] font-black text-black transition-all flex items-center gap-1.5 cursor-pointer shadow-lg shadow-yellow-500/10 hover:shadow-yellow-500/20"
+                        >
+                          {isZippingImages ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <Download className="w-3.5 h-3.5 stroke-[3]" />
+                          )}
+                          <span>Download All (ZIP)</span>
+                        </button>
+                      </div>
+
+                      {/* Image Grid */}
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-h-[300px] overflow-y-auto pr-1 scrollbar-thin">
+                        {detectedImages.map((img, idx) => (
+                          <div 
+                            key={idx}
+                            className="group relative aspect-square bg-black/60 rounded-xl overflow-hidden border border-glass-border hover:border-yellow-500/30 transition-all shadow-[inset_0_0_10px_rgba(0,0,0,0.5)]"
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img 
+                              src={img} 
+                              alt="Store asset" 
+                              className="w-full h-full object-cover group-hover:scale-105 transition-all duration-300"
+                              loading="lazy"
+                            />
+                            <div className="absolute inset-0 bg-black/75 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all duration-200">
+                              <button
+                                onClick={() => handleDownloadSingleImage(img)}
+                                className="p-2 bg-yellow-500 rounded-lg text-black hover:scale-110 active:scale-95 transition-all cursor-pointer shadow-lg shadow-yellow-500/25"
+                                title="Download image"
+                              >
+                                <Download className="w-3.5 h-3.5 stroke-[3]" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Results Sidebar */}
@@ -1074,85 +1161,7 @@ Report generated on Code Commandos Speed Audit Suite.`;
                 </div>
               )}
 
-              {/* Media Asset Inspector */}
-              {techInfo && (
-                <div className="p-5 rounded-xl border border-glass-border bg-gray-950/20 space-y-4">
-                  <span className="text-[10px] text-gray-500 font-extrabold uppercase tracking-wider flex items-center justify-between border-b border-glass-border pb-1.5">
-                    <span className="flex items-center gap-1"><Sparkles className="w-3 h-3 text-yellow-400" /> Media Asset Inspector</span>
-                    {detectedImages.length > 0 && (
-                      <span className="text-yellow-400 font-mono">{detectedImages.length} images</span>
-                    )}
-                  </span>
 
-                  {detectedImages.length === 0 ? (
-                    <button
-                      onClick={handleLoadImages}
-                      disabled={isLoadingImages}
-                      className="w-full flex items-center justify-center gap-2 bg-white/5 hover:bg-white/10 text-white font-extrabold text-xs uppercase tracking-wider py-2.5 px-4 rounded-lg border border-glass-border transition-all cursor-pointer"
-                    >
-                      {isLoadingImages ? (
-                        <Loader2 className="w-4 h-4 animate-spin text-yellow-400" />
-                      ) : (
-                        <FolderSync className="w-4 h-4 text-yellow-400" />
-                      )}
-                      <span>Load Store Images</span>
-                    </button>
-                  ) : (
-                    <div className="space-y-4">
-                      {/* Controls */}
-                      <div className="flex justify-between items-center gap-2">
-                        <button
-                          onClick={handleLoadImages}
-                          disabled={isLoadingImages}
-                          className="px-3 py-1.5 bg-white/5 border border-glass-border hover:bg-white/10 rounded-md text-[10px] font-bold text-gray-300 transition-all flex items-center gap-1.5 cursor-pointer"
-                        >
-                          <RefreshCw className={`w-3.5 h-3.5 ${isLoadingImages ? 'animate-spin' : ''}`} />
-                          <span>Reload</span>
-                        </button>
-                        <button
-                          onClick={handleDownloadAllImages}
-                          disabled={isZippingImages}
-                          className="px-3 py-1.5 bg-yellow-500 hover:bg-yellow-600 rounded-md text-[10px] font-black text-black transition-all flex items-center gap-1.5 cursor-pointer"
-                        >
-                          {isZippingImages ? (
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          ) : (
-                            <Download className="w-3.5 h-3.5 stroke-[3]" />
-                          )}
-                          <span>Download All (ZIP)</span>
-                        </button>
-                      </div>
-
-                      {/* Image Grid */}
-                      <div className="grid grid-cols-3 gap-2.5 max-h-[250px] overflow-y-auto pr-1">
-                        {detectedImages.map((img, idx) => (
-                          <div 
-                            key={idx}
-                            className="group relative aspect-square bg-black/40 rounded-lg overflow-hidden border border-glass-border hover:border-yellow-500/30 transition-all"
-                          >
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img 
-                              src={img} 
-                              alt="Store asset" 
-                              className="w-full h-full object-cover group-hover:scale-105 transition-all duration-300"
-                              loading="lazy"
-                            />
-                            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all duration-200">
-                              <button
-                                onClick={() => handleDownloadSingleImage(img)}
-                                className="p-1.5 bg-yellow-500 rounded text-black hover:scale-110 active:scale-95 transition-all cursor-pointer"
-                                title="Download image"
-                              >
-                                <Download className="w-3.5 h-3.5 stroke-[3]" />
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
           </motion.div>
         )}
