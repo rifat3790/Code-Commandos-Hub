@@ -76,27 +76,69 @@ export async function GET(request: Request) {
 
     const zip = new JSZip();
 
+    // Create Shopify directory structure
+    zip.folder("assets");
+    zip.folder("config");
+    zip.folder("layout");
+    zip.folder("locales");
+    zip.folder("sections");
+    zip.folder("snippets");
+    zip.folder("templates");
+
+    // Populate static Shopify configurations
+    zip.file("config/settings_schema.json", JSON.stringify([
+      {
+        "name": "theme_info",
+        "theme_name": "Scraped Theme Clone",
+        "theme_version": "1.0.0",
+        "theme_author": "Code Commandos",
+        "theme_documentation_url": "https://github.com",
+        "theme_support_url": "https://github.com"
+      }
+    ], null, 2));
+
+    zip.file("config/settings_data.json", JSON.stringify({
+      "current": "Default",
+      "presets": {
+        "Default": {
+          "sections": {}
+        }
+      }
+    }, null, 2));
+
+    zip.file("locales/en.default.json", JSON.stringify({
+      "general": {
+        "password_page": {
+          "login_form_heading": "Enter store using password"
+        }
+      }
+    }, null, 2));
+
+    // Placeholders to preserve empty folders in ZIP
+    zip.file("sections/placeholder.liquid", "{% comment %}Placeholder section{% endcomment %}");
+    zip.file("snippets/placeholder.liquid", "{% comment %}Placeholder snippet{% endcomment %}");
+
     // Regex to extract asset paths
     const cssRegex = /<link [^>]*href=["']([^"']+\.css(?:\?[^"']*)?)["']/gi;
     const jsRegex = /<script [^>]*src=["']([^"']+\.js(?:\?[^"']*)?)["']/gi;
     const imgRegex = /<img [^>]*src=["']([^"']+\.(?:png|jpg|jpeg|gif|webp|svg)(?:\?[^"']*)?)["']/gi;
 
-    const assetsToDownload: { url: string; folder: string }[] = [];
+    const assetsToDownload: { url: string; type: 'css' | 'js' | 'img' }[] = [];
     let match;
 
-    // CSS stylesheets
+    // CSS
     while ((match = cssRegex.exec(html)) !== null) {
       const url = match[1];
       if (!url.startsWith('data:')) {
-        assetsToDownload.push({ url, folder: 'assets/css' });
+        assetsToDownload.push({ url, type: 'css' });
       }
     }
 
-    // JS scripts
+    // JS
     while ((match = jsRegex.exec(html)) !== null) {
       const url = match[1];
       if (!url.startsWith('data:')) {
-        assetsToDownload.push({ url, folder: 'assets/js' });
+        assetsToDownload.push({ url, type: 'js' });
       }
     }
 
@@ -104,20 +146,30 @@ export async function GET(request: Request) {
     while ((match = imgRegex.exec(html)) !== null) {
       const url = match[1];
       if (!url.startsWith('data:')) {
-        assetsToDownload.push({ url, folder: 'assets/images' });
+        assetsToDownload.push({ url, type: 'img' });
       }
     }
 
-    // Filter duplicates
     const uniqueAssets = Array.from(new Set(assetsToDownload.map(a => JSON.stringify(a)))).map(s => JSON.parse(s)) as typeof assetsToDownload;
 
-    // We will rewrite matched URLs inside index.html to refer to local ZIP paths
-    let rewrittenHtml = html;
+    // We'll perform rewrites on both <head> and <body> content separately
+    let headContent = '';
+    const headMatch = html.match(/<head[^>]*>([\s\S]*?)<\/head>/i);
+    if (headMatch) {
+      headContent = headMatch[1];
+    }
 
-    // Limit to 50 assets to avoid high latency or server timeouts
-    const limitedAssets = uniqueAssets.slice(0, 50);
+    let bodyContent = '';
+    const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+    if (bodyMatch) {
+      bodyContent = bodyMatch[1];
+    } else {
+      bodyContent = html;
+    }
 
-    // Parallel downloader
+    // Limit download batch to 60 to prevent long await or timeout
+    const limitedAssets = uniqueAssets.slice(0, 60);
+
     const downloadPromises = limitedAssets.map(async (asset) => {
       let assetUrl = asset.url;
       if (assetUrl.startsWith('//')) {
@@ -132,23 +184,24 @@ export async function GET(request: Request) {
         const res = await fetch(assetUrl, { headers: { 'User-Agent': USER_AGENT } });
         if (res.ok) {
           const buffer = await res.arrayBuffer();
-          // Cleanup file name
+          // Extract filename without queries
           const parsedUrl = new URL(assetUrl);
           let filename = parsedUrl.pathname.split('/').pop() || 'asset';
-          filename = filename.split('?')[0]; // strip query strings
-          
+          filename = filename.split('?')[0];
+
           if (!filename.includes('.')) {
-            if (asset.folder === 'assets/css') filename += '.css';
-            else if (asset.folder === 'assets/js') filename += '.js';
+            if (asset.type === 'css') filename += '.css';
+            else if (asset.type === 'js') filename += '.js';
             else filename += '.png';
           }
 
-          const zipPath = `${asset.folder}/${filename}`;
-          zip.file(zipPath, buffer);
+          // In Shopify themes, assets must be placed FLAT under the assets directory!
+          zip.file(`assets/${filename}`, buffer);
 
-          // Update HTML mapping
-          const localPath = `./${zipPath}`;
-          rewrittenHtml = rewrittenHtml.replaceAll(asset.url, localPath);
+          // Map/Replace asset reference in both head and body using Shopify liquid syntax
+          const liquidAssetRef = `{{ '${filename}' | asset_url }}`;
+          headContent = headContent.replaceAll(asset.url, liquidAssetRef);
+          bodyContent = bodyContent.replaceAll(asset.url, liquidAssetRef);
         }
       } catch (err) {
         console.warn(`Export failure for asset: ${assetUrl}`, err);
@@ -157,8 +210,34 @@ export async function GET(request: Request) {
 
     await Promise.all(downloadPromises);
 
-    // Add main html page
-    zip.file("index.html", rewrittenHtml);
+    // Build standard layout/theme.liquid
+    // We must inject {{ content_for_header }} in the head, and {{ content_for_layout }} in the body
+    const themeLiquid = `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>{{ page_title }}</title>
+    
+    <!-- Scraped head resources -->
+    ${headContent}
+    
+    {{ content_for_header }}
+  </head>
+  <body>
+    {{ content_for_layout }}
+  </body>
+</html>`;
+
+    // Build templates/index.liquid (holds homepage layout)
+    const indexLiquid = `{% comment %}
+  Homepage reconstructed from scraped storefront HTML
+{% endcomment %}
+
+${bodyContent}`;
+
+    zip.file("layout/theme.liquid", themeLiquid);
+    zip.file("templates/index.liquid", indexLiquid);
 
     // Generate standard zip output
     const zipBlob = await zip.generateAsync({ type: 'blob' });
@@ -167,7 +246,7 @@ export async function GET(request: Request) {
     return new Response(zipBlob, {
       headers: {
         'Content-Type': 'application/zip',
-        'Content-Disposition': `attachment; filename="${cleanDomain}_theme_assets.zip"`
+        'Content-Disposition': `attachment; filename="theme_export_${cleanDomain}.zip"`
       }
     });
 
