@@ -209,7 +209,7 @@ export async function GET(request: Request) {
         }
       }
 
-      // 2. App Stack Extraction
+      // 2. App Stack Extraction (Dictionary based)
       const appSignatures: Record<string, string[]> = {
         'Klaviyo (Email Marketing)': ['klaviyo.com', 'onsite/js/klaviyo.js'],
         'Omnisend (Email Marketing)': ['omnisend.com', 'soundestlink'],
@@ -228,7 +228,7 @@ export async function GET(request: Request) {
         'Intercom': ['intercom.io', 'intercomcdn.com'],
         'Reamaze': ['reamaze.com'],
         'WhatsApp Chat (Elfsight)': ['elfsight.com'],
-        'Shopify Inbox': ['shopify_chat', 'shopify-chat'],
+        'Shopify Inbox': ['shopify_chat', 'shopify-chat', 'chat.shopify.com', 'shopify-inbox'],
         'Recharge (Subscriptions)': ['rechargepayments.com', 'recharge-subscription'],
         'Skio (Subscriptions)': ['skio.com', 'skio-plan-picker'],
         'Bold Subscriptions': ['boldapps.net', 'bold-subscriptions'],
@@ -261,6 +261,7 @@ export async function GET(request: Request) {
         'Algolia': ['algolia.net'],
         'Instafeed (Mintt Studio)': ['instafeed.minttstudio.com'],
         'Covet.pics (Shoppable Instagram)': ['covet.pics'],
+        'GSC Instagram Feed': ['gsc-instagram', 'gsc.io'],
         'Track123 (Order Tracking)': ['track123.com'],
         '17TRACK': ['17track.net'],
         'ParcelPanel': ['parcelpanel.com'],
@@ -298,12 +299,61 @@ export async function GET(request: Request) {
         'ClearPay': ['clearpay.com'],
         'Klarna': ['klarna.com', 'klarnaservices.com'],
         'Affirm': ['affirm.com'],
-        'Shop Pay': ['shop.app']
+        'Shop Pay': ['shop.app'],
+        'Globo Product Options': ['globosoftware.net', 'globo-product-options'],
+        'Events Calendar by InlightLabs': ['inlightlabs.com', 'events-calendar'],
+        'The Shop Calendar': ['shop-calendar'],
+        'Misk Variant Product Options': ['misk-variant', 'misk'],
+        'OSync (Order Sync)': ['osync'],
+        'Calee': ['calee'],
+        'Simesy Checkout Rules': ['simesy']
       };
 
       for (const [appName, signatures] of Object.entries(appSignatures)) {
         if (signatures.some(sig => html.includes(sig))) {
           detectedApps.push(appName);
+        }
+      }
+
+      // 2.1 Dynamic App Block Extraction (OS 2.0)
+      // Extracts dynamic app names embedded as App Blocks in Shopify OS 2.0 architecture
+      // Format: cdn.shopify.com/extensions/[uuid]/[app-name-or-block]/[version]/
+      const extensionRegex = /cdn\.shopify\.com\/extensions\/[a-zA-Z0-9-]+\/([a-zA-Z0-9-]+)\//g;
+      let extMatch;
+      while ((extMatch = extensionRegex.exec(html)) !== null) {
+         if (extMatch[1]) {
+           const rawName = extMatch[1];
+           // Format handle to title case (e.g. globo-product-options -> Globo Product Options)
+           const formattedName = rawName.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+           
+           // Make sure we don't duplicate apps we already found via dictionary
+           const isAlreadyDetected = detectedApps.some(app => app.toLowerCase().includes(formattedName.toLowerCase()) || formattedName.toLowerCase().includes(app.toLowerCase()));
+           
+           if (!isAlreadyDetected && formattedName.length > 2 && formattedName.toLowerCase() !== 'assets' && formattedName.toLowerCase() !== 'snippets') {
+             detectedApps.push(`${formattedName} (App Block)`);
+           }
+         }
+      }
+
+      // 2.2 Global Shopify window.Shopify object app extraction
+      // Fallback method to catch asynchronous load apps
+      const asyncLoadMatch = html.match(/var urls = \[([^\]]+)\]/);
+      if (asyncLoadMatch && asyncLoadMatch[1]) {
+        const urlsString = asyncLoadMatch[1];
+        // simple heuristic to find domain names of apps
+        const domainRegex = /https?:\/\/(?:api\.|cdn\.|www\.)?([a-zA-Z0-9-]+)\.[a-zA-Z0-9-.]+/g;
+        let dMatch;
+        while ((dMatch = domainRegex.exec(urlsString)) !== null) {
+          if (dMatch[1] && !dMatch[1].includes('shopify') && !dMatch[1].includes('trekkie')) {
+            const rawName = dMatch[1];
+            const formattedName = rawName.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+            
+            const isAlreadyDetected = detectedApps.some(app => app.toLowerCase().includes(formattedName.toLowerCase()) || formattedName.toLowerCase().includes(app.toLowerCase()));
+            
+            if (!isAlreadyDetected && formattedName.length > 2) {
+              detectedApps.push(`${formattedName} (Script)`);
+            }
+          }
         }
       }
 
