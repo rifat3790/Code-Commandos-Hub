@@ -69,6 +69,8 @@ export default function AuditSuitePage() {
   const [storePassword, setStorePassword] = useState('');
   const [isPasswordProtected, setIsPasswordProtected] = useState(false);
   const [isExportingTheme, setIsExportingTheme] = useState(false);
+  const [exportMethod, setExportMethod] = useState<'public' | 'admin'>('public');
+  const [adminToken, setAdminToken] = useState('');
   const [techInfo, setTechInfo] = useState<{ technology: string; isShopify: boolean; domain: string; theme?: {name: string, id: string, role: string, originalName?: string}; apps?: string[]; pixels?: string[]; socials?: string[]; emails?: string[] } | null>(null);
   const [collections, setCollections] = useState<any[]>([]);
   const [allProducts, setAllProducts] = useState<any[]>([]);
@@ -325,12 +327,20 @@ Report generated on Code Commandos Speed Audit Suite.`;
     
     try {
       let exportUrl = `/api/analyze-site/export-theme?url=${encodeURIComponent(inspectUrl.trim())}`;
-      if (storePassword) {
+      if (exportMethod === 'admin') {
+        if (!adminToken.trim()) {
+          throw new Error('Please enter a valid Admin Access Token.');
+        }
+        exportUrl += `&adminToken=${encodeURIComponent(adminToken.trim())}`;
+      } else if (storePassword) {
         exportUrl += `&storePassword=${encodeURIComponent(storePassword)}`;
       }
       
       const response = await fetch(exportUrl);
-      if (!response.ok) throw new Error('Theme asset export failed.');
+      if (!response.ok) {
+        const errorJson = await response.json().catch(() => ({ error: 'Theme asset export failed.' }));
+        throw new Error(errorJson.error || 'Theme asset export failed.');
+      }
       
       const blob = await response.blob();
       const downloadUrl = window.URL.createObjectURL(blob);
@@ -338,7 +348,8 @@ Report generated on Code Commandos Speed Audit Suite.`;
       link.href = downloadUrl;
       
       const cleanDomain = techInfo.domain.replace(/[^a-zA-Z0-9]/g, '_');
-      link.setAttribute('download', `${cleanDomain}_theme_assets.zip`);
+      const filePrefix = exportMethod === 'admin' ? 'original_theme_' : 'theme_export_';
+      link.setAttribute('download', `${filePrefix}${cleanDomain}.zip`);
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -347,6 +358,7 @@ Report generated on Code Commandos Speed Audit Suite.`;
       addLog('Theme assets exported and downloaded successfully!', 'success');
     } catch (error: any) {
       addLog(`Failed to export theme assets: ${error.message}`, 'error');
+      alert(`Export Failed: ${error.message}`);
     } finally {
       setIsExportingTheme(false);
     }
@@ -765,11 +777,30 @@ Report generated on Code Commandos Speed Audit Suite.`;
                     </div>
 
                     {techInfo.theme && (
-                      <div className="p-4 bg-black/40 border border-glass-border rounded-lg flex flex-col relative overflow-hidden">
+                      <div className="p-4 bg-black/40 border border-glass-border rounded-lg flex flex-col relative overflow-hidden space-y-3">
                         <div className="absolute top-0 right-0 w-24 h-24 bg-brand-green/10 blur-3xl rounded-full pointer-events-none" />
-                        <span className="text-[10px] text-gray-500 font-bold block uppercase tracking-wider flex items-center gap-1 mb-2">
-                          <Code className="w-3 h-3 text-brand-green" /> Theme Architecture
-                        </span>
+                        
+                        <div className="flex justify-between items-center">
+                          <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider flex items-center gap-1">
+                            <Code className="w-3 h-3 text-brand-green" /> Theme Architecture
+                          </span>
+                          
+                          {/* Export Method Toggle */}
+                          <div className="flex bg-black/40 border border-glass-border rounded p-0.5 text-[9px] font-bold">
+                            <button
+                              onClick={() => setExportMethod('public')}
+                              className={`px-1.5 py-0.5 rounded transition-all ${exportMethod === 'public' ? 'bg-brand-green text-black' : 'text-gray-400 hover:text-white'}`}
+                            >
+                              Public Clone
+                            </button>
+                            <button
+                              onClick={() => setExportMethod('admin')}
+                              className={`px-1.5 py-0.5 rounded transition-all ${exportMethod === 'admin' ? 'bg-yellow-500 text-black' : 'text-gray-400 hover:text-white'}`}
+                            >
+                              Admin API (100% Org)
+                            </button>
+                          </div>
+                        </div>
                         
                         <div className="flex justify-between items-end">
                           <div>
@@ -781,7 +812,25 @@ Report generated on Code Commandos Speed Audit Suite.`;
                             <span className="text-xs font-bold text-gray-300">{techInfo.theme.name}</span>
                           </div>
                         </div>
-                        <div className="mt-3 pt-3 border-t border-glass-border/50 flex justify-between items-center text-[10px] text-gray-500 font-mono">
+
+                        {exportMethod === 'admin' && (
+                          <div className="space-y-1.5 p-3 rounded bg-yellow-500/5 border border-yellow-500/20 text-[10px] animate-in fade-in duration-200">
+                            <label className="text-yellow-500 font-bold block">Shopify Admin API Token</label>
+                            <input
+                              type="password"
+                              value={adminToken}
+                              onChange={(e) => setAdminToken(e.target.value)}
+                              placeholder="shpat_xxxxxxxxxxxxxxxxxxxxxxxx"
+                              className="w-full px-2 py-1 bg-black/40 border border-yellow-500/25 rounded text-[10px] text-white focus:outline-none focus:border-yellow-400 transition-all font-mono"
+                            />
+                            <p className="text-[9px] text-gray-500 font-medium leading-relaxed">
+                              Token must have <code className="text-yellow-500/90 font-mono">read_themes</code> / <code className="text-yellow-500/90 font-mono">write_themes</code> permissions. 
+                              Downloads every single original Liquid and section file directly from the store's server.
+                            </p>
+                          </div>
+                        )}
+
+                        <div className="pt-2 border-t border-glass-border/50 flex justify-between items-center text-[10px] text-gray-500 font-mono">
                           <div className="flex flex-col gap-0.5">
                             <span>ID: {techInfo.theme.id}</span>
                             <span>Role: {techInfo.theme.role}</span>
@@ -790,14 +839,14 @@ Report generated on Code Commandos Speed Audit Suite.`;
                           <button
                             onClick={handleExportTheme}
                             disabled={isExportingTheme}
-                            className="px-2.5 py-1 bg-brand-green hover:bg-brand-green-hover text-black font-extrabold text-[10px] uppercase tracking-wider rounded transition-all flex items-center gap-1 disabled:opacity-50"
+                            className={`px-2.5 py-1 font-extrabold text-[10px] uppercase tracking-wider rounded transition-all flex items-center gap-1 disabled:opacity-50 ${exportMethod === 'admin' ? 'bg-yellow-500 hover:bg-yellow-600 text-black' : 'bg-brand-green hover:bg-brand-green-hover text-black'}`}
                           >
                             {isExportingTheme ? (
                               <Loader2 className="w-3.5 h-3.5 animate-spin" />
                             ) : (
                               <Download className="w-3.5 h-3.5 text-black" />
                             )}
-                            <span>Export ZIP</span>
+                            <span>{exportMethod === 'admin' ? 'Export Original' : 'Export Clone'}</span>
                           </button>
                         </div>
                       </div>
