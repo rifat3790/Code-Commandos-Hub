@@ -102,6 +102,13 @@ export default function AuditSuitePage() {
     };
     window.addEventListener('message', handleMessage);
 
+    const pingInterval = setInterval(() => {
+      if (!isExtensionInstalled) {
+        checkExtension();
+        window.postMessage({ type: 'PING_EXTENSION' }, '*');
+      }
+    }, 1000);
+
     // Listen for extension bridge events
     const handleProgress = (e: any) => setExtensionProgress({ percent: e.detail.percent, message: e.detail.message });
     const handleComplete = () => {
@@ -120,6 +127,7 @@ export default function AuditSuitePage() {
     window.addEventListener('SHOPIFY_EXPORT_ERROR', handleError);
 
     return () => {
+      clearInterval(pingInterval);
       window.removeEventListener('message', handleMessage);
       window.removeEventListener('SHOPIFY_EXPORT_PROGRESS', handleProgress);
       window.removeEventListener('SHOPIFY_EXPORT_COMPLETE', handleComplete);
