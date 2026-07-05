@@ -69,8 +69,10 @@ export default function AuditSuitePage() {
   const [storePassword, setStorePassword] = useState('');
   const [isPasswordProtected, setIsPasswordProtected] = useState(false);
   const [isExportingTheme, setIsExportingTheme] = useState(false);
-  const [exportMethod, setExportMethod] = useState<'public' | 'admin'>('public');
+  const [exportMethod, setExportMethod] = useState<'public' | 'admin' | 'extension'>('public');
   const [adminToken, setAdminToken] = useState('');
+  const [isExtensionInstalled, setIsExtensionInstalled] = useState(false);
+  const [extensionProgress, setExtensionProgress] = useState<{percent: number, message: string} | null>(null);
   const [detectedImages, setDetectedImages] = useState<string[]>([]);
   const [isLoadingImages, setIsLoadingImages] = useState(false);
   const [isZippingImages, setIsZippingImages] = useState(false);
@@ -83,6 +85,48 @@ export default function AuditSuitePage() {
 
   useEffect(() => {
     store.hydrate();
+
+    // Listen for extension installation
+    const checkExtension = () => {
+      const extMeta = document.querySelector('meta[name="shopify-theme-exporter"]');
+      if (extMeta && extMeta.getAttribute('content') === 'installed') {
+        setIsExtensionInstalled(true);
+      }
+    };
+    checkExtension();
+
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data && event.data.type === 'EXTENSION_INSTALLED') {
+        setIsExtensionInstalled(true);
+      }
+    };
+    window.addEventListener('message', handleMessage);
+
+    // Listen for extension bridge events
+    const handleProgress = (e: any) => setExtensionProgress({ percent: e.detail.percent, message: e.detail.message });
+    const handleComplete = () => {
+      setIsExportingTheme(false);
+      setExtensionProgress(null);
+      addLog('Theme downloaded successfully via Extension!', 'success');
+      toast.success('Theme successfully exported via Extension');
+    };
+    const handleError = (e: any) => {
+      setIsExportingTheme(false);
+      setExtensionProgress(null);
+      addLog('Extension Export Error: ' + e.detail.message, 'error');
+      toast.error(e.detail.message || 'Extension export failed');
+    };
+
+    window.addEventListener('SHOPIFY_EXPORT_PROGRESS', handleProgress);
+    window.addEventListener('SHOPIFY_EXPORT_COMPLETE', handleComplete);
+    window.addEventListener('SHOPIFY_EXPORT_ERROR', handleError);
+
+    return () => {
+      window.removeEventListener('message', handleMessage);
+      window.removeEventListener('SHOPIFY_EXPORT_PROGRESS', handleProgress);
+      window.removeEventListener('SHOPIFY_EXPORT_COMPLETE', handleComplete);
+      window.removeEventListener('SHOPIFY_EXPORT_ERROR', handleError);
+    };
   }, []);
 
   useEffect(() => {
@@ -329,10 +373,18 @@ Report generated on Code Commandos Speed Audit Suite.`;
     addLog(`Initiating theme asset compilation for ${techInfo.domain}...`, 'info');
     
     try {
+      if (exportMethod === 'extension') {
+        if (!isExtensionInstalled) {
+           throw new Error("Theme Exporter Chrome Extension is not installed or active.");
+        }
+        window.dispatchEvent(new CustomEvent('START_SHOPIFY_EXPORT', { detail: { url: inspectUrl.trim() } }));
+        return;
+      }
+
       let exportUrl = `/api/analyze-site/export-theme?url=${encodeURIComponent(inspectUrl.trim())}`;
       if (exportMethod === 'admin') {
         if (!adminToken.trim()) {
-          throw new Error('Please enter a valid Admin Access Token.');
+           throw new Error('Please enter a valid Admin Access Token.');
         }
         exportUrl += `&adminToken=${encodeURIComponent(adminToken.trim())}`;
       } else if (storePassword) {
@@ -987,7 +1039,13 @@ Report generated on Code Commandos Speed Audit Suite.`;
                               onClick={() => setExportMethod('admin')}
                               className={`px-1.5 py-0.5 rounded transition-all ${exportMethod === 'admin' ? 'bg-yellow-500 text-black' : 'text-gray-400 hover:text-white'}`}
                             >
-                              Admin API (100% Org)
+                              API Token
+                            </button>
+                            <button
+                              onClick={() => setExportMethod('extension')}
+                              className={`px-1.5 py-0.5 rounded transition-all ${exportMethod === 'extension' ? 'bg-purple-500 text-white' : 'text-gray-400 hover:text-white'}`}
+                            >
+                              Extension (100% Org)
                             </button>
                           </div>
                         </div>
@@ -1030,6 +1088,41 @@ Report generated on Code Commandos Speed Audit Suite.`;
                           </div>
                         )}
 
+                        {exportMethod === 'extension' && (
+                          <div className="space-y-2 p-3 rounded bg-purple-500/5 border border-purple-500/20 text-[10px] animate-in fade-in duration-200">
+                            {isExtensionInstalled ? (
+                              <>
+                                <p className="text-purple-400 font-bold flex items-center gap-1.5">
+                                  <ShieldCheck className="w-4 h-4 text-purple-400" /> Extension Connected Successfully
+                                </p>
+                                <p className="text-gray-400">Click Export and we will securely fetch the original files using your active Shopify browser session.</p>
+                                
+                                {extensionProgress && (
+                                  <div className="mt-2 space-y-1.5 p-2 rounded bg-black/30 border border-purple-500/10">
+                                    <div className="flex justify-between items-center text-[9px] uppercase font-bold text-purple-400">
+                                      <span>{extensionProgress.message}</span>
+                                      <span>{extensionProgress.percent}%</span>
+                                    </div>
+                                    <div className="w-full bg-gray-900 rounded-full h-1">
+                                      <div 
+                                        className="bg-purple-500 h-1 rounded-full transition-all duration-300 shadow-[0_0_8px_rgba(168,85,247,0.8)]" 
+                                        style={{ width: `${extensionProgress.percent}%` }} 
+                                      />
+                                    </div>
+                                  </div>
+                                )}
+                              </>
+                            ) : (
+                              <>
+                                <p className="text-red-400 font-bold flex items-center gap-1.5">
+                                  <AlertCircle className="w-4 h-4 text-red-400" /> Extension Not Found
+                                </p>
+                                <p className="text-gray-400">Please install and enable the Theme Exporter Chrome Extension to use this feature.</p>
+                              </>
+                            )}
+                          </div>
+                        )}
+
                         <div className="pt-2 border-t border-glass-border/50 flex justify-between items-center text-[10px] text-gray-500 font-mono">
                           <div className="flex flex-col gap-0.5">
                             <span>ID: {techInfo.theme.id}</span>
@@ -1038,15 +1131,15 @@ Report generated on Code Commandos Speed Audit Suite.`;
                           
                           <button
                             onClick={handleExportTheme}
-                            disabled={isExportingTheme}
-                            className={`px-2.5 py-1 font-extrabold text-[10px] uppercase tracking-wider rounded transition-all flex items-center gap-1 disabled:opacity-50 ${exportMethod === 'admin' ? 'bg-yellow-500 hover:bg-yellow-600 text-black' : 'bg-brand-green hover:bg-brand-green-hover text-black'}`}
+                            disabled={isExportingTheme || (exportMethod === 'extension' && !isExtensionInstalled)}
+                            className={`px-2.5 py-1 font-extrabold text-[10px] uppercase tracking-wider rounded transition-all flex items-center gap-1 disabled:opacity-50 ${exportMethod === 'admin' ? 'bg-yellow-500 hover:bg-yellow-600 text-black' : exportMethod === 'extension' ? 'bg-purple-500 hover:bg-purple-600 text-white' : 'bg-brand-green hover:bg-brand-green-hover text-black'}`}
                           >
                             {isExportingTheme ? (
                               <Loader2 className="w-3.5 h-3.5 animate-spin" />
                             ) : (
-                              <Download className="w-3.5 h-3.5 text-black" />
+                              <Download className="w-3.5 h-3.5" />
                             )}
-                            <span>{exportMethod === 'admin' ? 'Export Original' : 'Export Clone'}</span>
+                            <span>{exportMethod === 'admin' || exportMethod === 'extension' ? 'Export Original' : 'Export Clone'}</span>
                           </button>
                         </div>
                       </div>
