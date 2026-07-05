@@ -66,7 +66,7 @@ export default function AuditSuitePage() {
   const [inspectUrl, setInspectUrl] = useState('');
   const [scanStatus, setScanStatus] = useState<'idle' | 'detecting' | 'fetching_products' | 'mapping_collections' | 'completed' | 'error'>('idle');
   const [scanError, setScanError] = useState('');
-  const [techInfo, setTechInfo] = useState<{ technology: string; isShopify: boolean; domain: string; theme?: {name: string, id: string, role: string}; apps?: string[] } | null>(null);
+  const [techInfo, setTechInfo] = useState<{ technology: string; isShopify: boolean; domain: string; theme?: {name: string, id: string, role: string, originalName?: string}; apps?: string[]; pixels?: string[]; socials?: string[]; emails?: string[] } | null>(null);
   const [collections, setCollections] = useState<any[]>([]);
   const [allProducts, setAllProducts] = useState<any[]>([]);
   const [scanLogs, setScanLogs] = useState<string[]>([]);
@@ -167,11 +167,16 @@ Report generated on Code Commandos Speed Audit Suite.`;
         isShopify: detectData.isShopify,
         domain: detectData.domain,
         theme: detectData.theme,
-        apps: detectData.apps
+        apps: detectData.apps,
+        pixels: detectData.pixels,
+        socials: detectData.socials,
+        emails: detectData.emails
       });
 
-      if (detectData.theme?.name) addLog(`Theme detected: ${detectData.theme.name}`, 'success');
+      if (detectData.theme?.originalName) addLog(`Original Theme Match: ${detectData.theme.originalName}`, 'success');
+      if (detectData.theme?.name) addLog(`Theme renamed to: ${detectData.theme.name}`, 'info');
       if (detectData.apps?.length > 0) addLog(`Detected ${detectData.apps.length} Shopify apps`, 'success');
+      if (detectData.pixels?.length > 0) addLog(`Detected ${detectData.pixels.length} marketing pixels`, 'success');
 
       addLog(`Normalized domain: ${detectData.domain}`, 'success');
       addLog(`Technology detected: ${detectData.technology}`, 'success');
@@ -686,17 +691,25 @@ Report generated on Code Commandos Speed Audit Suite.`;
                     </div>
 
                     {techInfo.theme && (
-                      <div className="p-3 bg-black/40 border border-glass-border rounded-lg flex justify-between items-center relative overflow-hidden">
-                        <div className="absolute top-0 right-0 w-16 h-16 bg-brand-green/10 blur-2xl rounded-full pointer-events-none" />
-                        <div>
-                          <span className="text-[10px] text-gray-500 font-bold block uppercase tracking-wider flex items-center gap-1">
-                            <Code className="w-3 h-3 text-brand-green" /> Active Theme
-                          </span>
-                          <span className="text-sm font-black text-white mt-0.5 block">{techInfo.theme.name}</span>
+                      <div className="p-4 bg-black/40 border border-glass-border rounded-lg flex flex-col relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-24 h-24 bg-brand-green/10 blur-3xl rounded-full pointer-events-none" />
+                        <span className="text-[10px] text-gray-500 font-bold block uppercase tracking-wider flex items-center gap-1 mb-2">
+                          <Code className="w-3 h-3 text-brand-green" /> Theme Architecture
+                        </span>
+                        
+                        <div className="flex justify-between items-end">
+                          <div>
+                            <span className="text-xs text-gray-400 block mb-0.5">Original Blueprint</span>
+                            <span className="text-base font-black text-white">{techInfo.theme.originalName || 'Unknown'}</span>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-[10px] text-gray-500 block mb-0.5">Active/Renamed As</span>
+                            <span className="text-xs font-bold text-gray-300">{techInfo.theme.name}</span>
+                          </div>
                         </div>
-                        <div className="text-[10px] text-gray-500 font-mono text-right">
-                          <p>ID: {techInfo.theme.id}</p>
-                          <p>Role: {techInfo.theme.role}</p>
+                        <div className="mt-3 pt-3 border-t border-glass-border/50 flex justify-between text-[10px] text-gray-500 font-mono">
+                          <span>ID: {techInfo.theme.id}</span>
+                          <span>Role: {techInfo.theme.role}</span>
                         </div>
                       </div>
                     )}
@@ -711,6 +724,41 @@ Report generated on Code Commandos Speed Audit Suite.`;
                             <span key={app} className="px-2 py-1 bg-white/5 border border-white/10 rounded text-[10px] font-bold text-gray-300 hover:text-white hover:border-green-500/50 hover:bg-green-500/10 hover:shadow-[0_0_10px_rgba(34,197,94,0.2)] cursor-default transition-all">
                               {app}
                             </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {techInfo.pixels && techInfo.pixels.length > 0 && (
+                      <div className="space-y-2 pt-2">
+                        <span className="text-[10px] text-gray-500 font-bold block uppercase tracking-wider flex items-center gap-1">
+                          <Activity className="w-3 h-3 text-blue-400" /> Marketing & Analytics Pixels
+                        </span>
+                        <div className="flex flex-wrap gap-2">
+                          {techInfo.pixels.map(px => (
+                            <span key={px} className="px-2 py-1 bg-white/5 border border-white/10 rounded text-[10px] font-bold text-blue-300 hover:text-white hover:border-blue-500/50 hover:bg-blue-500/10 transition-all cursor-default">
+                              {px}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {((techInfo.socials && techInfo.socials.length > 0) || (techInfo.emails && techInfo.emails.length > 0)) && (
+                      <div className="space-y-3 pt-3 border-t border-glass-border mt-4">
+                        <span className="text-[10px] text-gray-500 font-bold block uppercase tracking-wider flex items-center gap-1">
+                          <Globe className="w-3 h-3 text-purple-400" /> Brand Presence
+                        </span>
+                        <div className="flex flex-col gap-1.5 text-xs">
+                          {techInfo.emails?.map(email => (
+                            <a key={email} href={`mailto:${email}`} className="text-purple-400 hover:text-purple-300 hover:underline flex items-center gap-2">
+                              ✉️ {email}
+                            </a>
+                          ))}
+                          {techInfo.socials?.map(social => (
+                            <a key={social} href={social} target="_blank" rel="noreferrer" className="text-gray-400 hover:text-white hover:underline truncate max-w-full block">
+                              🔗 {social.replace(/^https?:\/\/(www\.)?/, '')}
+                            </a>
                           ))}
                         </div>
                       </div>
