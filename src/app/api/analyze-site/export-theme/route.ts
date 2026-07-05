@@ -121,7 +121,7 @@ export async function GET(request: Request) {
             const data = await fetchAssetWithRetry(asset.key, themeId, domain, adminToken);
             const content = data.asset;
             if (content) {
-              if (content.value) {
+              if (content.value !== undefined && content.value !== null) {
                 zip.file(asset.key, content.value);
               } else if (content.attachment) {
                 zip.file(asset.key, Buffer.from(content.attachment, 'base64'));

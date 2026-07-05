@@ -1004,19 +1004,29 @@ Report generated on Code Commandos Speed Audit Suite.`;
                         </div>
 
                         {exportMethod === 'admin' && (
-                          <div className="space-y-1.5 p-3 rounded bg-yellow-500/5 border border-yellow-500/20 text-[10px] animate-in fade-in duration-200">
+                          <div className="space-y-2 p-3 rounded bg-yellow-500/5 border border-yellow-500/20 text-[10px] animate-in fade-in duration-200">
                             <label className="text-yellow-500 font-bold block">Shopify Admin API Token</label>
                             <input
                               type="password"
                               value={adminToken}
                               onChange={(e) => setAdminToken(e.target.value)}
                               placeholder="shpat_xxxxxxxxxxxxxxxxxxxxxxxx"
-                              className="w-full px-2 py-1 bg-black/40 border border-yellow-500/25 rounded text-[10px] text-white focus:outline-none focus:border-yellow-400 transition-all font-mono"
+                              className="w-full px-2 py-1.5 bg-black/40 border border-yellow-500/25 rounded text-[10px] text-white focus:outline-none focus:border-yellow-400 transition-all font-mono"
                             />
-                            <p className="text-[9px] text-gray-500 font-medium leading-relaxed">
-                              Token must have <code className="text-yellow-500/90 font-mono">read_themes</code> / <code className="text-yellow-500/90 font-mono">write_themes</code> permissions. 
-                              Downloads every single original Liquid and section file directly from the store's server.
-                            </p>
+                            
+                            <div className="pt-2 border-t border-yellow-500/10 space-y-1.5 text-[9px] text-gray-400 font-medium">
+                              <span className="text-yellow-500 font-bold block">How to get a token in 30 seconds:</span>
+                              <ol className="space-y-0.5 list-decimal pl-3 leading-relaxed">
+                                <li>Go to Shopify Admin &rarr; <span className="text-white">Settings</span> &rarr; <span className="text-white">Apps and sales channels</span>.</li>
+                                <li>Click <span className="text-white">Develop apps</span> &rarr; <span className="text-white">Create an app</span>.</li>
+                                <li>Click <span className="text-yellow-500">Configure Admin API integration</span>.</li>
+                                <li>Tick <span className="text-white font-mono">read_themes</span> / <span className="text-white font-mono">write_themes</span> scopes.</li>
+                                <li>Click <span className="text-white">Install app</span> and copy the Access Token.</li>
+                              </ol>
+                              <p className="text-yellow-500/90 font-bold leading-normal mt-1">
+                                💡 Required to fetch raw Liquid files, sections, and backend snippets. Public Clone only downloads public CSS, JS, and HTML.
+                              </p>
+                            </div>
                           </div>
                         )}
 
