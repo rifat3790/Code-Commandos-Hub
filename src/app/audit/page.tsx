@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Gauge, 
@@ -19,7 +19,14 @@ import {
   Tag, 
   CheckCircle2, 
   Edit,
-  Code
+  Code,
+  Globe,
+  Loader2,
+  Download,
+  Terminal,
+  Play,
+  AlertCircle,
+  FolderSync
 } from 'lucide-react';
 import { useWorkspaceStore } from '@/store/workspaceStore';
 
@@ -44,7 +51,7 @@ const AUDIT_CHECKLIST: AuditItem[] = [
 
 export default function AuditSuitePage() {
   const store = useWorkspaceStore();
-  const [activeTab, setActiveTab] = useState<'speed'>('speed');
+  const [activeTab, setActiveTab] = useState<'speed' | 'inspect'>('speed');
   
   // Speed Audit states
   const [storeUrl, setStoreUrl] = useState('fitestore-2.myshopify.com');
@@ -55,9 +62,26 @@ export default function AuditSuitePage() {
   });
   const [copiedReport, setCopiedReport] = useState(false);
 
+  // Tech & Product Inspector states
+  const [inspectUrl, setInspectUrl] = useState('');
+  const [scanStatus, setScanStatus] = useState<'idle' | 'detecting' | 'fetching_products' | 'mapping_collections' | 'completed' | 'error'>('idle');
+  const [scanError, setScanError] = useState('');
+  const [techInfo, setTechInfo] = useState<{ technology: string; isShopify: boolean; domain: string } | null>(null);
+  const [collections, setCollections] = useState<any[]>([]);
+  const [allProducts, setAllProducts] = useState<any[]>([]);
+  const [scanLogs, setScanLogs] = useState<string[]>([]);
+  const [fetchProgress, setFetchProgress] = useState({ current: 0, total: 0 });
+  const terminalEndRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     store.hydrate();
   }, []);
+
+  useEffect(() => {
+    if (terminalEndRef.current) {
+      terminalEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [scanLogs]);
 
   // Calculate dynamic PageSpeed score
   const speedScore = useMemo(() => {
@@ -105,19 +129,304 @@ Report generated on Code Commandos Speed Audit Suite.`;
     setTimeout(() => setCopiedReport(false), 2000);
   };
 
-  const getScoreColor = (score: number) => {
-    if (score >= 90) return 'text-emerald-400 border-emerald-500/20 bg-emerald-500/10';
-    if (score >= 70) return 'text-yellow-400 border-yellow-500/20 bg-yellow-500/10';
-    return 'text-red-400 border-red-500/20 bg-red-500/10';
+  // LOGGING UTILITY
+  const addLog = (message: string, type: 'info' | 'success' | 'error' = 'info') => {
+    const timestamp = new Date().toLocaleTimeString();
+    const prefix = type === 'success' ? '✔ [SUCCESS]' : type === 'error' ? '✖ [ERROR]' : 'ℹ [INFO]';
+    setScanLogs(prev => [...prev, `[${timestamp}] ${prefix} ${message}`]);
+  };
+
+  // CRAWLER & INSPECTOR FLOW
+  const handleStartScan = async () => {
+    if (!inspectUrl.trim()) {
+      setScanError('Please enter a valid URL or domain.');
+      return;
+    }
+
+    setScanStatus('detecting');
+    setScanError('');
+    setTechInfo(null);
+    setCollections([]);
+    setAllProducts([]);
+    setFetchProgress({ current: 0, total: 0 });
+    
+    const timestamp = new Date().toLocaleTimeString();
+    setScanLogs([`[${timestamp}] ℹ [INFO] Starting store analysis for: ${inspectUrl}`]);
+
+    try {
+      addLog('Probing website technology and headers...');
+      const detectRes = await fetch(`/api/analyze-site/detect?url=${encodeURIComponent(inspectUrl.trim())}`);
+      const detectData = await detectRes.json();
+
+      if (!detectRes.ok || !detectData.success) {
+        throw new Error(detectData.error || 'Failed to detect technology.');
+      }
+
+      setTechInfo({
+        technology: detectData.technology,
+        isShopify: detectData.isShopify,
+        domain: detectData.domain
+      });
+
+      addLog(`Normalized domain: ${detectData.domain}`, 'success');
+      addLog(`Technology detected: ${detectData.technology}`, 'success');
+
+      store.logActivity('Website Scanned', 'note', `Scanned: ${detectData.domain} (${detectData.technology})`);
+
+      if (!detectData.isShopify) {
+        addLog('Non-Shopify website detected. Product inspection and CSV export are only available for Shopify stores.', 'info');
+        setScanStatus('completed');
+        return;
+      }
+
+      // Shopify detected! Load collections
+      const initialCollections = detectData.collections || [];
+      setCollections(initialCollections.map((c: any) => ({
+        ...c,
+        productCount: 0,
+        products: [],
+        isLoading: false
+      })));
+      addLog(`Loaded ${initialCollections.length} public collections from collections.json`, 'success');
+
+      // Fetch all products page by page
+      setScanStatus('fetching_products');
+      addLog('Fetching store products (fetching 250 items per page)...');
+
+      let page = 1;
+      let hasMore = true;
+      let tempAllProducts: any[] = [];
+
+      while (hasMore) {
+        addLog(`Scraping products page ${page}...`);
+        const prodRes = await fetch(`/api/analyze-site/products?domain=${detectData.domain}&page=${page}&limit=250`);
+        if (!prodRes.ok) {
+          addLog(`Error fetching products page ${page}. Stopping.`, 'error');
+          break;
+        }
+
+        const prodData = await prodRes.json();
+        if (!prodData.success) {
+          addLog(`Failed to fetch page ${page}: ${prodData.error}`, 'error');
+          break;
+        }
+
+        const pageProducts = prodData.products || [];
+        tempAllProducts = [...tempAllProducts, ...pageProducts];
+        setAllProducts(tempAllProducts);
+        setFetchProgress({ current: tempAllProducts.length, total: tempAllProducts.length });
+        addLog(`Page ${page}: Fetched ${pageProducts.length} products. Cumulative total: ${tempAllProducts.length}`, 'success');
+
+        if (pageProducts.length < 250) {
+          hasMore = false;
+        } else {
+          page++;
+        }
+      }
+
+      addLog(`Product crawling complete. Total products loaded: ${tempAllProducts.length}`, 'success');
+
+      // Map products to collections
+      if (initialCollections.length > 0) {
+        setScanStatus('mapping_collections');
+        addLog('Mapping products to collections...');
+
+        for (const collection of initialCollections) {
+          addLog(`Fetching products for collection: "${collection.title}" (${collection.handle})...`);
+          
+          // Mark collection loading in UI
+          setCollections(prev => prev.map(c => c.handle === collection.handle ? { ...c, isLoading: true } : c));
+
+          let collPage = 1;
+          let collHasMore = true;
+          let collProducts: any[] = [];
+
+          while (collHasMore) {
+            const collProdRes = await fetch(`/api/analyze-site/products?domain=${detectData.domain}&collection=${collection.handle}&page=${collPage}&limit=250`);
+            if (!collProdRes.ok) {
+              addLog(`Error fetching products for collection "${collection.title}".`, 'error');
+              break;
+            }
+
+            const collProdData = await collProdRes.json();
+            if (!collProdData.success) {
+              addLog(`Failed collection fetch: ${collProdData.error}`, 'error');
+              break;
+            }
+
+            const pageCollProducts = collProdData.products || [];
+            collProducts = [...collProducts, ...pageCollProducts];
+
+            if (pageCollProducts.length < 250) {
+              collHasMore = false;
+            } else {
+              collPage++;
+            }
+          }
+
+          addLog(`Mapped ${collProducts.length} products to collection "${collection.title}".`, 'success');
+          
+          const updatedColl = {
+            ...collection,
+            productCount: collProducts.length,
+            products: collProducts,
+            isLoading: false
+          };
+
+          // Update state in real-time
+          setCollections(prev => prev.map(c => c.handle === collection.handle ? updatedColl : c));
+        }
+      }
+
+      addLog('All store audits and crawlings completed successfully.', 'success');
+      setScanStatus('completed');
+
+    } catch (err: any) {
+      addLog(`Scan failed: ${err.message}`, 'error');
+      setScanStatus('error');
+      setScanError(err.message || 'Scan failed.');
+    }
+  };
+
+  // EXPORT TO SHOPIFY CSV UTILITY
+  const handleExportCSV = (products: any[], title: string) => {
+    if (!products || products.length === 0) {
+      alert('No products available for export.');
+      return;
+    }
+
+    const filename = `${title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-shopify-products.csv`;
+    
+    // Shopify CSV columns schema
+    const headers = [
+      'Handle', 'Title', 'Body (HTML)', 'Vendor', 'Product Category', 'Type', 'Tags', 'Published',
+      'Option1 Name', 'Option1 Value', 'Option2 Name', 'Option2 Value', 'Option3 Name', 'Option3 Value',
+      'Variant SKU', 'Variant Grams', 'Variant Inventory Tracker', 'Variant Inventory Qty',
+      'Variant Inventory Policy', 'Variant Fulfillment Service', 'Variant Price', 'Variant Compare At Price',
+      'Variant Requires Shipping', 'Variant Taxable', 'Variant Barcode', 'Image Src', 'Image Position',
+      'Image Alt Text', 'Gift Card', 'SEO Title', 'SEO Description', 'Google Shopping / Google Product Category',
+      'Google Shopping / Gender', 'Google Shopping / Age Group', 'Google Shopping / MPN',
+      'Google Shopping / AdWords Grouping', 'Google Shopping / AdWords Labels', 'Google Shopping / Condition',
+      'Google Shopping / Custom Product', 'Google Shopping / Custom Label 0', 'Google Shopping / Custom Label 1',
+      'Google Shopping / Custom Label 2', 'Google Shopping / Custom Label 3', 'Google Shopping / Custom Label 4',
+      'Variant Image', 'Variant Weight Unit', 'Variant Tax Code', 'Cost per item', 'Status'
+    ];
+
+    const rows: string[][] = [headers];
+
+    products.forEach(product => {
+      const handle = product.handle || '';
+      const productTitle = product.title || '';
+      const bodyHtml = product.body_html || '';
+      const vendor = product.vendor || '';
+      const productType = product.product_type || '';
+      const tags = Array.isArray(product.tags)
+        ? product.tags.join(', ')
+        : typeof product.tags === 'string'
+          ? product.tags
+          : '';
+      const published = product.published_at ? 'true' : 'false';
+      const status = 'active';
+
+      const options = product.options || [];
+      const option1Name = options[0]?.name || '';
+      const option2Name = options[1]?.name || '';
+      const option3Name = options[2]?.name || '';
+
+      const variants = product.variants || [];
+      const images = product.images || [];
+
+      // Loop over the maximum of variants or images
+      const numRows = Math.max(variants.length, images.length, 1);
+
+      for (let i = 0; i < numRows; i++) {
+        const isFirstRow = i === 0;
+        const variant = variants[i];
+        const image = images[i];
+
+        const row: string[] = [];
+
+        row.push(handle); // Handle
+        row.push(isFirstRow ? productTitle : ''); // Title
+        row.push(isFirstRow ? bodyHtml : ''); // Body (HTML)
+        row.push(isFirstRow ? vendor : ''); // Vendor
+        row.push(''); // Product Category
+        row.push(isFirstRow ? productType : ''); // Type
+        row.push(isFirstRow ? tags : ''); // Tags
+        row.push(isFirstRow ? published : ''); // Published
+
+        row.push(isFirstRow ? option1Name : ''); // Option1 Name
+        row.push(variant ? (variant.option1 || '') : ''); // Option1 Value
+        row.push(isFirstRow ? option2Name : ''); // Option2 Name
+        row.push(variant ? (variant.option2 || '') : ''); // Option2 Value
+        row.push(isFirstRow ? option3Name : ''); // Option3 Name
+        row.push(variant ? (variant.option3 || '') : ''); // Option3 Value
+
+        row.push(variant?.sku || ''); // Variant SKU
+        row.push(variant?.grams !== undefined ? String(variant.grams) : ''); // Variant Grams
+        row.push(variant ? 'shopify' : ''); // Variant Inventory Tracker
+        row.push(variant ? '1' : ''); // Variant Inventory Qty
+        row.push(variant ? 'deny' : ''); // Variant Inventory Policy
+        row.push(variant ? 'manual' : ''); // Variant Fulfillment Service
+        row.push(variant?.price || ''); // Variant Price
+        row.push(variant?.compare_at_price || ''); // Variant Compare At Price
+        row.push(variant ? String(variant.requires_shipping ?? true) : ''); // Variant Requires Shipping
+        row.push(variant ? String(variant.taxable ?? true) : ''); // Variant Taxable
+        row.push(variant?.barcode || ''); // Variant Barcode
+
+        row.push(image?.src || ''); // Image Src
+        row.push(image?.position !== undefined ? String(image.position) : ''); // Image Position
+        row.push(image?.alt || ''); // Image Alt Text
+
+        row.push(isFirstRow ? 'false' : ''); // Gift Card
+        row.push(''); // SEO Title
+        row.push(''); // SEO Description
+
+        // Google Shopping
+        row.push(''); row.push(''); row.push(''); row.push(''); row.push('');
+        row.push(''); row.push(''); row.push(''); row.push(''); row.push('');
+        row.push(''); row.push(''); row.push(''); row.push('');
+
+        row.push(variant?.featured_image?.src || ''); // Variant Image
+        row.push(variant?.weight_unit || 'weight' in variant ? (variant.weight_unit || 'kg') : 'kg'); // Variant Weight Unit
+        row.push(''); // Variant Tax Code
+        row.push(''); // Cost per item
+        row.push(isFirstRow ? status : ''); // Status
+
+        rows.push(row);
+      }
+    });
+
+    const csvContent = rows
+      .map(r => r.map(val => {
+        let cleanVal = String(val);
+        if (cleanVal.includes('"') || cleanVal.includes(',') || cleanVal.includes('\n') || cleanVal.includes('\r')) {
+          cleanVal = '"' + cleanVal.replace(/"/g, '""') + '"';
+        }
+        return cleanVal;
+      }).join(','))
+      .join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', filename);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    store.logActivity('Products Exported', 'download', `Exported ${products.length} products to CSV: ${filename}`);
   };
 
   return (
     <div className="space-y-6 pb-12 text-left">
       {/* Header */}
       <div>
-        <h1 className="text-2xl lg:text-3xl font-extrabold tracking-tight text-white uppercase">Shopify Audit Suite</h1>
+        <h1 className="text-2xl lg:text-3xl font-extrabold tracking-tight text-white uppercase">Shopify Audit & Inspector Suite</h1>
         <p className="text-gray-400 text-sm font-medium">
-          Generate PageSpeed performance delivery reports.
+          Generate PageSpeed performance reports and inspect store technologies or export products.
         </p>
       </div>
 
@@ -134,9 +443,21 @@ Report generated on Code Commandos Speed Audit Suite.`;
           <Gauge className="w-4 h-4" />
           <span>Shopify Speed Audit Planner</span>
         </button>
+        <button
+          onClick={() => setActiveTab('inspect')}
+          className={`px-5 py-3 text-xs uppercase font-extrabold tracking-wider transition-all border-b-2 flex items-center gap-1.5 ${
+            activeTab === 'inspect' 
+              ? 'border-green-500 text-green-400' 
+              : 'border-transparent text-gray-500 hover:text-white'
+          }`}
+        >
+          <Globe className="w-4 h-4" />
+          <span>Store Tech & Product Inspector</span>
+        </button>
       </div>
 
       <AnimatePresence mode="wait">
+        {activeTab === 'speed' ? (
           <motion.div 
             key="speed-tab"
             initial={{ opacity: 0, y: 15 }}
@@ -232,7 +553,193 @@ Report generated on Code Commandos Speed Audit Suite.`;
               </div>
             </div>
           </motion.div>
+        ) : (
+          <motion.div
+            key="inspect-tab"
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -15 }}
+            className="grid grid-cols-1 xl:grid-cols-12 gap-6"
+          >
+            {/* Input & Scanner Log */}
+            <div className="xl:col-span-7 space-y-6">
+              <div className="p-5 rounded-xl border border-glass-border bg-gray-950/20 space-y-4">
+                <div className="space-y-1">
+                  <label className="text-[10px] text-gray-500 font-extrabold uppercase tracking-wider block">Website URL / Domain</label>
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Globe className="w-4 h-4 text-gray-500 absolute left-3 top-2.5" />
+                      <input
+                        type="text"
+                        value={inspectUrl}
+                        onChange={(e) => setInspectUrl(e.target.value)}
+                        placeholder="e.g. fashionstore.myshopify.com or brandname.com"
+                        className="w-full pl-9 pr-3 py-2 rounded-lg glass-input text-xs"
+                        disabled={scanStatus === 'detecting' || scanStatus === 'fetching_products' || scanStatus === 'mapping_collections'}
+                      />
+                    </div>
+                    <button
+                      onClick={handleStartScan}
+                      disabled={scanStatus === 'detecting' || scanStatus === 'fetching_products' || scanStatus === 'mapping_collections'}
+                      className="px-4 py-2 bg-brand-green hover:bg-brand-green-hover text-black font-extrabold text-xs uppercase tracking-wider rounded-lg transition-all flex items-center gap-1.5 disabled:opacity-50"
+                    >
+                      {scanStatus === 'detecting' || scanStatus === 'fetching_products' || scanStatus === 'mapping_collections' ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Play className="w-4 h-4 fill-black" />
+                      )}
+                      <span>Analyze</span>
+                    </button>
+                  </div>
+                  {scanError && (
+                    <p className="text-red-400 text-xs flex items-center gap-1.5 mt-1 font-medium">
+                      <AlertCircle className="w-3.5 h-3.5" />
+                      <span>{scanError}</span>
+                    </p>
+                  )}
+                </div>
+
+                {/* Progress bar */}
+                {(scanStatus === 'fetching_products' || scanStatus === 'mapping_collections') && (
+                  <div className="space-y-1.5 p-3 rounded-lg border border-yellow-500/20 bg-yellow-500/5">
+                    <div className="flex justify-between items-center text-[10px] uppercase font-bold tracking-wider text-yellow-400">
+                      <span>Crawling Shopify Products</span>
+                      <span>{fetchProgress.current} Items</span>
+                    </div>
+                    <div className="w-full bg-gray-900 rounded-full h-1.5 overflow-hidden">
+                      <div 
+                        className="bg-yellow-400 h-1.5 rounded-full transition-all duration-300 animate-pulse" 
+                        style={{ width: `${Math.min(100, Math.max(10, (fetchProgress.current % 250) / 2.5))}%` }} 
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Terminal Console */}
+                <div className="space-y-1.5">
+                  <span className="text-[10px] text-gray-500 font-extrabold uppercase tracking-wider flex items-center gap-1.5">
+                    <Terminal className="w-3.5 h-3.5 text-green-400" />
+                    <span>Audit Scanner Console Output</span>
+                  </span>
+                  
+                  <div className="bg-black/75 border border-glass-border p-4 rounded-xl text-xs font-mono text-green-400 h-[280px] overflow-y-auto space-y-1.5 flex flex-col scrollbar-thin">
+                    {scanLogs.length === 0 ? (
+                      <span className="text-gray-500 italic select-none">Console idle. Enter URL above and click Analyze.</span>
+                    ) : (
+                      scanLogs.map((log, idx) => (
+                        <div key={idx} className="leading-relaxed whitespace-pre-wrap border-l-2 border-green-500/20 pl-2">
+                          {log}
+                        </div>
+                      ))
+                    )}
+                    <div ref={terminalEndRef} />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Results Sidebar */}
+            <div className="xl:col-span-5 space-y-6">
+              {/* Technology details card */}
+              <div className="p-5 rounded-xl border border-glass-border bg-gray-950/20 relative overflow-hidden space-y-4">
+                <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-green-500 to-emerald-500" />
+                <span className="text-[10px] text-gray-500 font-extrabold uppercase tracking-wider block">Inspector Metrics</span>
+                
+                {techInfo ? (
+                  <div className="space-y-4">
+                    <div>
+                      <span className="text-xs text-gray-400 font-semibold">Store Domain</span>
+                      <h4 className="text-sm font-extrabold text-white font-mono mt-0.5">{techInfo.domain}</h4>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="p-3 bg-white/5 border border-glass-border rounded-lg text-center">
+                        <span className="text-[10px] text-gray-500 font-bold block uppercase tracking-wider">Technology</span>
+                        <div className="mt-1 inline-flex items-center gap-1 bg-green-500/10 border border-green-500/20 px-2 py-0.5 rounded text-[11px] text-green-400 font-bold">
+                          <Zap className="w-3 h-3 fill-green-400" />
+                          <span>{techInfo.technology}</span>
+                        </div>
+                      </div>
+
+                      <div className="p-3 bg-white/5 border border-glass-border rounded-lg text-center">
+                        <span className="text-[10px] text-gray-500 font-bold block uppercase tracking-wider">Total Products</span>
+                        <span className="text-lg font-black text-white block mt-0.5">{allProducts.length}</span>
+                      </div>
+                    </div>
+
+                    {techInfo.isShopify && (
+                      <div className="space-y-3 pt-2 border-t border-glass-border">
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="text-gray-400">Public Collections</span>
+                          <span className="font-bold text-white">{collections.length}</span>
+                        </div>
+
+                        {allProducts.length > 0 && (
+                          <button
+                            onClick={() => handleExportCSV(allProducts, `${techInfo.domain}-all-products`)}
+                            className="w-full flex items-center justify-center gap-2 bg-brand-green hover:bg-brand-green-hover text-black font-extrabold text-xs uppercase tracking-wider py-2.5 px-4 rounded-lg transition-all shadow-lg glow-green"
+                          >
+                            <Download className="w-4 h-4 stroke-[3]" />
+                            <span>Export All Products (CSV)</span>
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center py-6 text-gray-500 text-xs italic">
+                    Scan a store to populate inspector details.
+                  </div>
+                )}
+              </div>
+
+              {/* Collections Breakdowns */}
+              {techInfo?.isShopify && collections.length > 0 && (
+                <div className="p-5 rounded-xl border border-glass-border bg-gray-950/20 space-y-4">
+                  <span className="text-[10px] text-gray-500 font-extrabold uppercase tracking-wider flex items-center justify-between border-b border-glass-border pb-1.5">
+                    <span>Collections Breakdown</span>
+                    <span className="text-green-400">{collections.length} items</span>
+                  </span>
+
+                  <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+                    {collections.map((coll) => (
+                      <div 
+                        key={coll.id}
+                        className="p-3 bg-black/40 border border-glass-border hover:border-glass-border/30 rounded-lg flex justify-between items-center text-xs"
+                      >
+                        <div className="space-y-0.5">
+                          <span className="font-bold text-white block">{coll.title}</span>
+                          <span className="text-[10px] text-gray-500 font-mono block">handle: {coll.handle}</span>
+                        </div>
+
+                        <div className="flex items-center gap-3 shrink-0">
+                          {coll.isLoading ? (
+                            <Loader2 className="w-4 h-4 animate-spin text-yellow-400" />
+                          ) : (
+                            <span className="font-bold text-green-400 px-2 py-0.5 bg-green-500/10 border border-green-500/10 rounded">
+                              {coll.productCount} Products
+                            </span>
+                          )}
+
+                          <button
+                            onClick={() => handleExportCSV(coll.products, `${techInfo.domain}-${coll.handle}`)}
+                            disabled={coll.isLoading || !coll.products || coll.products.length === 0}
+                            className="p-1.5 rounded bg-glass-hover text-gray-400 hover:text-white disabled:opacity-30 disabled:pointer-events-none transition-all"
+                            title={`Export collection: ${coll.title}`}
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
       </AnimatePresence>
     </div>
   );
 }
+
