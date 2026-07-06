@@ -31,12 +31,17 @@ const getDynamicReplacement = (word: string): string => {
     zoom: ['z-oom', 'z_oom'],
     email: ['e-mail', 'e_mail'],
     gmail: ['g-mail', 'g_mail'],
+    account: ['a-ccount', 'a_ccount'],
     address: ['a-ddress', 'a_ddress'],
     phone: ['p-hone', 'p_hone'],
     number: ['n-umber', 'n_umber'],
     bank: ['b-ank', 'b_ank'],
     paypal: ['p-aypal', 'p_aypal'],
     stripe: ['s-tripe', 's_tripe'],
+    payout: ['p-ayout', 'p_ayout'],
+    money: ['m-oney', 'm_oney'],
+    dollar: ['d-ollar', 'd_ollar'],
+    usd: ['u-sd', 'u_sd'],
     rating: ['r-ating', 'r_ating'],
     ratings: ['r-atings', 'r_atings'],
     review: ['r-eview', 'r_eview'],
@@ -114,6 +119,10 @@ const RESTRICTED_WORDS_MAP: { pattern: RegExp, word: string, getReplacement: () 
   { pattern: /\bpay\b/gi, word: 'pay', getReplacement: () => getDynamicReplacement('pay'), professional: 'process the order' },
   { pattern: /\bstripe\b/gi, word: 'stripe', getReplacement: () => getDynamicReplacement('stripe'), professional: 'gateway channel' },
   { pattern: /\bpaypal\b/gi, word: 'paypal', getReplacement: () => getDynamicReplacement('paypal'), professional: 'payment merchant' },
+  { pattern: /\bpayout\b/gi, word: 'payout', getReplacement: () => getDynamicReplacement('payout'), professional: 'order completion' },
+  { pattern: /\bmoney\b/gi, word: 'money', getReplacement: () => getDynamicReplacement('money'), professional: 'funds' },
+  { pattern: /\bdollar\b/gi, word: 'dollar', getReplacement: () => getDynamicReplacement('dollar'), professional: 'budget' },
+  { pattern: /\busd\b/gi, word: 'usd', getReplacement: () => getDynamicReplacement('usd'), professional: 'budget' },
   { pattern: /\bcontact\b/gi, word: 'contact', getReplacement: () => getDynamicReplacement('contact'), professional: 'communication' },
   { pattern: /\bfiverr\b/gi, word: 'fiverr', getReplacement: () => getDynamicReplacement('fiverr'), professional: 'platform' },
   { pattern: /\bwhatsapp\b/gi, word: 'whatsapp', getReplacement: () => getDynamicReplacement('whatsapp'), professional: 'inbox messaging' },
@@ -121,6 +130,7 @@ const RESTRICTED_WORDS_MAP: { pattern: RegExp, word: string, getReplacement: () 
   { pattern: /\bzoom\b/gi, word: 'zoom', getReplacement: () => getDynamicReplacement('zoom'), professional: 'discussion' },
   { pattern: /\bemail\b/gi, word: 'email', getReplacement: () => getDynamicReplacement('email'), professional: 'inbox details' },
   { pattern: /\bgmail\b/gi, word: 'gmail', getReplacement: () => getDynamicReplacement('gmail'), professional: 'inbox details' },
+  { pattern: /\baccount\b/gi, word: 'account', getReplacement: () => getDynamicReplacement('account'), professional: 'profile credentials' },
   { pattern: /\baddress\b/gi, word: 'address', getReplacement: () => getDynamicReplacement('address'), professional: 'details' },
   { pattern: /\bphone\b/gi, word: 'phone', getReplacement: () => getDynamicReplacement('phone'), professional: 'contact details' },
   { pattern: /\bnumber\b/gi, word: 'number', getReplacement: () => getDynamicReplacement('number'), professional: 'reference details' },
@@ -384,8 +394,8 @@ export default function MessageHelperPage() {
       };
     }
     
-    const hasContact = detectedWords.some(w => ['whatsapp', 'skype', 'zoom', 'email', 'gmail', 'phone', 'number', 'address', 'contact'].includes(w));
-    const hasPayment = detectedWords.some(w => ['payment', 'payments', 'pay', 'stripe', 'paypal', 'bank'].includes(w));
+    const hasContact = detectedWords.some(w => ['whatsapp', 'skype', 'zoom', 'email', 'gmail', 'phone', 'number', 'address', 'contact', 'account'].includes(w));
+    const hasPayment = detectedWords.some(w => ['payment', 'payments', 'pay', 'stripe', 'paypal', 'bank', 'payout', 'money', 'dollar', 'usd'].includes(w));
     const hasReview = detectedWords.some(w => ['rating', 'ratings', 'review', 'reviews'].includes(w));
     
     if (hasContact || hasPayment) {
@@ -682,8 +692,8 @@ export default function MessageHelperPage() {
                 <div className="border-t border-glass-border pt-3.5 space-y-2 text-[11px]">
                   <span className="text-gray-500 uppercase tracking-wider block font-bold text-[9px]">Triggered Violations</span>
                   {detectedWords.map(word => {
-                    const isPayment = ['payment', 'payments', 'pay', 'stripe', 'paypal', 'bank'].includes(word);
-                    const isContact = ['whatsapp', 'skype', 'zoom', 'email', 'gmail', 'phone', 'number', 'address', 'contact'].includes(word);
+                    const isPayment = ['payment', 'payments', 'pay', 'stripe', 'paypal', 'bank', 'payout', 'money', 'dollar', 'usd'].includes(word);
+                    const isContact = ['whatsapp', 'skype', 'zoom', 'email', 'gmail', 'phone', 'number', 'address', 'contact', 'account'].includes(word);
                     return (
                       <div key={word} className="flex items-start gap-2 text-gray-300">
                         <span className={`w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ${isPayment || isContact ? 'bg-red-550' : 'bg-amber-550'}`} />
