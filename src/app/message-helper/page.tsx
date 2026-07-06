@@ -485,7 +485,6 @@ export default function MessageHelperPage() {
       desc: 'Platform names or general system words found. Keep conversations within Fiverr.' 
     };
   };
-  };
   
   const risk = getRiskScore();
 
