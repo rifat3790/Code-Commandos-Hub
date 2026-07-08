@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -241,6 +241,7 @@ export default function ChatPage() {
   const [searchSession, setSearchSession] = useState('');
   const [activeSessionId, setActiveSessionId] = useState<string>('');
   const [activeCategory, setActiveCategory] = useState('General Assistant');
+  const [selectedModel, setSelectedModel] = useState('gemini-2.0-flash-lite');
   
   const [chatDraftText, setChatDraftText] = useState('');
   
@@ -254,7 +255,7 @@ export default function ChatPage() {
 
   const { messages, input, handleInputChange, handleSubmit, setMessages, status, append } = useChat({
     api: '/api/chat',
-    body: { selectedModel: 'gemini-2.0-flash-lite' }
+    body: { selectedModel }
   });
 
   const isLoading = status === 'streaming' || status === 'submitted';
@@ -415,6 +416,15 @@ export default function ChatPage() {
         </div>
         
         <div className="flex gap-2">
+          <select
+            value={selectedModel}
+            onChange={(e) => setSelectedModel(e.target.value)}
+            className="px-3 py-2 rounded-lg glass-input text-xs cursor-pointer text-green-400 border-green-500/20"
+          >
+            <option value="gemini-2.0-flash-lite">Gemini Flash Lite</option>
+            <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+            <option value="openai">ChatGPT (GPT-4o)</option>
+          </select>
           <select
             value={activeCategory}
             onChange={(e) => setActiveCategory(e.target.value)}
