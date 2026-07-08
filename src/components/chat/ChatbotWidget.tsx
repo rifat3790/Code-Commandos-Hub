@@ -1,13 +1,14 @@
-'use client';
+﻿'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { db } from '@/lib/firebase';
 import { collection, query, where, or, onSnapshot, addDoc, orderBy, serverTimestamp, getDocs, doc, updateDoc } from 'firebase/firestore';
-import { MessageCircle, X, Send, User, ChevronLeft, Phone, Video } from 'lucide-react';
+import { MessageCircle, X, Send, User, ChevronLeft, Phone, Video, Bot, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useWorkspaceStore } from '@/store/workspaceStore';
 import { useCall } from '@/context/CallContext';
+import { useChat } from '@ai-sdk/react';
 
 interface ChatMessage {
   id: string;
@@ -33,7 +34,13 @@ export default function ChatbotWidget() {
   const emojiRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const POPULAR_EMOJIS = ['😊', '😂', '❤️', '👍', '🔥', '😍', '💻', '🤔', '🎉', '🙌', '🚀', '⚠️', '✅', '❌', '👀', '💡', '💬', '📌', '⚡', '🤝'];
+  // Integrate AI Chat for the widget
+  const { messages: aiMessages, append: appendAi, status: aiStatus } = useChat({
+    api: '/api/chat',
+    id: 'chatbot-widget-ai'
+  });
+
+  const POPULAR_EMOJIS = ['ðŸ˜Š', 'ðŸ˜‚', 'â¤ï¸', 'ðŸ‘', 'ðŸ”¥', 'ðŸ˜', 'ðŸ’»', 'ðŸ¤”', 'ðŸŽ‰', 'ðŸ™Œ', 'ðŸš€', 'âš ï¸', 'âœ…', 'âŒ', 'ðŸ‘€', 'ðŸ’¡', 'ðŸ’¬', 'ðŸ“Œ', 'âš¡', 'ðŸ¤'];
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -75,13 +82,11 @@ export default function ChatbotWidget() {
 
     let q;
     if (isAdminOrSuperAdmin) {
-      // Admin: Listen to all messages
       q = query(
         collection(db, 'chats'),
         orderBy('timestamp', 'asc')
       );
     } else {
-      // Regular User: Listen to their messages and support messages
       q = query(
         collection(db, 'chats'),
         or(
@@ -112,10 +117,8 @@ export default function ChatbotWidget() {
 
     const listMap = new Map<string, {uid: string, name: string, unread: number, lastMessage?: string, lastTimestamp: number}>();
     
-    // Add Support Team for everyone
     listMap.set('admin', { uid: 'admin', name: 'Support Team', unread: 0, lastMessage: '', lastTimestamp: 0 });
 
-    // Add all fetched users
     allUsers.forEach(u => {
       if (u.firebaseUid === user.uid) return;
       listMap.set(u.firebaseUid, { 
@@ -127,7 +130,6 @@ export default function ChatbotWidget() {
       });
     });
 
-    // Update with message history
     messages.forEach(m => {
       const myId = isAdminOrSuperAdmin ? 'admin' : user.uid;
       const amISender = m.senderUid === myId || m.senderUid === user.uid;
@@ -136,7 +138,7 @@ export default function ChatbotWidget() {
       if (!amISender && !amIReceiver) return;
       
       let otherId = amISender ? m.receiverUid : m.senderUid;
-      if (otherId === user.uid) otherId = 'admin'; // Fallback for self
+      if (otherId === user.uid) otherId = 'admin'; 
       
       if (!listMap.has(otherId)) {
         listMap.set(otherId, { uid: otherId, name: m.senderName || 'User', unread: 0, lastMessage: '', lastTimestamp: 0 });
@@ -144,7 +146,6 @@ export default function ChatbotWidget() {
       
       const existing = listMap.get(otherId)!;
       
-      // Calculate unread
       if (!m.readStatus && amIReceiver && m.senderUid !== user.uid) {
         existing.unread += 1;
       }
@@ -160,24 +161,31 @@ export default function ChatbotWidget() {
       }
     });
 
-    // For admin, hide 'admin' from list
     if (isAdminOrSuperAdmin) {
       listMap.delete('admin');
     }
 
     const sortedChats = Array.from(listMap.values()).sort((a, b) => b.lastTimestamp - a.lastTimestamp);
-    setChatList(sortedChats);
-  }, [messages, allUsers, user, isAdminOrSuperAdmin]);
+    
+    // Inject AI Assistant at the top
+    setChatList([
+      { 
+        uid: 'ai_assistant', 
+        name: 'AI Assistant', 
+        unread: 0, 
+        lastMessage: aiMessages.length > 0 ? aiMessages[aiMessages.length - 1].content : 'Ask me anything! âœ¨', 
+        lastTimestamp: Date.now() 
+      },
+      ...sortedChats
+    ]);
+  }, [messages, allUsers, user, isAdminOrSuperAdmin, aiMessages]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isOpen, activeChatUser]);
+  }, [messages, aiMessages, isOpen, activeChatUser]);
 
-  // Mark messages as read when chat is opened
   useEffect(() => {
-    if (!user || !isOpen) return;
-
-    if (!activeChatUser) return;
+    if (!user || !isOpen || !activeChatUser || activeChatUser === 'ai_assistant') return;
 
     const msgsToUpdate = messages.filter(m => {
       if (m.readStatus) return false;
@@ -199,7 +207,6 @@ export default function ChatbotWidget() {
     }
   }, [isOpen, activeChatUser, messages, user, isAdminOrSuperAdmin]);
 
-
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMessage.trim() || !user) return;
@@ -208,6 +215,13 @@ export default function ChatbotWidget() {
     setNewMessage('');
 
     if (!activeChatUser) return;
+    
+    // Intercept AI Assistant messages
+    if (activeChatUser === 'ai_assistant') {
+      appendAi({ role: 'user', content: msgText });
+      return;
+    }
+
     let receiver = activeChatUser;
 
     try {
@@ -226,17 +240,29 @@ export default function ChatbotWidget() {
 
   if (!user) return null;
 
-  // Filter messages for the current view
-  const displayMessages = activeChatUser
-    ? messages.filter(m => {
-        const myId = isAdminOrSuperAdmin ? 'admin' : user.uid;
-        const amISender = m.senderUid === myId || m.senderUid === user.uid;
-        const amIReceiver = m.receiverUid === myId || m.receiverUid === user.uid;
-        const isOtherSender = m.senderUid === activeChatUser;
-        const isOtherReceiver = m.receiverUid === activeChatUser;
-        return (amISender && isOtherReceiver) || (amIReceiver && isOtherSender);
-      })
-    : [];
+  // Format AI messages to look like chat messages
+  const aiDisplayMessages = aiMessages.map((m: any, i) => ({
+    id: `ai-${m.id || i}`,
+    senderUid: m.role === 'user' ? user.uid : 'ai_assistant',
+    senderName: m.role === 'user' ? 'You' : 'AI Assistant',
+    receiverUid: m.role === 'user' ? 'ai_assistant' : user.uid,
+    text: m.content || m.parts?.filter((p: any) => p.type === 'text').map((p: any) => p.text).join('') || '',
+    timestamp: { seconds: Date.now() / 1000 },
+    readStatus: true
+  }));
+
+  const displayMessages = activeChatUser === 'ai_assistant'
+    ? aiDisplayMessages
+    : activeChatUser
+      ? messages.filter(m => {
+          const myId = isAdminOrSuperAdmin ? 'admin' : user.uid;
+          const amISender = m.senderUid === myId || m.senderUid === user.uid;
+          const amIReceiver = m.receiverUid === myId || m.receiverUid === user.uid;
+          const isOtherSender = m.senderUid === activeChatUser;
+          const isOtherReceiver = m.receiverUid === activeChatUser;
+          return (amISender && isOtherReceiver) || (amIReceiver && isOtherSender);
+        })
+      : [];
 
   const totalUnread = chatList.reduce((acc, c) => acc + c.unread, 0);
 
@@ -251,26 +277,30 @@ export default function ChatbotWidget() {
             className="bg-gray-900 border border-glass-border shadow-2xl rounded-2xl w-[350px] h-[500px] mb-4 flex flex-col overflow-hidden"
           >
             {/* Header */}
-            <div className="bg-brand-green p-4 flex items-center justify-between text-black shadow-md">
+            <div className={`p-4 flex items-center justify-between text-black shadow-md ${activeChatUser === 'ai_assistant' ? 'bg-gradient-to-r from-green-400 to-emerald-500' : 'bg-brand-green'}`}>
               <div className="flex items-center gap-2 overflow-hidden flex-1">
                 {activeChatUser && (
-                  <button onClick={() => setActiveChatUser(null)} className="p-1 hover:bg-brand-green rounded transition-colors shrink-0">
+                  <button onClick={() => setActiveChatUser(null)} className="p-1 hover:bg-black/10 rounded transition-colors shrink-0">
                     <ChevronLeft className="w-5 h-5" />
                   </button>
                 )}
-                <MessageCircle className="w-5 h-5 shrink-0" />
+                {activeChatUser === 'ai_assistant' ? (
+                  <Sparkles className="w-5 h-5 shrink-0" />
+                ) : (
+                  <MessageCircle className="w-5 h-5 shrink-0" />
+                )}
                 <span className="font-bold truncate">
                   {activeChatUser ? activeChatName : 'Directory'}
                 </span>
               </div>
               <div className="flex items-center gap-1.5 shrink-0">
-                {activeChatUser && (
+                {activeChatUser && activeChatUser !== 'ai_assistant' && (
                   <>
                     <button
                       onClick={() => {
                         startCall(activeChatUser, activeChatName, 'audio');
                       }}
-                      className="p-1 hover:bg-brand-green-hover rounded transition-all hover:scale-105 text-black"
+                      className="p-1 hover:bg-black/10 rounded transition-all hover:scale-105 text-black"
                       title="Audio Call"
                     >
                       <Phone className="w-4.5 h-4.5" />
@@ -279,14 +309,14 @@ export default function ChatbotWidget() {
                       onClick={() => {
                         startCall(activeChatUser, activeChatName, 'video');
                       }}
-                      className="p-1 hover:bg-brand-green-hover rounded transition-all hover:scale-105 text-black"
+                      className="p-1 hover:bg-black/10 rounded transition-all hover:scale-105 text-black"
                       title="Video Call"
                     >
                       <Video className="w-4.5 h-4.5" />
                     </button>
                   </>
                 )}
-                <button onClick={() => setIsOpen(false)} className="text-black/80 hover:text-black hover:bg-brand-green p-1 rounded transition-colors">
+                <button onClick={() => setIsOpen(false)} className="text-black/80 hover:text-black hover:bg-black/10 p-1 rounded transition-colors">
                   <X className="w-5 h-5" />
                 </button>
               </div>
@@ -304,14 +334,14 @@ export default function ChatbotWidget() {
                       <button 
                         key={c.uid}
                         onClick={() => { setActiveChatUser(c.uid); setActiveChatName(c.name); }}
-                        className="flex items-center justify-between p-3 rounded-xl border border-glass-border bg-gray-900 hover:bg-gray-800 transition-colors text-left"
+                        className={`flex items-center justify-between p-3 rounded-xl border border-glass-border transition-colors text-left ${c.uid === 'ai_assistant' ? 'bg-green-500/10 hover:bg-green-500/20 border-green-500/20' : 'bg-gray-900 hover:bg-gray-800'}`}
                       >
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-brand-green/20 flex items-center justify-center">
-                            <User className="w-5 h-5 text-brand-green" />
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center ${c.uid === 'ai_assistant' ? 'bg-green-500 text-black' : 'bg-brand-green/20'}`}>
+                            {c.uid === 'ai_assistant' ? <Bot className="w-5 h-5" /> : <User className="w-5 h-5 text-brand-green" />}
                           </div>
                           <div>
-                            <p className="text-white font-medium text-sm">{c.name}</p>
+                            <p className={`font-medium text-sm ${c.uid === 'ai_assistant' ? 'text-green-400 font-bold' : 'text-white'}`}>{c.name}</p>
                             <p className="text-gray-400 text-xs truncate max-w-[180px]">
                               {c.lastMessage || 'Tap to reply'}
                             </p>
@@ -331,7 +361,7 @@ export default function ChatbotWidget() {
                 <>
                   {displayMessages.length === 0 && (
                     <div className="text-center text-gray-500 text-sm mt-10">
-                      No messages yet.
+                      {activeChatUser === 'ai_assistant' ? 'Ask me to write code, generate images, or review text!' : 'No messages yet.'}
                     </div>
                   )}
                   {displayMessages.map((msg, i) => {
@@ -339,12 +369,12 @@ export default function ChatbotWidget() {
                     const isMe = msg.senderUid === myId || msg.senderUid === user.uid;
                     return (
                       <div key={msg.id || i} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
-                        <div className={`max-w-[80%] rounded-2xl px-4 py-2 ${
+                        <div className={`max-w-[85%] rounded-2xl px-4 py-2 ${
                           isMe 
                             ? 'bg-brand-green text-black rounded-tr-sm' 
                             : 'bg-gray-800 text-gray-200 border border-glass-border rounded-tl-sm'
                         }`}>
-                          <p className="text-sm">{msg.text}</p>
+                          <p className="text-sm whitespace-pre-wrap leading-relaxed">{msg.text}</p>
                         </div>
                         <span className="text-[10px] text-gray-500 mt-1 mx-1">
                           {isMe ? 'You' : msg.senderName}
@@ -352,6 +382,16 @@ export default function ChatbotWidget() {
                       </div>
                     );
                   })}
+                  {activeChatUser === 'ai_assistant' && aiStatus === 'submitted' && (
+                    <div className="flex flex-col items-start">
+                      <div className="max-w-[80%] rounded-2xl px-4 py-3 bg-gray-800 border border-glass-border rounded-tl-sm flex items-center gap-1.5 h-10">
+                        <div className="w-1.5 h-1.5 rounded-full bg-green-400/60 animate-bounce" style={{ animationDelay: '0ms' }} />
+                        <div className="w-1.5 h-1.5 rounded-full bg-green-400/60 animate-bounce" style={{ animationDelay: '150ms' }} />
+                        <div className="w-1.5 h-1.5 rounded-full bg-green-400/60 animate-bounce" style={{ animationDelay: '300ms' }} />
+                      </div>
+                      <span className="text-[10px] text-gray-500 mt-1 mx-1">AI Assistant</span>
+                    </div>
+                  )}
                   <div ref={messagesEndRef} />
                 </>
               )}
@@ -393,7 +433,8 @@ export default function ChatbotWidget() {
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
                     placeholder="Type a message..."
-                    className="flex-1 bg-gray-950 border border-gray-800 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-brand-green transition-colors"
+                    disabled={activeChatUser === 'ai_assistant' && aiStatus === 'submitted'}
+                    className="flex-1 bg-gray-950 border border-gray-800 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-brand-green transition-colors disabled:opacity-50"
                   />
                   
                   {/* Emoji Trigger Button */}
@@ -403,12 +444,12 @@ export default function ChatbotWidget() {
                     className={`p-2 rounded-xl border transition-all text-xs flex items-center justify-center w-10 h-10 shrink-0 ${isEmojiOpen ? 'bg-purple-500/20 border-purple-500 text-purple-400' : 'bg-gray-950 border-gray-800 text-gray-400 hover:text-white'}`}
                     title="Insert Emoji"
                   >
-                    😊
+                    ðŸ˜Š
                   </button>
 
                   <button
                     type="submit"
-                    disabled={!newMessage.trim()}
+                    disabled={!newMessage.trim() || (activeChatUser === 'ai_assistant' && aiStatus === 'submitted')}
                     className="bg-brand-green hover:bg-brand-green-hover disabled:opacity-50 disabled:cursor-not-allowed text-black p-2 rounded-xl transition-colors glow-green flex items-center justify-center w-10 h-10 shrink-0"
                   >
                     <Send className="w-4 h-4" />
