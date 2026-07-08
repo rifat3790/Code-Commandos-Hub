@@ -43,11 +43,11 @@ function cn(...inputs: (string | undefined | null | false)[]) {
 }
 
 // Inline Markdown Parser
-function parseInlineStyles(text: string) {
+function parseInlineStyles(text: string, isMe: boolean = false) {
   const parts = text.split(/(\*\*.*?\*\*|`.*?`)/g);
   return parts.map((part, i) => {
     if (part.startsWith('**') && part.endsWith('**')) {
-      return <strong key={i} className="font-semibold text-white">{part.slice(2, -2)}</strong>;
+      return <strong key={i} className={`font-semibold ${isMe ? 'text-black' : 'text-white'}`}>{part.slice(2, -2)}</strong>;
     }
     if (part.startsWith('`') && part.endsWith('`')) {
       return <code key={i} className="px-1.5 py-0.5 rounded bg-gray-900 text-green-400 font-mono text-[13px] border border-glass-border">{part.slice(1, -1)}</code>;
@@ -130,7 +130,7 @@ function ImageCard({ url, prompt, onShowToast }: { url: string; prompt: string; 
   );
 }
 
-function parseTextAndImages(text: string, onShowToast?: (msg: string) => void) {
+function parseTextAndImages(text: string, onShowToast?: (msg: string) => void, isMe: boolean = false) {
   const imgRegex = /!\[(.*?)\]\((.*?)\)/g;
   const parts = [];
   let lastIndex = 0;
@@ -154,7 +154,7 @@ function parseTextAndImages(text: string, onShowToast?: (msg: string) => void) {
     <span className="w-full block">
       {parts.map((p, idx) => {
         if (p.type === 'text') {
-          return <span key={idx}>{parseInlineStyles(p.content || '')}</span>;
+          return <span key={idx}>{parseInlineStyles(p.content || '', isMe)}</span>;
         } else {
           return <ImageCard key={idx} url={p.url || ''} prompt={p.alt || 'Generated Image'} onShowToast={onShowToast} />;
         }
@@ -163,7 +163,7 @@ function parseTextAndImages(text: string, onShowToast?: (msg: string) => void) {
   );
 }
 
-function renderMarkdown(content: string, onShowToast?: (msg: string) => void) {
+function renderMarkdown(content: string, onShowToast?: (msg: string) => void, isMe: boolean = false) {
   if (!content) return null;
   const parts = content.split(/(```[\s\S]*?```)/g);
   
@@ -203,19 +203,19 @@ function renderMarkdown(content: string, onShowToast?: (msg: string) => void) {
           if (!trimmed) return <div key={lineIdx} className="h-1.5" />;
           
           if (trimmed.startsWith('###')) {
-            return <h3 key={lineIdx} className="text-sm font-bold text-gray-50 mt-4 mb-1 tracking-tight flex items-center gap-1.5">{parseTextAndImages(trimmed.slice(3).trim(), onShowToast)}</h3>;
+            return <h3 key={lineIdx} className={`text-sm font-bold mt-4 mb-1 tracking-tight flex items-center gap-1.5 ${isMe ? 'text-black' : 'text-gray-50'}`}>{parseTextAndImages(trimmed.slice(3).trim(), onShowToast, isMe)}</h3>;
           }
           if (trimmed.startsWith('##')) {
-            return <h2 key={lineIdx} className="text-base font-bold text-gray-50 mt-5 mb-2 tracking-tight">{parseTextAndImages(trimmed.slice(2).trim(), onShowToast)}</h2>;
+            return <h2 key={lineIdx} className={`text-base font-bold mt-5 mb-2 tracking-tight ${isMe ? 'text-black' : 'text-gray-50'}`}>{parseTextAndImages(trimmed.slice(2).trim(), onShowToast, isMe)}</h2>;
           }
           if (trimmed.startsWith('#')) {
-            return <h1 key={lineIdx} className="text-lg font-extrabold text-white mt-6 mb-3 tracking-tight">{parseTextAndImages(trimmed.slice(1).trim(), onShowToast)}</h1>;
+            return <h1 key={lineIdx} className={`text-lg font-extrabold mt-6 mb-3 tracking-tight ${isMe ? 'text-black' : 'text-white'}`}>{parseTextAndImages(trimmed.slice(1).trim(), onShowToast, isMe)}</h1>;
           }
           
           if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
             return (
-              <li key={lineIdx} className="list-disc list-inside text-gray-300 pl-2 leading-relaxed text-[13px] text-left">
-                {parseTextAndImages(trimmed.slice(2), onShowToast)}
+              <li key={lineIdx} className={`list-disc list-inside pl-2 leading-relaxed text-[13px] text-left ${isMe ? 'text-black font-semibold' : 'text-gray-300'}`}>
+                {parseTextAndImages(trimmed.slice(2), onShowToast, isMe)}
               </li>
             );
           }
@@ -223,13 +223,13 @@ function renderMarkdown(content: string, onShowToast?: (msg: string) => void) {
           const numMatch = trimmed.match(/^(\d+)\.\s(.*)/);
           if (numMatch) {
             return (
-              <li key={lineIdx} className="list-decimal list-inside text-gray-300 pl-2 leading-relaxed text-[13px] text-left">
-                {parseTextAndImages(numMatch[2], onShowToast)}
+              <li key={lineIdx} className={`list-decimal list-inside pl-2 leading-relaxed text-[13px] text-left ${isMe ? 'text-black font-semibold' : 'text-gray-300'}`}>
+                {parseTextAndImages(numMatch[2], onShowToast, isMe)}
               </li>
             );
           }
 
-          return <p key={lineIdx} className="text-[13px] text-gray-300 leading-relaxed text-left">{parseTextAndImages(trimmed, onShowToast)}</p>;
+          return <p key={lineIdx} className={`text-[13px] leading-relaxed text-left ${isMe ? 'text-black font-semibold' : 'text-gray-300'}`}>{parseTextAndImages(trimmed, onShowToast, isMe)}</p>;
         })}
       </div>
     );
@@ -557,8 +557,8 @@ export default function ChatPage() {
                           isAssistant ? 'bg-gray-900 border border-glass-border text-gray-300 rounded-tl-sm' : 'bg-green-500 text-black font-semibold rounded-tr-sm text-left'
                         }`}>
                           {(msg as any).content 
-                            ? renderMarkdown((msg as any).content, showToast) 
-                            : renderMarkdown(msg.parts?.filter((p: any) => p.type === 'text').map((p: any) => p.text).join('') || '', showToast)}
+                            ? renderMarkdown((msg as any).content, showToast, !isAssistant) 
+                            : renderMarkdown(msg.parts?.filter((p: any) => p.type === 'text').map((p: any) => p.text).join('') || '', showToast, !isAssistant)}
                         </div>
                       )}
 
