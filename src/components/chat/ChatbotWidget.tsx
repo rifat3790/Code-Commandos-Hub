@@ -237,6 +237,43 @@ export default function ChatbotWidget() {
         timestamp: serverTimestamp(),
         readStatus: false
       });
+
+      // AI Auto-reply for Support
+      if (!isAdminOrSuperAdmin && receiver === 'admin') {
+        const chatHistory = messages
+          .filter(m => (m.senderUid === user.uid && m.receiverUid === 'admin') || (m.senderUid === 'admin' && m.receiverUid === user.uid))
+          .sort((a, b) => ((a.timestamp as any)?.seconds || 0) - ((b.timestamp as any)?.seconds || 0))
+          .slice(-5)
+          .map(m => ({
+             role: m.senderUid === user.uid ? 'user' : 'assistant',
+             content: m.text
+          }));
+          
+        chatHistory.push({ role: 'user', content: msgText });
+
+        fetch('https://text.pollinations.ai/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            messages: [
+              { role: 'system', content: 'You are Code Commandos AI Support. Reply in Bengali or English based on the user\'s language. Be brief, helpful and professional. If you cannot solve it fully, mention that the human support team will follow up later.' },
+              ...chatHistory
+            ],
+            model: 'openai'
+          })
+        }).then(res => res.text()).then(aiReply => {
+           if(aiReply) {
+             addDoc(collection(db, 'chats'), {
+               senderUid: 'admin',
+               senderName: 'Support Team (AI)',
+               receiverUid: user.uid,
+               text: aiReply,
+               timestamp: serverTimestamp(),
+               readStatus: false
+             }).catch(e => console.error("Error saving AI reply: ", e));
+           }
+        }).catch(err => console.error("AI Support Reply Error:", err));
+      }
     } catch (error) {
       console.error("Error sending message: ", error);
     }
