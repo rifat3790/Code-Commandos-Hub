@@ -253,6 +253,7 @@ export default function ChatPage() {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
+  const inputRef = useRef<HTMLInputElement>(null);
   const [input, setInput] = useState('');
   const { messages, setMessages, status, sendMessage } = useChat({
     api: '/api/chat',
@@ -268,6 +269,9 @@ export default function ChatPage() {
     if (!input.trim()) return;
     sendMessage({ role: 'user', parts: [{ type: 'text', text: input }] } as any);
     setInput('');
+    setTimeout(() => {
+      inputRef.current?.focus();
+    }, 10);
   };
 
   const isLoading = status === 'streaming' || status === 'submitted';
@@ -598,6 +602,7 @@ export default function ChatPage() {
 
           <form onSubmit={onFormSubmit} className="p-4 border-t border-glass-border bg-gray-950/20 shrink-0 flex gap-2">
             <input
+              ref={inputRef}
               type="text"
               value={input}
               onChange={handleInputChange}

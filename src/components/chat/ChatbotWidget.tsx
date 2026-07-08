@@ -33,6 +33,7 @@ export default function ChatbotWidget() {
   const [isEmojiOpen, setIsEmojiOpen] = useState(false);
   const emojiRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // Integrate AI Chat for the widget
   const { messages: aiMessages, sendMessage: appendAi, status: aiStatus } = useChat({
@@ -40,7 +41,7 @@ export default function ChatbotWidget() {
     id: 'chatbot-widget-ai'
   } as any);
 
-  const POPULAR_EMOJIS = ['ðŸ˜Š', 'ðŸ˜‚', 'â¤ï¸', 'ðŸ‘', 'ðŸ”¥', 'ðŸ˜', 'ðŸ’»', 'ðŸ¤”', 'ðŸŽ‰', 'ðŸ™Œ', 'ðŸš€', 'âš ï¸', 'âœ…', 'âŒ', 'ðŸ‘€', 'ðŸ’¡', 'ðŸ’¬', 'ðŸ“Œ', 'âš¡', 'ðŸ¤'];
+  const POPULAR_EMOJIS = ['😀', '😂', '❤️', '👍', '🔥', '😱', '💻', '🤔', '🎉', '🙌', '🚀', '⚠️', '✅', '❌', '👀', '💡', '💬', '📌', '⚡', '😎'];
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -213,6 +214,9 @@ export default function ChatbotWidget() {
 
     const msgText = newMessage.trim();
     setNewMessage('');
+    setTimeout(() => {
+      inputRef.current?.focus();
+    }, 10);
 
     if (!activeChatUser) return;
     
@@ -429,6 +433,7 @@ export default function ChatbotWidget() {
 
                 <form onSubmit={handleSendMessage} className="p-3 bg-gray-900 border-t border-glass-border flex gap-2 items-center">
                   <input
+                    ref={inputRef}
                     type="text"
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}

@@ -24,7 +24,7 @@ interface WorkspaceState {
   isHydrated: boolean;
   pendingModal: { isOpen: boolean; message: string };
 
-  hydrate: () => Promise<void>;
+  hydrate: (uid?: string) => Promise<void>;
   showPendingModal: (message?: string) => void;
   closePendingModal: () => void;
   
@@ -137,9 +137,11 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   
   closePendingModal: () => set({ pendingModal: { isOpen: false, message: '' } }),
 
-  hydrate: async () => {
+  hydrate: async (uid?: string) => {
     try {
-      const res = await fetch('/api/data');
+      const currentUid = uid || auth.currentUser?.uid;
+      const url = currentUid ? `/api/data?uid=${currentUid}` : '/api/data';
+      const res = await fetch(url);
       const data = await res.json();
       if (data.success) {
         set({
@@ -237,9 +239,10 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   },
 
   addChatSession: async (session) => {
-    const applied = await pushToDatabase('create', 'chatSessions', session);
+    const sessionWithUid = auth.currentUser ? { ...session, firebaseUid: auth.currentUser.uid } : session;
+    const applied = await pushToDatabase('create', 'chatSessions', sessionWithUid);
     if (applied) {
-      set((state) => ({ chatSessions: [session, ...state.chatSessions] }));
+      set((state) => ({ chatSessions: [sessionWithUid, ...state.chatSessions] }));
     }
   },
 

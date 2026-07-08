@@ -6,14 +6,19 @@ import {
 
 import SettingsModel from '@/models/Settings';
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     await connectToDatabase();
+
+    const url = new URL(req.url);
+    const uid = url.searchParams.get('uid');
+
+    const chatQuery = uid ? { firebaseUid: uid } : {};
 
     const [templates, notes, chatSessions, stickyNotes, downloads, recentActivities, credentials, settingsDoc] = await Promise.all([
       TemplateModel.find({}).lean(),
       NoteModel.find({}).sort({ updatedAt: -1 }).lean(),
-      ChatSessionModel.find({}).sort({ updatedAt: -1 }).lean(),
+      ChatSessionModel.find(chatQuery).sort({ updatedAt: -1 }).lean(),
       StickyNoteModel.find({}).sort({ updatedAt: -1 }).lean(),
       DownloadModel.find({}).sort({ _id: -1 }).lean(),
       ActivityModel.find({}).sort({ timestamp: -1 }).limit(50).lean(),

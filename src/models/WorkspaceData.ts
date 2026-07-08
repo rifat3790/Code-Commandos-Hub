@@ -32,6 +32,7 @@ const NoteSchema = new Schema({
 const ChatSessionSchema = new Schema({
   id: { type: String, required: true, unique: true },
   title: { type: String, required: true },
+  firebaseUid: { type: String },
   messages: [{
     id: String,
     role: { type: String, enum: ['user', 'assistant'] },

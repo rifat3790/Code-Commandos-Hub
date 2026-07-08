@@ -153,6 +153,19 @@ function HeartbeatTrigger() {
   return null;
 }
 
+function WorkspaceHydrator() {
+  const { user } = useAuth();
+  const hydrate = useWorkspaceStore(state => state.hydrate);
+  
+  useEffect(() => {
+    if (user?.uid) {
+      hydrate(user.uid);
+    }
+  }, [user?.uid, hydrate]);
+
+  return null;
+}
+
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const pathname = usePathname();
@@ -171,6 +184,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
       <ThemeProvider>
         <CallProvider>
           <HeartbeatTrigger />
+          <WorkspaceHydrator />
           <div className="flex flex-col md:flex-row h-screen w-screen overflow-hidden bg-[#030712]">
         {/* Sidebar - responsive built-in mobile/desktop */}
         <Sidebar isMobileOpen={isMobileOpen} onCloseMobile={() => setIsMobileOpen(false)} />
