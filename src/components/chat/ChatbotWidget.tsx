@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
@@ -35,10 +35,10 @@ export default function ChatbotWidget() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Integrate AI Chat for the widget
-  const { messages: aiMessages, append: appendAi, status: aiStatus } = useChat({
+  const { messages: aiMessages, sendMessage: appendAi, status: aiStatus } = useChat({
     api: '/api/chat',
     id: 'chatbot-widget-ai'
-  });
+  } as any);
 
   const POPULAR_EMOJIS = ['ðŸ˜Š', 'ðŸ˜‚', 'â¤ï¸', 'ðŸ‘', 'ðŸ”¥', 'ðŸ˜', 'ðŸ’»', 'ðŸ¤”', 'ðŸŽ‰', 'ðŸ™Œ', 'ðŸš€', 'âš ï¸', 'âœ…', 'âŒ', 'ðŸ‘€', 'ðŸ’¡', 'ðŸ’¬', 'ðŸ“Œ', 'âš¡', 'ðŸ¤'];
 
@@ -173,7 +173,7 @@ export default function ChatbotWidget() {
         uid: 'ai_assistant', 
         name: 'AI Assistant', 
         unread: 0, 
-        lastMessage: aiMessages.length > 0 ? aiMessages[aiMessages.length - 1].content : 'Ask me anything! âœ¨', 
+        lastMessage: aiMessages.length > 0 ? (aiMessages[aiMessages.length - 1] as any).content : 'Ask me anything! ✨', 
         lastTimestamp: Date.now() 
       },
       ...sortedChats
@@ -218,7 +218,7 @@ export default function ChatbotWidget() {
     
     // Intercept AI Assistant messages
     if (activeChatUser === 'ai_assistant') {
-      appendAi({ role: 'user', content: msgText });
+      appendAi({ role: 'user', content: msgText } as any);
       return;
     }
 

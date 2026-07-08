@@ -242,6 +242,7 @@ export default function ChatPage() {
   const [activeSessionId, setActiveSessionId] = useState<string>('');
   const [activeCategory, setActiveCategory] = useState('General Assistant');
   const [selectedModel, setSelectedModel] = useState('gemini-2.0-flash-lite');
+  const [input, setInput] = useState('');
   
   const [chatDraftText, setChatDraftText] = useState('');
   
@@ -253,10 +254,14 @@ export default function ChatPage() {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  const { messages, input, handleInputChange, handleSubmit, setMessages, status, append } = useChat({
+  const { messages, setMessages, status, sendMessage } = useChat({
     api: '/api/chat',
     body: { selectedModel }
-  });
+  } as any);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setInput(e.target.value);
+  };
 
   const isLoading = status === 'streaming' || status === 'submitted';
 
@@ -279,7 +284,7 @@ export default function ChatPage() {
         id: m.id,
         role: m.role,
         content: m.content
-      })));
+      })) as any);
     } else {
       setMessages([]);
     }
@@ -289,7 +294,7 @@ export default function ChatPage() {
   useEffect(() => {
     if (activeSessionId && messages.length > 0) {
       const currentSession = store.chatSessions.find(s => s.id === activeSessionId);
-      if (currentSession && JSON.stringify(currentSession.messages.map(m => m.content)) !== JSON.stringify(messages.map(m => m.content))) {
+      if (currentSession && JSON.stringify(currentSession.messages.map(m => m.content)) !== JSON.stringify(messages.map((m: any) => m.content || ''))) {
         store.updateChatSession(activeSessionId, {
           messages: messages.map((m: any) => ({
             id: m.id,
@@ -355,7 +360,8 @@ export default function ChatPage() {
       });
     }
 
-    handleSubmit(e);
+    sendMessage({ role: 'user', content: input } as any);
+    setInput('');
   };
 
   const handlePinSession = (id: string, e: React.MouseEvent) => {
@@ -377,15 +383,15 @@ export default function ChatPage() {
   const handleChatTool = (tool: 'rewrite' | 'expand' | 'shorten' | 'formal' | 'friendly' | 'professional') => {
     if (!chatDraftText.trim()) return;
     let prompt = `Rewrite the following text to be ${tool}:\n\n${chatDraftText}`;
-    append({ role: 'user', content: prompt });
+    sendMessage({ role: 'user', content: prompt } as any);
     setChatDraftText('');
     store.logActivity('Draft Modified by AI', 'chat', `Applied tool: ${tool}`);
   };
 
   const handleCompareVersions = () => {
     if (!chatDraftText.trim()) return;
-    const prompt = `Generate 3 versions of this reply (Formal, Friendly, Professional) for me to compare side-by-side:\n\n${chatDraftText}`;
-    append({ role: 'user', content: prompt });
+    const prompt = `Generate 3 versions of this reply (Formal, Friendly, Professional) for me to choose from:\n\n${chatDraftText}`;
+    sendMessage({ role: 'user', content: prompt } as any);
     setChatDraftText('');
   };
 
