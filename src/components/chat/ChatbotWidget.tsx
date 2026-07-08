@@ -173,7 +173,7 @@ export default function ChatbotWidget() {
         uid: 'ai_assistant', 
         name: 'AI Assistant', 
         unread: 0, 
-        lastMessage: aiMessages.length > 0 ? (aiMessages[aiMessages.length - 1] as any).content : 'Ask me anything! ✨', 
+        lastMessage: aiMessages.length > 0 ? (aiMessages[aiMessages.length - 1] as any).content || (aiMessages[aiMessages.length - 1] as any).parts?.filter((p: any) => p.type === 'text').map((p: any) => p.text).join('') || '...' : 'Ask me anything! ✨', 
         lastTimestamp: Date.now() 
       },
       ...sortedChats
@@ -218,7 +218,7 @@ export default function ChatbotWidget() {
     
     // Intercept AI Assistant messages
     if (activeChatUser === 'ai_assistant') {
-      appendAi({ role: 'user', content: msgText } as any);
+      appendAi({ role: 'user', parts: [{ type: 'text', text: msgText }] });
       return;
     }
 

@@ -242,7 +242,6 @@ export default function ChatPage() {
   const [activeSessionId, setActiveSessionId] = useState<string>('');
   const [activeCategory, setActiveCategory] = useState('General Assistant');
   const [selectedModel, setSelectedModel] = useState('gemini-2.0-flash-lite');
-  const [input, setInput] = useState('');
   
   const [chatDraftText, setChatDraftText] = useState('');
   
@@ -254,13 +253,21 @@ export default function ChatPage() {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
+  const [input, setInput] = useState('');
   const { messages, setMessages, status, sendMessage } = useChat({
     api: '/api/chat',
     body: { selectedModel }
   } as any);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setInput(e.target.value);
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!input.trim()) return;
+    sendMessage({ role: 'user', parts: [{ type: 'text', text: input }] } as any);
+    setInput('');
   };
 
   const isLoading = status === 'streaming' || status === 'submitted';
@@ -294,12 +301,12 @@ export default function ChatPage() {
   useEffect(() => {
     if (activeSessionId && messages.length > 0) {
       const currentSession = store.chatSessions.find(s => s.id === activeSessionId);
-      if (currentSession && JSON.stringify(currentSession.messages.map(m => m.content)) !== JSON.stringify(messages.map((m: any) => m.content || ''))) {
+      if (currentSession && JSON.stringify(currentSession.messages.map(m => m.content)) !== JSON.stringify(messages.map((m: any) => m.content || m.parts?.filter((p: any) => p.type === 'text').map((p: any) => p.text).join('')))) {
         store.updateChatSession(activeSessionId, {
           messages: messages.map((m: any) => ({
             id: m.id,
             role: m.role as any,
-            content: m.content || '',
+            content: m.content || m.parts?.filter((p: any) => p.type === 'text').map((p: any) => p.text).join('') || '',
             timestamp: new Date().toISOString()
           }))
         });
@@ -360,8 +367,7 @@ export default function ChatPage() {
       });
     }
 
-    sendMessage({ role: 'user', content: input } as any);
-    setInput('');
+    handleSubmit(e);
   };
 
   const handlePinSession = (id: string, e: React.MouseEvent) => {
@@ -383,15 +389,15 @@ export default function ChatPage() {
   const handleChatTool = (tool: 'rewrite' | 'expand' | 'shorten' | 'formal' | 'friendly' | 'professional') => {
     if (!chatDraftText.trim()) return;
     let prompt = `Rewrite the following text to be ${tool}:\n\n${chatDraftText}`;
-    sendMessage({ role: 'user', content: prompt } as any);
+    sendMessage({ role: 'user', parts: [{ type: 'text', text: prompt }] } as any);
     setChatDraftText('');
     store.logActivity('Draft Modified by AI', 'chat', `Applied tool: ${tool}`);
   };
 
   const handleCompareVersions = () => {
     if (!chatDraftText.trim()) return;
-    const prompt = `Generate 3 versions of this reply (Formal, Friendly, Professional) for me to choose from:\n\n${chatDraftText}`;
-    sendMessage({ role: 'user', content: prompt } as any);
+    const prompt = `Generate 3 versions of this reply (Formal, Friendly, Professional) for me to compare side-by-side:\n\n${chatDraftText}`;
+    sendMessage({ role: 'user', parts: [{ type: 'text', text: prompt }] } as any);
     setChatDraftText('');
   };
 
