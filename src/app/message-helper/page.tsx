@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ShieldAlert, 
@@ -13,9 +13,11 @@ import {
   FileText,
   HelpCircle,
   ArrowRight,
-  RefreshCw
+  RefreshCw,
+  Palette
 } from 'lucide-react';
 import { useWorkspaceStore } from '@/store/workspaceStore';
+import { useAuth } from '@/context/AuthContext';
 
 // Helper to get a randomized obfuscated bypass term for words to avoid bot pattern matches
 const getDynamicReplacement = (word: string): string => {
@@ -203,6 +205,7 @@ const RESTRICTED_WORDS_MAP: { pattern: RegExp, word: string, getReplacement: () 
 
 export default function MessageHelperPage() {
   const store = useWorkspaceStore();
+  const { dbUser } = useAuth();
   const [inputText, setInputText] = useState('');
   const [detectedWords, setDetectedWords] = useState<string[]>([]);
   const [stealthLevel, setStealthLevel] = useState<'low' | 'medium' | 'high' | 'homoglyph'>('low');
@@ -213,6 +216,127 @@ export default function MessageHelperPage() {
   const [newTemplateDesc, setNewTemplateDesc] = useState('');
   const [historyList, setHistoryList] = useState<{ id: string; text: string; date: string }[]>([]);
   const [copied, setCopied] = useState(false);
+
+  const activeMessageHelperLayout = store.settings?.messageHelperLayout || 'default';
+  const isSuperAdmin = dbUser?.role === 'super_admin';
+
+  const messageHelperLayouts = [
+    { id: 'default', name: 'Layout 1: Neon Glassmorphic' },
+    { id: 'slate', name: 'Layout 2: Clean Slate & Platinum' },
+    { id: 'aurora', name: 'Layout 3: Aurora Gradient' },
+    { id: 'cyber', name: 'Layout 4: Cyber-Chrono (Green)' },
+    { id: 'gold', name: 'Layout 5: Royal Gold & Onyx' }
+  ];
+
+  const helperStyles = useMemo(() => {
+    switch(activeMessageHelperLayout) {
+      case 'slate': // Layout 2: Clean Slate & Platinum
+        return {
+          wrapper: "space-y-6 pb-12 relative font-sans",
+          headerTitle: "text-2xl lg:text-3xl font-bold tracking-tight text-white",
+          headerDesc: "text-gray-400 text-sm",
+          editorCard: "p-5 rounded-none border border-gray-800 bg-gray-900 space-y-4",
+          textarea: "w-full p-4 rounded-none bg-gray-950 border border-gray-800 text-white font-medium text-sm leading-relaxed focus:border-gray-600 outline-none",
+          controlPanel: "p-4 rounded-none border border-gray-850 bg-gray-955 space-y-3 text-left",
+          controlBtnActive: "p-2.5 rounded-none border border-white/40 bg-gray-800 text-white flex flex-col justify-between transition-all text-left",
+          controlBtnInactive: "p-2.5 rounded-none border border-gray-800 bg-gray-950/20 text-gray-400 hover:text-white hover:bg-gray-800 text-left",
+          visualizerBox: "p-4 rounded-none bg-gray-955 border border-gray-850 space-y-2 text-left",
+          actionBtnCorrect: "px-5 py-2.5 rounded-none bg-white hover:bg-gray-250 text-black font-bold text-xs uppercase tracking-wider transition-colors flex items-center gap-1.5",
+          actionBtnSec: "px-4 py-2.5 rounded-none bg-gray-900 border border-gray-800 hover:bg-gray-800 text-white font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-1.5",
+          actionBtnClear: "px-4 py-2.5 rounded-none bg-gray-955 hover:bg-gray-900 border border-gray-800 text-gray-400 hover:text-white font-bold text-xs uppercase tracking-wider transition-all ml-auto flex items-center gap-1.5",
+          toneWrapper: "p-5 rounded-none border border-gray-800 bg-gray-900 space-y-4",
+          toneBtnActive: "px-3 py-1.5 rounded-none bg-gray-800 border border-gray-700 text-white text-xs font-semibold uppercase tracking-wider transition-all",
+          toneBtnInactive: "px-3 py-1.5 rounded-none text-gray-400 hover:text-white hover:bg-gray-800 text-xs font-semibold uppercase tracking-wider transition-all",
+          sidebarCard: "p-5 rounded-none border border-gray-800 bg-gray-900 space-y-4 text-left",
+          sidebarBtn: "w-full p-3 rounded-none bg-gray-955 border border-gray-850 hover:bg-gray-850 hover:border-gray-650 transition-all text-left space-y-1 block",
+          outputPreBox: "p-4 rounded-none bg-gray-955 border border-gray-850 font-mono text-xs leading-relaxed space-y-2 max-h-[300px] overflow-y-auto relative text-left"
+        };
+      case 'aurora': // Layout 3: Aurora Gradient & Mesh Flow
+        return {
+          wrapper: "space-y-6 pb-12 relative font-sans",
+          headerTitle: "text-2xl lg:text-3xl font-extrabold tracking-tight text-white",
+          headerDesc: "text-indigo-200/80 text-sm",
+          editorCard: "p-5 rounded-2xl border border-indigo-500/10 bg-indigo-950/5 space-y-4 shadow-[0_8px_32px_rgba(99,102,241,0.05)]",
+          textarea: "w-full p-4 rounded-2xl bg-indigo-950/40 border border-indigo-500/20 text-white font-medium text-sm leading-relaxed focus:ring-2 focus:ring-indigo-500/50 outline-none",
+          controlPanel: "p-4 rounded-2xl border border-indigo-500/15 bg-indigo-950/20 space-y-3 text-left",
+          controlBtnActive: "p-2.5 rounded-xl border border-indigo-500 bg-indigo-500/20 text-indigo-300 flex flex-col justify-between transition-all text-left",
+          controlBtnInactive: "p-2.5 rounded-xl border border-indigo-500/10 bg-indigo-950/10 text-indigo-300/60 hover:text-white hover:bg-indigo-950/30 text-left",
+          visualizerBox: "p-4 rounded-2xl bg-indigo-950/30 border border-indigo-500/10 space-y-2 text-left",
+          actionBtnCorrect: "px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-xs uppercase tracking-wider transition-colors flex items-center gap-1.5 shadow-md",
+          actionBtnSec: "px-4 py-2.5 rounded-xl bg-indigo-950/40 border border-indigo-500/20 hover:bg-indigo-900/60 text-white font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-1.5",
+          actionBtnClear: "px-4 py-2.5 rounded-xl bg-transparent hover:bg-red-500/10 border border-red-500/20 hover:border-red-500/40 text-red-300 font-bold text-xs uppercase tracking-wider transition-all ml-auto flex items-center gap-1.5",
+          toneWrapper: "p-5 rounded-2xl border border-indigo-500/10 bg-indigo-950/5 space-y-4",
+          toneBtnActive: "px-3 py-1.5 rounded-xl bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 text-xs font-semibold uppercase tracking-wider transition-all",
+          toneBtnInactive: "px-3 py-1.5 rounded-xl text-indigo-200/50 hover:text-white hover:bg-indigo-950/40 text-xs font-semibold uppercase tracking-wider transition-all",
+          sidebarCard: "p-5 rounded-2xl border border-indigo-500/10 bg-indigo-950/5 space-y-4 text-left shadow-[0_8px_32px_rgba(99,102,241,0.05)]",
+          sidebarBtn: "w-full p-3 rounded-xl bg-indigo-950/20 border border-indigo-500/10 hover:bg-indigo-950/40 hover:border-indigo-500/30 transition-all text-left space-y-1 block",
+          outputPreBox: "p-4 rounded-2xl bg-indigo-950/30 border border-indigo-500/10 font-mono text-xs leading-relaxed space-y-2 max-h-[300px] overflow-y-auto relative text-left"
+        };
+      case 'cyber': // Layout 4: Cyberpunk Matrix Tech
+        return {
+          wrapper: "space-y-6 pb-12 relative font-mono",
+          headerTitle: "text-2xl lg:text-3xl font-black tracking-tight text-white uppercase",
+          headerDesc: "text-emerald-500/80 text-xs",
+          editorCard: "p-5 rounded-none border border-emerald-500/30 bg-black space-y-4 shadow-[0_0_15px_rgba(16,185,129,0.05)]",
+          textarea: "w-full p-4 rounded-none bg-black border border-emerald-500/40 text-emerald-450 font-medium text-sm leading-relaxed focus:border-emerald-500 outline-none",
+          controlPanel: "p-4 rounded-none border border-emerald-500/20 bg-black space-y-3 text-left",
+          controlBtnActive: "p-2.5 rounded-none border border-emerald-500 bg-emerald-950/30 text-emerald-400 flex flex-col justify-between transition-all text-left",
+          controlBtnInactive: "p-2.5 rounded-none border border-emerald-500/10 bg-black text-emerald-600 hover:text-emerald-400 hover:bg-emerald-950/20 text-left",
+          visualizerBox: "p-4 rounded-none bg-black border border-emerald-500/20 space-y-2 text-left",
+          actionBtnCorrect: "px-5 py-2.5 rounded-none bg-black border-2 border-dashed border-emerald-500 hover:bg-emerald-950/30 text-emerald-400 font-bold text-xs uppercase tracking-wider transition-colors flex items-center gap-1.5",
+          actionBtnSec: "px-4 py-2.5 rounded-none bg-black border border-emerald-500/35 hover:bg-emerald-950/20 text-white font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-1.5",
+          actionBtnClear: "px-4 py-2.5 rounded-none bg-black border border-red-500/30 hover:bg-red-950/20 text-red-400 font-bold text-xs uppercase tracking-wider transition-all ml-auto flex items-center gap-1.5",
+          toneWrapper: "p-5 rounded-none border border-emerald-500/30 bg-black space-y-4",
+          toneBtnActive: "px-3 py-1.5 rounded-none bg-emerald-950/40 border border-emerald-500/50 text-emerald-400 text-xs font-semibold uppercase tracking-wider transition-all",
+          toneBtnInactive: "px-3 py-1.5 rounded-none text-emerald-600 hover:text-emerald-400 hover:bg-emerald-950/20 text-xs font-semibold uppercase tracking-wider transition-all",
+          sidebarCard: "p-5 rounded-none border border-emerald-500/30 bg-black space-y-4 text-left",
+          sidebarBtn: "w-full p-3 rounded-none bg-black border border-emerald-500/20 hover:bg-emerald-950/10 hover:border-emerald-500/40 transition-all text-left space-y-1 block",
+          outputPreBox: "p-4 rounded-none bg-black border border-emerald-500/20 font-mono text-xs leading-relaxed space-y-2 max-h-[300px] overflow-y-auto relative text-left"
+        };
+      case 'gold': // Layout 5: Royal Gold & Onyx
+        return {
+          wrapper: "space-y-6 pb-12 relative font-sans",
+          headerTitle: "text-2xl lg:text-3xl font-black tracking-tight text-white uppercase tracking-wider",
+          headerDesc: "text-amber-250/70 text-sm",
+          editorCard: "p-5 rounded-2xl border border-amber-500/25 bg-[#0b0b0b] space-y-4 shadow-lg",
+          textarea: "w-full p-4 rounded-2xl bg-black border border-amber-500/20 text-white font-medium text-sm leading-relaxed focus:ring-1 focus:ring-amber-500/40 outline-none",
+          controlPanel: "p-4 rounded-2xl border border-amber-500/15 bg-black space-y-3 text-left",
+          controlBtnActive: "p-2.5 rounded-xl border border-amber-500 bg-amber-500/10 text-amber-300 flex flex-col justify-between transition-all text-left",
+          controlBtnInactive: "p-2.5 rounded-xl border border-amber-500/10 bg-black text-amber-200/50 hover:text-white hover:bg-[#151515] text-left",
+          visualizerBox: "p-4 rounded-2xl bg-black border border-amber-500/15 space-y-2 text-left",
+          actionBtnCorrect: "px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-black font-bold text-xs uppercase tracking-wider transition-colors flex items-center gap-1.5 shadow-sm",
+          actionBtnSec: "px-4 py-2.5 rounded-xl bg-[#121212] border border-amber-500/20 hover:bg-[#1a1a1a] text-white font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-1.5",
+          actionBtnClear: "px-4 py-2.5 rounded-xl bg-transparent hover:bg-red-500/15 border border-red-500/20 hover:border-red-500/40 text-red-400 font-bold text-xs uppercase tracking-wider transition-all ml-auto flex items-center gap-1.5",
+          toneWrapper: "p-5 rounded-2xl border border-amber-500/25 bg-[#0b0b0b] space-y-4",
+          toneBtnActive: "px-3 py-1.5 rounded-xl bg-amber-500/20 border border-amber-500/30 text-amber-300 text-xs font-semibold uppercase tracking-wider transition-all",
+          toneBtnInactive: "px-3 py-1.5 rounded-xl text-amber-200/50 hover:text-white hover:bg-[#151515] text-xs font-semibold uppercase tracking-wider transition-all",
+          sidebarCard: "p-5 rounded-2xl border border-amber-500/25 bg-[#0b0b0b] space-y-4 text-left shadow-md",
+          sidebarBtn: "w-full p-3 rounded-xl bg-black border border-amber-500/15 hover:bg-[#121212] hover:border-amber-500/35 transition-all text-left space-y-1 block",
+          outputPreBox: "p-4 rounded-2xl bg-black border border-amber-500/15 font-mono text-xs leading-relaxed space-y-2 max-h-[300px] overflow-y-auto relative text-left"
+        };
+      default: // Neon Glassmorphic (Default)
+        return {
+          wrapper: "space-y-6 pb-12 relative",
+          headerTitle: "text-2xl lg:text-3xl font-extrabold tracking-tight text-white",
+          headerDesc: "text-gray-400 text-sm",
+          editorCard: "p-5 rounded-xl border border-glass-border bg-gray-950/20 space-y-4",
+          textarea: "w-full p-4 rounded-xl glass-input font-medium text-sm leading-relaxed",
+          controlPanel: "p-4 rounded-xl border border-glass-border bg-gray-955/40 space-y-3 text-left",
+          controlBtnActive: "p-2.5 rounded-lg border border-green-500 bg-green-500/10 text-green-400 shadow-[0_0_15px_rgba(34,197,94,0.15)] flex flex-col justify-between transition-all text-left",
+          controlBtnInactive: "p-2.5 rounded-lg border border-glass-border bg-gray-955/20 text-gray-400 hover:text-white hover:bg-glass-hover text-left",
+          visualizerBox: "p-4 rounded-xl bg-gray-955/60 border border-glass-border space-y-2 text-left",
+          actionBtnCorrect: "px-5 py-2.5 rounded-lg bg-green-500 hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed text-black font-bold text-xs uppercase tracking-wider transition-colors flex items-center gap-1.5 glow-green",
+          actionBtnSec: "px-4 py-2.5 rounded-lg bg-gray-900 border border-glass-border hover:bg-glass-hover text-white font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-1.5",
+          actionBtnClear: "px-4 py-2.5 rounded-lg bg-gray-955 hover:bg-red-950/20 border border-red-500/10 hover:border-red-500/30 text-gray-400 hover:text-red-400 font-bold text-xs uppercase tracking-wider transition-all ml-auto flex items-center gap-1.5",
+          toneWrapper: "p-5 rounded-xl border border-glass-border bg-gray-955/20 space-y-4",
+          toneBtnActive: "px-3 py-1.5 rounded-md text-xs font-semibold uppercase tracking-wider transition-all bg-green-500/10 border border-green-500/20 text-green-400",
+          toneBtnInactive: "px-3 py-1.5 rounded-md text-xs font-semibold uppercase tracking-wider transition-all text-gray-400 hover:text-white hover:bg-glass-hover",
+          sidebarCard: "p-5 rounded-xl border border-glass-border bg-gray-955/20 space-y-4 text-left",
+          sidebarBtn: "w-full p-3 rounded-lg bg-gray-955/60 border border-glass-border hover:bg-glass-hover hover:border-white/10 transition-all text-left space-y-1 block",
+          outputPreBox: "p-4 rounded-xl bg-gray-955/60 border border-glass-border font-mono text-xs leading-relaxed space-y-2 max-h-[300px] overflow-y-auto relative text-left"
+        };
+    }
+  }, [activeMessageHelperLayout]);
 
   useEffect(() => {
     store.hydrate();
@@ -488,8 +612,8 @@ export default function MessageHelperPage() {
   
   const risk = getRiskScore();
 
-  return (
-    <div className="space-y-6 pb-12 relative">
+   return (
+    <div className={helperStyles.wrapper}>
       <AnimatePresence>
         {copied && (
           <motion.div
@@ -503,19 +627,39 @@ export default function MessageHelperPage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Super Admin Layout Selection UI */}
+      {isSuperAdmin && (
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-gray-900/60 border border-glass-border rounded-2xl backdrop-blur-md gap-4">
+          <div className="flex items-center gap-2 text-gray-300">
+            <Palette className="w-5 h-5 text-green-400 animate-spin-slow" />
+            <span className="text-sm font-semibold">Message Helper Layout Theme (Super Admin Only)</span>
+          </div>
+          <select
+            value={activeMessageHelperLayout}
+            onChange={(e) => store.updateSettings({ messageHelperLayout: e.target.value })}
+            className="bg-gray-955 text-white border border-glass-border px-4 py-2 rounded-xl text-sm outline-none focus:border-green-500 transition-colors cursor-pointer w-full sm:w-auto"
+          >
+            {messageHelperLayouts.map((l) => (
+              <option key={l.id} value={l.id}>{l.name}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
       {/* Header */}
       <div>
-        <h1 className="text-2xl lg:text-3xl font-extrabold tracking-tight text-white">MESSAGE HELPER</h1>
-        <p className="text-gray-400 text-sm">Fiverr & Upwork communications advisor. Review word policies and adjust tone scales.</p>
+        <h1 className={helperStyles.headerTitle}>MESSAGE HELPER</h1>
+        <p className={helperStyles.headerDesc}>Fiverr & Upwork communications advisor. Review word policies and adjust tone scales.</p>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
         
         {/* Core Editor Panel */}
         <div className="xl:col-span-3 space-y-6">
-          <div className="p-5 rounded-xl border border-glass-border bg-gray-950/20 space-y-4">
+          <div className={helperStyles.editorCard}>
             <div className="flex items-center justify-between">
-              <span className="text-xs text-gray-500">TASTE YOUR MESSAGE HERE IT AUTOMATICALLY CHECKS YOUR WORDS.</span>
+              <span className="text-xs text-gray-500">PASTE YOUR MESSAGE HERE IT AUTOMATICALLY CHECKS YOUR WORDS.</span>
               <span className="text-xs text-gray-400 font-medium">{inputText.length}/2500 Characters</span>
             </div>
 
@@ -524,11 +668,11 @@ export default function MessageHelperPage() {
               onChange={(e) => setInputText(e.target.value)}
               placeholder="Paste or type your developer update draft here..."
               rows={8}
-              className="w-full p-4 rounded-xl glass-input font-medium text-sm leading-relaxed"
+              className={helperStyles.textarea}
             />
 
             {/* Premium Stealth Bypass Engine Control Panel */}
-            <div className="p-4 rounded-xl border border-glass-border bg-gray-950/40 space-y-3 text-left">
+            <div className={helperStyles.controlPanel}>
               <div className="flex items-center justify-between">
                 <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Stealth Bypass Engine Control</span>
                 <span className="text-[9px] px-1.5 py-0.5 rounded bg-green-500/10 text-green-400 border border-green-500/25 font-bold font-mono">Stealth Active</span>
@@ -543,11 +687,7 @@ export default function MessageHelperPage() {
                   <button
                     key={level.id}
                     onClick={() => setStealthLevel(level.id as any)}
-                    className={`p-2.5 rounded-lg border text-left flex flex-col justify-between transition-all ${
-                      stealthLevel === level.id
-                        ? 'border-green-500 bg-green-500/10 text-green-400 shadow-[0_0_15px_rgba(34,197,94,0.15)]'
-                        : 'border-glass-border bg-gray-950/20 text-gray-400 hover:text-white hover:bg-glass-hover'
-                    }`}
+                    className={stealthLevel === level.id ? helperStyles.controlBtnActive : helperStyles.controlBtnInactive}
                   >
                     <span className="text-xs font-extrabold">{level.name}</span>
                     <span className="text-[9px] leading-tight text-gray-500 mt-1">{level.desc}</span>
@@ -575,7 +715,7 @@ export default function MessageHelperPage() {
 
             {/* Visualizer output card */}
             {inputText && (
-              <div className="p-4 rounded-xl bg-gray-950/60 border border-glass-border space-y-2 text-left">
+              <div className={helperStyles.visualizerBox}>
                 <span className="text-[10px] text-gray-500 uppercase tracking-wider block font-bold">Analysis Visualizer</span>
                 <p className="text-sm text-gray-300 leading-relaxed font-medium">
                   {renderHighlightedText(activeText)}
@@ -588,7 +728,7 @@ export default function MessageHelperPage() {
               <button
                 onClick={handleCorrect}
                 disabled={!inputText}
-                className="px-5 py-2.5 rounded-lg bg-green-500 hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed text-black font-bold text-xs uppercase tracking-wider transition-colors flex items-center gap-1.5 glow-green"
+                className={helperStyles.actionBtnCorrect}
               >
                 <RefreshCw className="w-4 h-4" />
                 <span>Correct Message</span>
@@ -597,7 +737,7 @@ export default function MessageHelperPage() {
               <button
                 onClick={() => handleCopy(activeText)}
                 disabled={!activeText}
-                className="px-4 py-2.5 rounded-lg bg-gray-900 border border-glass-border hover:bg-glass-hover text-white font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-1.5"
+                className={helperStyles.actionBtnSec}
               >
                 {copied ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
                 <span className={copied ? "text-green-400" : ""}>{copied ? 'Copied' : 'Copy'}</span>
@@ -606,7 +746,7 @@ export default function MessageHelperPage() {
               <button
                 onClick={() => setSaveModalOpen(true)}
                 disabled={!activeText}
-                className="px-4 py-2.5 rounded-lg bg-gray-900 border border-glass-border hover:bg-glass-hover text-white font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-1.5"
+                className={helperStyles.actionBtnSec}
               >
                 <Save className="w-4 h-4" />
                 <span>Save Template</span>
@@ -615,7 +755,7 @@ export default function MessageHelperPage() {
               <button
                 onClick={handleClear}
                 disabled={!inputText}
-                className="px-4 py-2.5 rounded-lg bg-gray-950 hover:bg-red-950/20 border border-red-500/10 hover:border-red-500/30 text-gray-400 hover:text-red-400 font-bold text-xs uppercase tracking-wider transition-all ml-auto flex items-center gap-1.5"
+                className={helperStyles.actionBtnClear}
               >
                 <Trash2 className="w-4 h-4" />
                 <span>Clear</span>
@@ -625,18 +765,14 @@ export default function MessageHelperPage() {
 
           {/* Tone Rewrite Deck (Only display when text exists) */}
           {inputText && (
-            <div className="p-5 rounded-xl border border-glass-border bg-gray-950/20 space-y-4">
+            <div className={helperStyles.toneWrapper}>
               <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-glass-border pb-3 gap-3">
                 <div className="flex flex-wrap gap-2">
                   {(['original', 'professional', 'short', 'formal', 'friendly', 'grammar', 'clean'] as const).map((tab) => (
                     <button
                       key={tab}
                       onClick={() => setActiveTab(tab)}
-                      className={`px-3 py-1.5 rounded-md text-xs font-semibold uppercase tracking-wider transition-all ${
-                        activeTab === tab 
-                          ? 'bg-green-500/10 border border-green-500/20 text-green-400' 
-                          : 'text-gray-400 hover:text-white hover:bg-glass-hover'
-                      }`}
+                      className={activeTab === tab ? helperStyles.toneBtnActive : helperStyles.toneBtnInactive}
                     >
                       {tab}
                     </button>
@@ -659,7 +795,7 @@ export default function MessageHelperPage() {
                 renderDiffCompare()
               ) : (
                 <div className="space-y-3">
-                  <div className="p-4 rounded-xl bg-gray-950/60 border border-glass-border font-mono text-xs leading-relaxed space-y-2 max-h-[300px] overflow-y-auto relative text-left">
+                  <div className={helperStyles.outputPreBox}>
                     <button 
                       onClick={() => handleCopy(activeText)}
                       className="absolute top-3 right-3 p-1.5 rounded hover:bg-glass-hover text-gray-400 hover:text-white transition-colors"
@@ -688,7 +824,7 @@ export default function MessageHelperPage() {
         {/* Sidebar History Column */}
         <div className="space-y-6">
           
-          <div className="p-5 rounded-xl border border-glass-border bg-gray-950/20 space-y-4 text-left">
+          <div className={helperStyles.sidebarCard}>
             <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
               <History className="w-4 h-4 text-green-400" />
               <span>Scan History</span>
@@ -700,7 +836,7 @@ export default function MessageHelperPage() {
                   <button
                     key={hist.id}
                     onClick={() => setInputText(hist.text)}
-                    className="w-full p-3 rounded-lg bg-gray-950/60 border border-glass-border hover:bg-glass-hover hover:border-white/10 transition-all text-left space-y-1 block"
+                    className={helperStyles.sidebarBtn}
                   >
                     <div className="flex items-center justify-between text-[10px] text-gray-500">
                       <span>Analyzed Code</span>
@@ -718,7 +854,7 @@ export default function MessageHelperPage() {
           </div>
 
           {/* Interactive Policy Shield Heatmap */}
-          <div className="p-5 rounded-xl border border-glass-border bg-gray-950/20 space-y-4 text-left">
+          <div className={helperStyles.sidebarCard}>
             <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center justify-between">
               <span className="flex items-center gap-2">
                 <ShieldAlert className="w-4 h-4 text-green-455" />
@@ -844,7 +980,7 @@ export default function MessageHelperPage() {
               <div className="flex justify-end gap-3 pt-2">
                 <button
                   onClick={() => setSaveModalOpen(false)}
-                  className="px-3.5 py-2 rounded-lg bg-gray-950 border border-glass-border hover:bg-glass-hover text-xs font-semibold text-gray-400 hover:text-white"
+                  className="px-3.5 py-2 rounded-lg bg-gray-955 border border-glass-border hover:bg-glass-hover text-xs font-semibold text-gray-400 hover:text-white"
                 >
                   Cancel
                 </button>

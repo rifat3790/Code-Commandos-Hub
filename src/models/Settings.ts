@@ -8,6 +8,8 @@ export interface ISettings extends Document {
   trackerLayout: string;
   homeLayout: string;
   workspaceLayout: string;
+  messageHelperLayout: string;
+  templatesLayout: string;
 }
 
 const SettingsSchema: Schema = new Schema({
@@ -17,7 +19,9 @@ const SettingsSchema: Schema = new Schema({
   userEnabledMenus: { type: [String], default: [] },
   trackerLayout: { type: String, default: 'default' },
   homeLayout: { type: String, default: 'default' },
-  workspaceLayout: { type: String, default: 'default' }
+  workspaceLayout: { type: String, default: 'default' },
+  messageHelperLayout: { type: String, default: 'default' },
+  templatesLayout: { type: String, default: 'default' }
 });
 
 export default mongoose.models.Settings || mongoose.model<ISettings>('Settings', SettingsSchema);

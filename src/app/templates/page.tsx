@@ -17,10 +17,12 @@ import {
   FileCheck,
   Variable,
   AlertCircle,
-  RefreshCw
+  RefreshCw,
+  Palette
 } from 'lucide-react';
 import { useWorkspaceStore } from '@/store/workspaceStore';
 import { Template } from '@/types';
+import { useAuth } from '@/context/AuthContext';
 
 const CATEGORIES = [
   'All',
@@ -43,8 +45,105 @@ const CATEGORIES = [
 
 export default function TemplatesPage() {
   const store = useWorkspaceStore();
+  const { dbUser } = useAuth();
   const [activeCategory, setActiveCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
+
+  const activeTemplatesLayout = store.settings?.templatesLayout || 'default';
+  const isSuperAdmin = dbUser?.role === 'super_admin';
+
+  const templatesLayouts = [
+    { id: 'default', name: 'Layout 1: Neon Glassmorphic' },
+    { id: 'slate', name: 'Layout 2: Clean Slate & Platinum' },
+    { id: 'aurora', name: 'Layout 3: Aurora Gradient' },
+    { id: 'cyber', name: 'Layout 4: Cyber-Chrono (Green)' },
+    { id: 'gold', name: 'Layout 5: Royal Gold & Onyx' }
+  ];
+
+  const templatesStyles = useMemo(() => {
+    switch(activeTemplatesLayout) {
+      case 'slate': // Layout 2: Clean Slate & Platinum
+        return {
+          wrapper: "space-y-6 pb-12 relative font-sans",
+          headerTitle: "text-2xl lg:text-3xl font-bold tracking-tight text-white",
+          headerDesc: "text-gray-400 text-sm",
+          categoryBtnActive: "px-3 py-1.5 rounded-none text-xs font-bold uppercase tracking-wider bg-gray-800 text-white border border-gray-700 whitespace-nowrap",
+          categoryBtnInactive: "px-3 py-1.5 rounded-none text-xs font-semibold uppercase tracking-wider text-gray-450 hover:text-white bg-gray-955 border border-gray-850 hover:border-gray-700 whitespace-nowrap",
+          mainCard: "p-5 rounded-none border border-gray-800 bg-gray-905 space-y-4",
+          cardContainer: "p-4 rounded-none border border-gray-850 bg-gray-955 hover:border-gray-650 hover:bg-gray-850 transition-all cursor-pointer text-left block relative",
+          inputField: "w-full pl-9 pr-4 py-2 rounded-none bg-gray-955 border border-gray-850 text-white text-xs focus:border-gray-600 outline-none",
+          actionBtnAdd: "flex items-center gap-1.5 px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-none text-xs font-bold transition-all border border-gray-700",
+          templateBodyBox: "p-5 rounded-none border border-gray-800 bg-gray-905 space-y-5 text-left h-full flex flex-col",
+          preBox: "p-4 rounded-none bg-gray-955 border border-gray-850 font-mono text-xs leading-relaxed space-y-2 h-full min-h-[160px] overflow-y-auto relative text-left",
+          badge: "px-2 py-0.5 rounded-none text-[10px] font-bold uppercase tracking-wider bg-gray-800 text-gray-300 border border-gray-700",
+          varInput: "w-full px-3 py-1.5 rounded-none bg-gray-955 border border-gray-850 text-white text-xs focus:border-gray-600 outline-none"
+        };
+      case 'aurora': // Layout 3: Aurora Gradient & Mesh Flow
+        return {
+          wrapper: "space-y-6 pb-12 relative font-sans",
+          headerTitle: "text-2xl lg:text-3xl font-extrabold tracking-tight text-white",
+          headerDesc: "text-indigo-200/80 text-sm",
+          categoryBtnActive: "px-3 py-1.5 rounded-xl text-xs font-bold uppercase tracking-wider bg-indigo-500/20 text-indigo-300 border border-indigo-500/35 whitespace-nowrap",
+          categoryBtnInactive: "px-3 py-1.5 rounded-xl text-xs font-semibold uppercase tracking-wider text-indigo-200/50 hover:text-white bg-indigo-955/20 border border-indigo-500/10 hover:border-indigo-500/30 whitespace-nowrap",
+          mainCard: "p-5 rounded-2xl border border-indigo-500/10 bg-indigo-955/5 shadow-[0_8px_32px_rgba(99,102,241,0.05)] space-y-4",
+          cardContainer: "p-4 rounded-2xl border border-indigo-500/10 bg-indigo-955/20 hover:border-indigo-500/35 hover:bg-indigo-955/30 transition-all cursor-pointer text-left block relative shadow-sm",
+          inputField: "w-full pl-9 pr-4 py-2 rounded-xl bg-indigo-955/40 border border-indigo-500/20 text-white text-xs focus:ring-2 focus:ring-indigo-500/50 outline-none",
+          actionBtnAdd: "flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-xl text-xs font-bold transition-all shadow-md",
+          templateBodyBox: "p-5 rounded-2xl border border-indigo-500/15 bg-indigo-955/5 shadow-[0_8px_32px_rgba(99,102,241,0.05)] space-y-5 text-left h-full flex flex-col",
+          preBox: "p-4 rounded-2xl bg-indigo-955/30 border border-indigo-500/10 font-mono text-xs leading-relaxed space-y-2 h-full min-h-[160px] overflow-y-auto relative text-left",
+          badge: "px-2 py-0.5 rounded-xl text-[10px] font-bold uppercase tracking-wider bg-indigo-500/20 text-indigo-300 border border-indigo-500/20",
+          varInput: "w-full px-3 py-1.5 rounded-xl bg-indigo-955/40 border border-indigo-500/20 text-white text-xs focus:ring-2 focus:ring-indigo-500/50 outline-none"
+        };
+      case 'cyber': // Layout 4: Cyberpunk Matrix Tech
+        return {
+          wrapper: "space-y-6 pb-12 relative font-mono",
+          headerTitle: "text-2xl lg:text-3xl font-black tracking-tight text-white uppercase",
+          headerDesc: "text-emerald-500/80 text-xs",
+          categoryBtnActive: "px-3 py-1.5 rounded-none text-xs font-bold uppercase tracking-wider bg-emerald-955/30 text-emerald-400 border border-emerald-500/60 whitespace-nowrap",
+          categoryBtnInactive: "px-3 py-1.5 rounded-none text-xs font-semibold uppercase tracking-wider text-emerald-600 hover:text-emerald-400 bg-black border border-emerald-500/25 hover:border-emerald-500/50 whitespace-nowrap",
+          mainCard: "p-5 rounded-none border border-emerald-500/30 bg-black shadow-[0_0_15px_rgba(16,185,129,0.05)] space-y-4",
+          cardContainer: "p-4 rounded-none border border-emerald-500/20 bg-black hover:border-emerald-500/50 hover:bg-emerald-955/10 transition-all cursor-pointer text-left block relative",
+          inputField: "w-full pl-9 pr-4 py-2 rounded-none bg-black border border-emerald-500/35 text-emerald-450 text-xs focus:border-emerald-500 outline-none",
+          actionBtnAdd: "flex items-center gap-1.5 px-4 py-2 bg-black border-2 border-dashed border-emerald-500 hover:bg-emerald-955/30 text-emerald-400 rounded-none text-xs font-bold transition-all",
+          templateBodyBox: "p-5 rounded-none border border-emerald-500/30 bg-black shadow-[0_0_15px_rgba(16,185,129,0.05)] space-y-5 text-left h-full flex flex-col",
+          preBox: "p-4 rounded-none bg-black border border-emerald-500/20 font-mono text-xs leading-relaxed space-y-2 h-full min-h-[160px] overflow-y-auto relative text-left",
+          badge: "px-2 py-0.5 rounded-none text-[10px] font-bold uppercase tracking-wider bg-emerald-955/20 text-emerald-400 border border-emerald-500/30",
+          varInput: "w-full px-3 py-1.5 rounded-none bg-black border border-emerald-500/35 text-emerald-450 text-xs focus:border-emerald-500 outline-none font-mono"
+        };
+      case 'gold': // Layout 5: Royal Gold & Onyx
+        return {
+          wrapper: "space-y-6 pb-12 relative font-sans",
+          headerTitle: "text-2xl lg:text-3xl font-black tracking-tight text-white uppercase tracking-wider",
+          headerDesc: "text-amber-250/70 text-sm",
+          categoryBtnActive: "px-3 py-1.5 rounded-xl text-xs font-bold uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/40 whitespace-nowrap",
+          categoryBtnInactive: "px-3 py-1.5 rounded-xl text-xs font-semibold uppercase tracking-wider text-amber-200/50 hover:text-white bg-black border border-amber-500/15 hover:border-amber-500/30 whitespace-nowrap",
+          mainCard: "p-5 rounded-2xl border border-amber-500/25 bg-[#0b0b0b] shadow-lg space-y-4",
+          cardContainer: "p-4 rounded-2xl border border-amber-500/15 bg-[#121212] hover:border-amber-500/35 hover:bg-[#1a1a1a] transition-all cursor-pointer text-left block relative shadow-sm",
+          inputField: "w-full pl-9 pr-4 py-2 rounded-xl bg-black border border-amber-500/20 text-white text-xs focus:ring-1 focus:ring-amber-500/40 outline-none",
+          actionBtnAdd: "flex items-center gap-1.5 px-4 py-2 bg-amber-600 hover:bg-amber-500 text-black rounded-xl text-xs font-bold transition-all shadow-sm",
+          templateBodyBox: "p-5 rounded-2xl border border-amber-500/25 bg-[#0b0b0b] space-y-5 text-left h-full flex flex-col shadow-lg",
+          preBox: "p-4 rounded-2xl bg-black border border-amber-500/15 font-mono text-xs leading-relaxed space-y-2 h-full min-h-[160px] overflow-y-auto relative text-left",
+          badge: "px-2 py-0.5 rounded-xl text-[10px] font-bold uppercase tracking-wider bg-amber-500/25 text-amber-300 border border-amber-500/20",
+          varInput: "w-full px-3 py-1.5 rounded-xl bg-black border border-amber-500/20 text-white text-xs focus:ring-1 focus:ring-amber-500/40 outline-none"
+        };
+      default: // Neon Glassmorphic (Default)
+        return {
+          wrapper: "space-y-6 pb-12 relative",
+          headerTitle: "text-2xl lg:text-3xl font-extrabold tracking-tight text-white",
+          headerDesc: "text-gray-400 text-sm",
+          categoryBtnActive: "px-3 py-1.5 rounded-md text-xs font-semibold uppercase tracking-wider transition-all bg-green-500/10 border border-green-500/20 text-green-400 whitespace-nowrap",
+          categoryBtnInactive: "px-3 py-1.5 rounded-md text-xs font-semibold uppercase tracking-wider text-gray-400 hover:text-white hover:bg-glass-hover whitespace-nowrap",
+          mainCard: "p-5 rounded-xl border border-glass-border bg-gray-955/20 space-y-4",
+          cardContainer: "p-4 rounded-xl border border-glass-border bg-gray-955/60 hover:bg-glass-hover hover:border-white/10 transition-all cursor-pointer text-left block relative",
+          inputField: "w-full pl-9 pr-4 py-2 rounded-lg glass-input text-xs focus:ring-2 focus:ring-green-500/50 outline-none",
+          actionBtnAdd: "flex items-center gap-1.5 px-4 py-2 bg-green-500 hover:bg-green-600 text-black rounded-xl text-xs font-bold transition-all glow-green",
+          templateBodyBox: "p-5 rounded-xl border border-glass-border bg-gray-955/20 space-y-5 text-left h-full flex flex-col",
+          preBox: "p-4 rounded-xl bg-gray-955/60 border border-glass-border font-mono text-xs leading-relaxed space-y-2 h-full min-h-[160px] overflow-y-auto relative text-left",
+          badge: "px-2 py-0.5 rounded bg-green-500/10 text-green-400 border border-green-500/20 text-[10px] font-semibold uppercase tracking-wider",
+          varInput: "w-full px-3 py-1.5 rounded-lg glass-input text-xs"
+        };
+    }
+  }, [activeTemplatesLayout]);
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
   
   // Variables builder state
@@ -236,12 +335,31 @@ export default function TemplatesPage() {
   };
 
   return (
-    <div className="h-full flex flex-col space-y-6 pb-12">
+    <div className={templatesStyles.wrapper}>
+      {/* Super Admin Layout Selection UI */}
+      {isSuperAdmin && (
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-gray-900/60 border border-glass-border rounded-2xl backdrop-blur-md gap-4 shrink-0">
+          <div className="flex items-center gap-2 text-gray-300">
+            <Palette className="w-5 h-5 text-green-400 animate-spin-slow" />
+            <span className="text-sm font-semibold">Template Center Layout Theme (Super Admin Only)</span>
+          </div>
+          <select
+            value={activeTemplatesLayout}
+            onChange={(e) => store.updateSettings({ templatesLayout: e.target.value })}
+            className="bg-gray-955 text-white border border-glass-border px-4 py-2 rounded-xl text-sm outline-none focus:border-green-500 transition-colors cursor-pointer w-full sm:w-auto"
+          >
+            {templatesLayouts.map((l) => (
+              <option key={l.id} value={l.id}>{l.name}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0">
         <div>
-          <h1 className="text-2xl lg:text-3xl font-extrabold tracking-tight text-white">TEMPLATE CENTER</h1>
-          <p className="text-gray-400 text-sm font-medium">Internal Shopify communication assets. Customize variables and copy drafts.</p>
+          <h1 className={templatesStyles.headerTitle}>TEMPLATE CENTER</h1>
+          <p className={templatesStyles.headerDesc}>Internal Shopify communication assets. Customize variables and copy drafts.</p>
         </div>
         <div className="flex gap-2">
           <button
@@ -253,7 +371,7 @@ export default function TemplatesPage() {
           </button>
           <button
             onClick={() => setBuilderOpen(true)}
-            className="px-4 py-2 rounded-lg bg-green-500 hover:bg-green-600 text-black font-bold text-xs uppercase tracking-wider transition-colors flex items-center gap-1.5 glow-green"
+            className={templatesStyles.actionBtnAdd}
           >
             <Plus className="w-4 h-4" />
             <span>Create Template</span>
@@ -262,21 +380,17 @@ export default function TemplatesPage() {
       </div>
 
       {/* Main Layout split grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 border border-glass-border rounded-2xl bg-gray-950/20 overflow-hidden min-h-[580px] h-[calc(100vh-180px)]">
+      <div className={`grid grid-cols-1 lg:grid-cols-4 border border-glass-border rounded-2xl bg-gray-955/20 overflow-hidden min-h-[580px] h-[calc(100vh-180px)]`}>
         
-        {/* Left Side: Notion Categories Navigation */}
-        <div className="border-r border-glass-border bg-gray-950/45 p-4 overflow-y-auto space-y-4">
+        {/* Left Side: Category Navigation */}
+        <div className="border-r border-glass-border bg-gray-955/45 p-4 overflow-y-auto space-y-4">
           <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Categories</span>
           <nav className="space-y-1">
             {CATEGORIES.map((cat) => (
               <button
                 key={cat}
                 onClick={() => setActiveCategory(cat)}
-                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all text-left ${
-                  activeCategory === cat 
-                    ? 'text-green-400 bg-green-500/10 border border-green-500/15' 
-                    : 'text-gray-400 hover:text-white hover:bg-glass-hover'
-                }`}
+                className={activeCategory === cat ? templatesStyles.categoryBtnActive : templatesStyles.categoryBtnInactive}
               >
                 <Folder className="w-4 h-4 shrink-0 text-gray-500" />
                 <span>{cat}</span>
@@ -285,8 +399,8 @@ export default function TemplatesPage() {
           </nav>
         </div>
 
-        {/* Center: Gmail Template Listing */}
-        <div className="lg:col-span-1 border-r border-glass-border flex flex-col bg-gray-950/15 h-full overflow-hidden">
+        {/* Center: Template Listing */}
+        <div className="lg:col-span-1 border-r border-glass-border flex flex-col bg-gray-955/15 h-full overflow-hidden">
           {/* Search bar */}
           <div className="p-3 border-b border-glass-border relative shrink-0">
             <Search className="absolute left-6 top-5.5 w-4.5 h-4.5 text-gray-500" />
@@ -295,7 +409,7 @@ export default function TemplatesPage() {
               placeholder="Search templates..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 rounded-lg glass-input text-xs"
+              className={templatesStyles.inputField}
             />
           </div>
 
@@ -308,9 +422,7 @@ export default function TemplatesPage() {
                   <div
                     key={tpl.id}
                     onClick={() => setSelectedTemplate(tpl)}
-                    className={`p-3.5 space-y-1.5 cursor-pointer transition-colors text-left relative ${
-                      isSelected ? 'bg-glass-hover border-l-2 border-green-400' : 'hover:bg-glass-hover/40'
-                    }`}
+                    className={templatesStyles.cardContainer + ` ${isSelected ? 'bg-glass-hover border-l-2 border-green-400' : 'hover:bg-glass-hover/40'}`}
                   >
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-xs font-bold text-white truncate max-w-[120px]">{tpl.title}</span>
@@ -324,7 +436,7 @@ export default function TemplatesPage() {
                       </div>
                     </div>
                     <p className="text-[10px] text-gray-500 line-clamp-1 leading-relaxed">{tpl.description}</p>
-                    <span className="inline-block px-1.5 py-0.5 rounded bg-gray-900 border border-glass-border text-[9px] font-semibold text-gray-400">
+                    <span className={templatesStyles.badge}>
                       {tpl.category}
                     </span>
                   </div>
@@ -342,7 +454,7 @@ export default function TemplatesPage() {
             <div className="flex flex-col h-full overflow-hidden">
               
               {/* Preview header */}
-              <div className="p-4 border-b border-glass-border shrink-0 flex items-center justify-between gap-4 bg-gray-950/30">
+              <div className="p-4 border-b border-glass-border shrink-0 flex items-center justify-between gap-4 bg-gray-955/30">
                 <div className="overflow-hidden">
                   <h2 className="text-sm font-bold text-white truncate">{selectedTemplate.title}</h2>
                   <p className="text-[10px] text-gray-500 mt-0.5 truncate">{selectedTemplate.description}</p>
@@ -358,7 +470,7 @@ export default function TemplatesPage() {
                   {selectedTemplate.isCustom && (
                     <button
                       onClick={(e) => handleDelete(selectedTemplate.id, e)}
-                      className="p-1.5 rounded bg-red-950/20 border border-red-500/10 hover:border-red-500/30 text-red-400 hover:bg-red-500/10 transition-colors"
+                      className="p-1.5 rounded bg-red-955/20 border border-red-500/10 hover:border-red-500/30 text-red-400 hover:bg-red-500/10 transition-colors"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -386,7 +498,7 @@ export default function TemplatesPage() {
                             placeholder={`Fill ${key.replace('_', ' ')}`}
                             value={variableValues[key]}
                             onChange={(e) => setVariableValues({ ...variableValues, [key]: e.target.value })}
-                            className="w-full px-3 py-1.5 rounded-lg glass-input text-xs"
+                            className={templatesStyles.varInput}
                           />
                         </div>
                       ))}
@@ -402,7 +514,7 @@ export default function TemplatesPage() {
                 </div>
 
                 {/* Compiled Composer Draft */}
-                <div className="p-4 flex flex-col h-full overflow-hidden text-left bg-gray-950/30">
+                <div className="p-4 flex flex-col h-full overflow-hidden text-left bg-gray-955/30">
                   <div className="flex items-center justify-between shrink-0 mb-3">
                     <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider flex items-center gap-1">
                       <FileCheck className="w-3.5 h-3.5" />
@@ -418,7 +530,7 @@ export default function TemplatesPage() {
                     </button>
                   </div>
 
-                  <div className="flex-1 overflow-y-auto p-4 rounded-xl bg-gray-950/60 border border-glass-border font-mono text-xs leading-relaxed max-h-[360px] text-gray-300 relative select-text">
+                  <div className={templatesStyles.preBox}>
                     <pre className="whitespace-pre-wrap font-sans text-xs leading-relaxed">{compiledPreview}</pre>
                   </div>
                 </div>
@@ -447,7 +559,7 @@ export default function TemplatesPage() {
                 <p className="text-xs text-gray-500">Upload documents containing Shopify layout templates to extract them locally.</p>
               </div>
 
-              <div className="border border-dashed border-glass-border rounded-xl p-8 flex flex-col items-center justify-center space-y-2 text-center bg-gray-950/20 hover:bg-glass-hover/20 transition-all relative">
+              <div className="border border-dashed border-glass-border rounded-xl p-8 flex flex-col items-center justify-center space-y-2 text-center bg-gray-955/20 hover:bg-glass-hover/20 transition-all relative">
                 <input
                   type="file"
                   accept=".pdf,.txt,.doc,.docx"
@@ -460,7 +572,7 @@ export default function TemplatesPage() {
               </div>
 
               {pdfFilesList.map((file, i) => (
-                <div key={i} className="p-3 rounded-lg bg-gray-950/60 border border-glass-border flex items-center justify-between text-xs">
+                <div key={i} className="p-3 rounded-lg bg-gray-955/60 border border-glass-border flex items-center justify-between text-xs">
                   <span className="text-white truncate font-bold">{file.name}</span>
                   <span className="text-gray-500">{file.size}</span>
                 </div>
@@ -492,7 +604,7 @@ export default function TemplatesPage() {
                     setPdfExtractedText('');
                     setPdfFilesList([]);
                   }}
-                  className="px-3.5 py-2 rounded-lg bg-gray-950 border border-glass-border hover:bg-glass-hover text-xs font-semibold text-gray-400 hover:text-white"
+                  className="px-3.5 py-2 rounded-lg bg-gray-955 border border-glass-border hover:bg-glass-hover text-xs font-semibold text-gray-400 hover:text-white"
                 >
                   Cancel
                 </button>
@@ -574,7 +686,7 @@ export default function TemplatesPage() {
                   <button
                     type="button"
                     onClick={() => setBuilderOpen(false)}
-                    className="px-3.5 py-2 rounded-lg bg-gray-950 border border-glass-border hover:bg-glass-hover text-xs font-semibold text-gray-400 hover:text-white"
+                    className="px-3.5 py-2 rounded-lg bg-gray-955 border border-glass-border hover:bg-glass-hover text-xs font-semibold text-gray-400 hover:text-white"
                   >
                     Cancel
                   </button>
