@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -17,7 +17,8 @@ import {
   ArrowUpRight,
   Pin,
   Save,
-  Loader2
+  Loader2,
+  Palette
 } from 'lucide-react';
 import { useWorkspaceStore } from '@/store/workspaceStore';
 import { useAuth } from '@/context/AuthContext';
@@ -25,7 +26,7 @@ import toast from 'react-hot-toast';
 
 export default function WorkspacePage() {
   const store = useWorkspaceStore();
-  const { user } = useAuth();
+  const { user, dbUser } = useAuth();
   
   const [newStickyText, setNewStickyText] = useState('');
   const [stickyColor, setStickyColor] = useState('yellow');
@@ -43,6 +44,122 @@ export default function WorkspacePage() {
   const [conversionRate, setConversionRate] = useState<number>(115);
   const [currencySymbol, setCurrencySymbol] = useState<string>('৳');
   const [isSavingCalc, setIsSavingCalc] = useState(false);
+
+  const isSuperAdmin = dbUser?.role === 'super_admin';
+  const activeWorkspaceLayout = store.settings?.workspaceLayout || 'default';
+
+  const workspaceLayouts = [
+    { id: 'default', name: 'Layout 1: Neon Glassmorphic' },
+    { id: 'slate', name: 'Layout 2: Clean Slate & Platinum' },
+    { id: 'aurora', name: 'Layout 3: Aurora Gradient' },
+    { id: 'cyber', name: 'Layout 4: Cyber-Chrono (Green)' },
+    { id: 'gold', name: 'Layout 5: Royal Gold & Onyx' }
+  ];
+
+  const workspaceLayoutStyles = useMemo(() => {
+    switch(activeWorkspaceLayout) {
+      case 'slate': // Layout 2: Clean Slate & Platinum
+        return {
+          wrapper: "space-y-8 pb-12 font-sans",
+          headerTitle: "text-2xl lg:text-3xl font-bold tracking-tight text-white",
+          headerDesc: "text-gray-400 text-sm",
+          cardContainer: "p-5 rounded-none border border-gray-800 bg-gray-900 hover:border-gray-650 hover:bg-gray-850 transition-all group relative overflow-hidden",
+          cardIconBox: "p-2.5 bg-gray-850 text-gray-300 rounded-none group-hover:scale-105 transition-transform border border-gray-800",
+          cardTitle: "text-sm font-bold text-white group-hover:text-gray-350 transition-colors",
+          cardDesc: "text-xs text-gray-450 mt-1",
+          widgetCard: "p-5 rounded-none border border-gray-800 bg-gray-900/60 space-y-4 shadow-none relative overflow-hidden",
+          widgetHeaderBar: "absolute top-0 left-0 w-full h-0.5 bg-gray-700",
+          widgetTitle: "text-xs font-bold text-gray-450 uppercase tracking-widest flex items-center gap-2",
+          inputField: "px-3 py-1.5 text-xs rounded-none bg-gray-955 border border-gray-800 text-white w-full focus:border-gray-600 outline-none",
+          selectField: "px-2 py-1.5 text-xs rounded-none bg-gray-955 border border-gray-800 text-white cursor-pointer focus:border-gray-600 outline-none",
+          actionBtn: "p-2 rounded-none bg-gray-800 hover:bg-gray-700 disabled:opacity-50 text-white transition-colors border border-gray-700",
+          stickyCard: "p-4 rounded-none border flex flex-col justify-between h-36 shadow-none transition-shadow",
+          stickyText: "text-xs overflow-y-auto leading-relaxed h-full pr-1 font-normal",
+          presetCard: "p-3 rounded-none bg-gray-955 border border-gray-850 space-y-2 text-left hover:border-gray-750 transition-colors",
+          calcResultBox: "flex justify-between font-black text-xs text-white font-mono bg-gray-850 p-2 rounded-none border border-gray-755"
+        };
+      case 'aurora': // Layout 3: Aurora Gradient & Mesh Flow
+        return {
+          wrapper: "space-y-8 pb-12 font-sans",
+          headerTitle: "text-2xl lg:text-3xl font-extrabold tracking-tight text-white",
+          headerDesc: "text-indigo-200/80 text-sm",
+          cardContainer: "p-5 rounded-2xl border border-indigo-500/10 bg-indigo-950/20 hover:border-indigo-500/35 hover:bg-indigo-950/30 transition-all duration-300 hover:scale-[1.01] shadow-md group relative overflow-hidden",
+          cardIconBox: "p-2.5 bg-indigo-500/10 text-indigo-300 rounded-xl group-hover:scale-110 transition-transform",
+          cardTitle: "text-sm font-bold text-white group-hover:text-indigo-400 transition-colors",
+          cardDesc: "text-xs text-indigo-200/70 mt-1",
+          widgetCard: "p-5 rounded-2xl border border-indigo-500/20 bg-indigo-950/5 space-y-4 shadow-[0_8px_32px_rgba(99,102,241,0.08)] relative overflow-hidden",
+          widgetHeaderBar: "absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 to-purple-500",
+          widgetTitle: "text-sm font-bold text-indigo-200 flex items-center gap-2",
+          inputField: "px-3 py-1.5 text-xs rounded-xl bg-indigo-950/40 border border-indigo-500/20 text-white w-full focus:ring-2 focus:ring-indigo-500/50 outline-none",
+          selectField: "px-2 py-1.5 text-xs rounded-xl bg-indigo-950/40 border border-indigo-500/20 text-white cursor-pointer focus:ring-2 focus:ring-indigo-500/50 outline-none",
+          actionBtn: "p-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white shadow-md disabled:opacity-50 transition-all duration-300",
+          stickyCard: "p-4 rounded-2xl border flex flex-col justify-between h-36 shadow-md hover:shadow-lg transition-shadow duration-300",
+          stickyText: "text-xs overflow-y-auto leading-relaxed h-full pr-1 font-medium",
+          presetCard: "p-3 rounded-xl bg-indigo-950/20 border border-indigo-500/10 space-y-2 text-left hover:border-indigo-500/30 transition-colors",
+          calcResultBox: "flex justify-between font-black text-xs text-indigo-300 font-mono bg-indigo-500/10 p-2 rounded-xl border border-indigo-500/20 shadow-[0_2px_10px_rgba(99,102,241,0.05)]"
+        };
+      case 'cyber': // Layout 4: Cyberpunk Matrix Tech
+        return {
+          wrapper: "space-y-8 pb-12 font-mono",
+          headerTitle: "text-2xl lg:text-3xl font-black tracking-tight text-white uppercase",
+          headerDesc: "text-emerald-500/80 text-xs",
+          cardContainer: "p-5 rounded-none border border-emerald-500/25 bg-black hover:border-emerald-500/50 hover:bg-emerald-950/10 transition-all duration-200 group relative overflow-hidden",
+          cardIconBox: "p-2.5 bg-black border border-emerald-500/30 text-emerald-400 rounded-none group-hover:scale-105 transition-transform",
+          cardTitle: "text-sm font-bold text-white group-hover:text-emerald-400 transition-colors uppercase",
+          cardDesc: "text-[11px] text-emerald-500/70 mt-1",
+          widgetCard: "p-5 rounded-none border border-emerald-500/30 bg-black space-y-4 shadow-[0_0_15px_rgba(16,185,129,0.05)] relative overflow-hidden",
+          widgetHeaderBar: "absolute top-0 left-0 w-full h-1 bg-emerald-500/60",
+          widgetTitle: "text-xs font-bold text-emerald-400 flex items-center gap-2 uppercase tracking-widest",
+          inputField: "px-3 py-1.5 text-xs rounded-none bg-black border border-emerald-500/40 text-emerald-400 w-full focus:border-emerald-500 outline-none font-mono",
+          selectField: "px-2 py-1.5 text-xs rounded-none bg-black border border-emerald-500/40 text-emerald-400 cursor-pointer focus:border-emerald-500 outline-none font-mono",
+          actionBtn: "p-2 rounded-none bg-black border-2 border-dashed border-emerald-500/50 hover:bg-emerald-950/30 text-emerald-400 disabled:opacity-50 transition-colors",
+          stickyCard: "p-4 rounded-none border flex flex-col justify-between h-36 shadow-none transition-shadow",
+          stickyText: "text-xs overflow-y-auto leading-relaxed h-full pr-1 font-mono",
+          presetCard: "p-3 rounded-none bg-black border border-emerald-500/10 space-y-2 text-left hover:border-emerald-500/30 transition-colors",
+          calcResultBox: "flex justify-between font-black text-xs text-emerald-450 font-mono bg-emerald-950/20 p-2 rounded-none border border-emerald-500/30 animate-pulse"
+        };
+      case 'gold': // Layout 5: Royal Gold & Onyx
+        return {
+          wrapper: "space-y-8 pb-12 font-sans",
+          headerTitle: "text-2xl lg:text-3xl font-black tracking-tight text-white uppercase tracking-wider",
+          headerDesc: "text-amber-250/70 text-sm",
+          cardContainer: "p-5 rounded-2xl border border-amber-500/10 bg-[#121212] hover:border-amber-500/30 hover:bg-[#1a1a1a] hover:shadow-[0_4px_20px_rgba(217,119,6,0.08)] transition-all duration-300 group relative overflow-hidden",
+          cardIconBox: "p-2.5 bg-black border border-amber-500/20 text-amber-400 rounded-xl group-hover:scale-110 transition-transform",
+          cardTitle: "text-sm font-bold text-white group-hover:text-amber-300 transition-colors",
+          cardDesc: "text-xs text-amber-200/60 mt-1",
+          widgetCard: "p-5 rounded-2xl border border-amber-500/25 bg-[#0b0b0b] space-y-4 shadow-lg relative overflow-hidden",
+          widgetHeaderBar: "absolute top-0 left-0 w-full h-1 bg-amber-500/50",
+          widgetTitle: "text-sm font-bold text-amber-300 flex items-center gap-2 uppercase tracking-wide",
+          inputField: "px-3 py-1.5 text-xs rounded-xl bg-black border border-amber-500/20 text-white w-full focus:ring-1 focus:ring-amber-500/40 outline-none",
+          selectField: "px-2 py-1.5 text-xs rounded-xl bg-black border border-amber-500/20 text-white cursor-pointer focus:ring-1 focus:ring-amber-500/40 outline-none",
+          actionBtn: "p-2 rounded-xl bg-amber-650 hover:bg-amber-500 text-black font-bold disabled:opacity-50 transition-colors shadow-sm",
+          stickyCard: "p-4 rounded-xl border flex flex-col justify-between h-36 shadow-md hover:shadow-lg transition-shadow duration-300",
+          stickyText: "text-xs overflow-y-auto leading-relaxed h-full pr-1 font-medium",
+          presetCard: "p-3 rounded-xl bg-black border border-amber-500/10 space-y-2 text-left hover:border-amber-500/35 transition-colors",
+          calcResultBox: "flex justify-between font-black text-xs text-amber-450 font-mono bg-amber-500/10 p-2 rounded-xl border border-amber-500/20"
+        };
+      default: // Neon Glassmorphic (Default)
+        return {
+          wrapper: "space-y-8 pb-12",
+          headerTitle: "text-2xl lg:text-3xl font-extrabold tracking-tight text-white",
+          headerDesc: "text-gray-400 text-sm",
+          cardContainer: "p-5 rounded-xl border border-glass-border bg-gray-950/40 hover:border-green-500/30 hover:bg-glass-hover transition-all group relative overflow-hidden",
+          cardIconBox: "p-2.5 bg-green-500/10 text-green-400 rounded-lg group-hover:scale-110 transition-transform",
+          cardTitle: "text-sm font-bold text-white group-hover:text-green-400 transition-colors",
+          cardDesc: "text-xs text-gray-400 mt-1",
+          widgetCard: "p-5 rounded-xl border border-glass-border bg-gray-950/20 space-y-4 shadow-[0_8px_30px_rgb(0,0,0,0.12)] relative overflow-hidden",
+          widgetHeaderBar: "",
+          widgetTitle: "text-base font-bold text-white flex items-center gap-2",
+          inputField: "px-3 py-1.5 text-xs rounded-lg glass-input w-full focus:ring-2 focus:ring-green-500/50 outline-none",
+          selectField: "px-2 py-1.5 text-xs rounded-lg glass-input cursor-pointer focus:ring-2 focus:ring-green-500/50 outline-none",
+          actionBtn: "p-2 rounded-lg bg-green-500 hover:bg-green-600 disabled:opacity-50 text-black transition-colors",
+          stickyCard: "p-4 rounded-xl border flex flex-col justify-between h-36 shadow-lg hover:shadow-xl transition-shadow",
+          stickyText: "text-xs overflow-y-auto leading-relaxed h-full pr-1 font-medium",
+          presetCard: "p-3 rounded-lg bg-gray-950/60 border border-glass-border space-y-2 text-left hover:border-white/10 transition-colors",
+          calcResultBox: "flex justify-between font-black text-xs text-emerald-400 font-mono bg-green-500/10 p-2 rounded-lg border border-green-500/20"
+        };
+    }
+  }, [activeWorkspaceLayout]);
 
   useEffect(() => {
     store.hydrate();
@@ -185,12 +302,31 @@ export default function WorkspacePage() {
   ];
 
   return (
-    <div className="space-y-8 pb-12">
+    <div className={workspaceLayoutStyles.wrapper}>
+      {/* Super Admin Layout Selection UI */}
+      {isSuperAdmin && (
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-gray-900/60 border border-glass-border rounded-2xl backdrop-blur-md gap-4">
+          <div className="flex items-center gap-2 text-gray-300">
+            <Palette className="w-5 h-5 text-green-400 animate-spin-slow" />
+            <span className="text-sm font-semibold">Workspace Board Layout Theme (Super Admin Only)</span>
+          </div>
+          <select
+            value={activeWorkspaceLayout}
+            onChange={(e) => store.updateSettings({ workspaceLayout: e.target.value })}
+            className="bg-gray-950 text-white border border-glass-border px-4 py-2 rounded-xl text-sm outline-none focus:border-green-500 transition-colors cursor-pointer w-full sm:w-auto"
+          >
+            {workspaceLayouts.map((l) => (
+              <option key={l.id} value={l.id}>{l.name}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl lg:text-3xl font-extrabold tracking-tight text-white">WORKSPACE BOARD</h1>
-          <p className="text-gray-400 text-sm">All operations deck. Sticky notes, quick template exports, and tool launchers.</p>
+          <h1 className={workspaceLayoutStyles.headerTitle}>WORKSPACE BOARD</h1>
+          <p className={workspaceLayoutStyles.headerDesc}>All operations deck. Sticky notes, quick template exports, and tool launchers.</p>
         </div>
       </div>
 
@@ -202,75 +338,76 @@ export default function WorkspacePage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             
             {/* Open Message Helper */}
-            <div className="p-5 rounded-xl border border-glass-border bg-gray-950/40 hover:border-green-500/30 hover:bg-glass-hover transition-all group relative overflow-hidden">
+            <div className={workspaceLayoutStyles.cardContainer}>
               <Link href="/message-helper" className="absolute inset-0 z-10" />
               <div className="absolute top-0 right-0 w-32 h-32 bg-green-500/5 rounded-full blur-3xl pointer-events-none group-hover:bg-green-500/10 transition-colors" />
               <div className="flex items-start justify-between relative z-10">
-                <div className="p-2.5 bg-green-500/10 text-green-400 rounded-lg group-hover:scale-110 transition-transform">
+                <div className={workspaceLayoutStyles.cardIconBox}>
                   <ShieldAlert className="w-5 h-5" />
                 </div>
                 <ArrowUpRight className="w-4 h-4 text-gray-600 group-hover:text-white transition-colors" />
               </div>
               <div className="mt-4 relative z-10">
-                <h3 className="text-sm font-bold text-white group-hover:text-green-400 transition-colors">Fiverr Message Checker</h3>
-                <p className="text-xs text-gray-400 mt-1">Review drafts for flagged words (e.g. payment, contact) and correct them.</p>
+                <h3 className={workspaceLayoutStyles.cardTitle}>Fiverr Message Checker</h3>
+                <p className={workspaceLayoutStyles.cardDesc}>Review drafts for flagged words (e.g. payment, contact) and correct them.</p>
               </div>
             </div>
 
             {/* Open Templates */}
-            <div className="p-5 rounded-xl border border-glass-border bg-gray-950/40 hover:border-purple-500/30 hover:bg-glass-hover transition-all group relative overflow-hidden">
+            <div className={workspaceLayoutStyles.cardContainer}>
               <Link href="/templates" className="absolute inset-0 z-10" />
               <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/5 rounded-full blur-3xl pointer-events-none group-hover:bg-purple-500/10 transition-colors" />
               <div className="flex items-start justify-between relative z-10">
-                <div className="p-2.5 bg-purple-500/10 text-purple-400 rounded-lg group-hover:scale-110 transition-transform">
+                <div className={workspaceLayoutStyles.cardIconBox}>
                   <FileCode className="w-5 h-5" />
                 </div>
                 <ArrowUpRight className="w-4 h-4 text-gray-600 group-hover:text-white transition-colors" />
               </div>
               <div className="mt-4 relative z-10">
-                <h3 className="text-sm font-bold text-white group-hover:text-purple-400 transition-colors">Team Template Hub</h3>
-                <p className="text-xs text-gray-400 mt-1">Access over 20+ preset updates, delivery followups, and billing queries.</p>
+                <h3 className={workspaceLayoutStyles.cardTitle}>Team Template Hub</h3>
+                <p className={workspaceLayoutStyles.cardDesc}>Access over 20+ preset updates, delivery followups, and billing queries.</p>
               </div>
             </div>
 
             {/* Generate Mockup */}
-            <div className="p-5 rounded-xl border border-glass-border bg-gray-950/40 hover:border-blue-500/30 hover:bg-glass-hover transition-all group relative overflow-hidden">
+            <div className={workspaceLayoutStyles.cardContainer}>
               <Link href="/mockup" className="absolute inset-0 z-10" />
               <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full blur-3xl pointer-events-none group-hover:bg-blue-500/10 transition-colors" />
               <div className="flex items-start justify-between relative z-10">
-                <div className="p-2.5 bg-blue-500/10 text-blue-400 rounded-lg group-hover:scale-110 transition-transform">
+                <div className={workspaceLayoutStyles.cardIconBox}>
                   <Trophy className="w-5 h-5" />
                 </div>
                 <ArrowUpRight className="w-4 h-4 text-gray-600 group-hover:text-white transition-colors" />
               </div>
               <div className="mt-4 relative z-10">
-                <h3 className="text-sm font-bold text-white group-hover:text-blue-400 transition-colors">Congratulations Studio</h3>
-                <p className="text-xs text-gray-400 mt-1">Render high-end congratulatory review blocks to PNG images.</p>
+                <h3 className={workspaceLayoutStyles.cardTitle}>Congratulations Studio</h3>
+                <p className={workspaceLayoutStyles.cardDesc}>Render high-end congratulatory review blocks to PNG images.</p>
               </div>
             </div>
 
             {/* Open Chat */}
-            <div className="p-5 rounded-xl border border-glass-border bg-gray-950/40 hover:border-amber-500/30 hover:bg-glass-hover transition-all group relative overflow-hidden">
+            <div className={workspaceLayoutStyles.cardContainer}>
               <Link href="/chat" className="absolute inset-0 z-10" />
               <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-3xl pointer-events-none group-hover:bg-amber-500/10 transition-colors" />
               <div className="flex items-start justify-between relative z-10">
-                <div className="p-2.5 bg-amber-500/10 text-amber-400 rounded-lg group-hover:scale-110 transition-transform">
+                <div className={workspaceLayoutStyles.cardIconBox}>
                   <MessageSquare className="w-5 h-5" />
                 </div>
                 <ArrowUpRight className="w-4 h-4 text-gray-600 group-hover:text-white transition-colors" />
               </div>
               <div className="mt-4 relative z-10">
-                <h3 className="text-sm font-bold text-white group-hover:text-amber-400 transition-colors">Chat Assistant</h3>
-                <p className="text-xs text-gray-400 mt-1">Write, simplify, or fix tone locally for client revisions.</p>
+                <h3 className={workspaceLayoutStyles.cardTitle}>Chat Assistant</h3>
+                <p className={workspaceLayoutStyles.cardDesc}>Write, simplify, or fix tone locally for client revisions.</p>
               </div>
             </div>
 
           </div>
 
           {/* Sticky Notes Canvas */}
-          <div className="p-5 rounded-xl border border-glass-border bg-gray-950/20 space-y-4 shadow-[0_8px_30px_rgb(0,0,0,0.12)]">
+          <div className={workspaceLayoutStyles.widgetCard}>
+            {workspaceLayoutStyles.widgetHeaderBar && <div className={workspaceLayoutStyles.widgetHeaderBar} />}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <h2 className="text-base font-bold text-white flex items-center gap-2">
+              <h2 className={workspaceLayoutStyles.widgetTitle}>
                 <Pin className="w-4.5 h-4.5 text-green-400" />
                 <span>Cloud Sticky Board</span>
               </h2>
@@ -280,12 +417,12 @@ export default function WorkspacePage() {
                   placeholder="Sticky note..."
                   value={newStickyText}
                   onChange={(e) => setNewStickyText(e.target.value)}
-                  className="px-3 py-1.5 text-xs rounded-lg glass-input w-full sm:w-60 focus:ring-2 focus:ring-green-500/50 outline-none"
+                  className={workspaceLayoutStyles.inputField + " w-full sm:w-60"}
                 />
                 <select
                   value={stickyColor}
                   onChange={(e) => setStickyColor(e.target.value)}
-                  className="px-2 py-1.5 text-xs rounded-lg glass-input cursor-pointer focus:ring-2 focus:ring-green-500/50 outline-none"
+                  className={workspaceLayoutStyles.selectField}
                 >
                   <option value="yellow">Yellow</option>
                   <option value="pink">Pink</option>
@@ -293,7 +430,7 @@ export default function WorkspacePage() {
                   <option value="green">Green</option>
                   <option value="purple">Purple</option>
                 </select>
-                <button type="submit" disabled={!newStickyText.trim() || isLoadingNotes} className="p-2 rounded-lg bg-green-500 hover:bg-green-600 disabled:opacity-50 text-black transition-colors">
+                <button type="submit" disabled={!newStickyText.trim() || isLoadingNotes} className={workspaceLayoutStyles.actionBtn}>
                   <Plus className="w-4 h-4" />
                 </button>
               </form>
@@ -315,9 +452,9 @@ export default function WorkspacePage() {
                         initial={{ opacity: 0, scale: 0.8 }}
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.8 }}
-                        className={`p-4 rounded-xl border flex flex-col justify-between h-36 shadow-lg hover:shadow-xl transition-shadow ${style.border} ${style.bg}`}
+                        className={workspaceLayoutStyles.stickyCard + ` ${style.border} ${style.bg}`}
                       >
-                        <p className={`text-xs ${style.text} overflow-y-auto leading-relaxed h-full pr-1 font-medium`}>
+                        <p className={workspaceLayoutStyles.stickyText + ` ${style.text}`}>
                           {note.content}
                         </p>
                         <div className="flex items-center justify-between pt-2 mt-2 border-t border-white/10">
@@ -350,9 +487,10 @@ export default function WorkspacePage() {
         <div className="space-y-6">
           
           {/* Quick Delivery Template copy widget */}
-          <div className="p-5 rounded-xl border border-glass-border bg-gray-950/20 space-y-4">
+          <div className={workspaceLayoutStyles.widgetCard}>
+            {workspaceLayoutStyles.widgetHeaderBar && <div className={workspaceLayoutStyles.widgetHeaderBar} />}
             <div>
-              <h2 className="text-base font-bold text-white flex items-center gap-2">
+              <h2 className={workspaceLayoutStyles.widgetTitle}>
                 <Sparkles className="w-4.5 h-4.5 text-green-400" />
                 <span>Quick Delivery</span>
               </h2>
@@ -364,12 +502,12 @@ export default function WorkspacePage() {
               placeholder="Search delivery presets..."
               value={quickSearch}
               onChange={(e) => setQuickSearch(e.target.value)}
-              className="w-full px-3 py-1.5 text-xs rounded-lg glass-input focus:ring-2 focus:ring-green-500/50 outline-none"
+              className={workspaceLayoutStyles.inputField}
             />
 
             <div className="space-y-3.5">
               {deliveryTemplates.map((tpl) => (
-                <div key={tpl.id} className="p-3 rounded-lg bg-gray-950/60 border border-glass-border space-y-2 text-left hover:border-white/10 transition-colors">
+                <div key={tpl.id} className={workspaceLayoutStyles.presetCard}>
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-white truncate max-w-[170px]">{tpl.title}</span>
                     <button
@@ -398,10 +536,11 @@ export default function WorkspacePage() {
             const netEarningsLocal = netEarningsUSD * conversionRate;
 
             return (
-              <div className="p-5 rounded-xl border border-glass-border bg-gray-950/20 space-y-4">
+              <div className={workspaceLayoutStyles.widgetCard}>
+                {workspaceLayoutStyles.widgetHeaderBar && <div className={workspaceLayoutStyles.widgetHeaderBar} />}
                 <div className="flex items-start justify-between">
                   <div>
-                    <h2 className="text-base font-bold text-white flex items-center gap-2">
+                    <h2 className={workspaceLayoutStyles.widgetTitle}>
                       <Sparkles className="w-4.5 h-4.5 text-green-400" />
                       <span>Freelance Calculator</span>
                     </h2>
@@ -427,7 +566,7 @@ export default function WorkspacePage() {
                         type="number"
                         value={grossAmount || ''}
                         onChange={(e) => setGrossAmount(Number(e.target.value))}
-                        className="w-full pl-7 pr-3 py-1.5 text-xs rounded-lg glass-input font-bold focus:ring-2 focus:ring-green-500/50 outline-none"
+                        className={workspaceLayoutStyles.inputField + " pl-7 pr-3 font-bold"}
                       />
                     </div>
                   </div>
@@ -440,7 +579,7 @@ export default function WorkspacePage() {
                         type="number"
                         value={platformFeePercent || ''}
                         onChange={(e) => setPlatformFeePercent(Number(e.target.value))}
-                        className="w-full px-2.5 py-1.5 text-xs rounded-lg glass-input font-semibold focus:ring-2 focus:ring-green-500/50 outline-none"
+                        className={workspaceLayoutStyles.inputField + " font-semibold"}
                       />
                     </div>
                     {/* Withdrawal Fee Percent Input */}
@@ -450,7 +589,7 @@ export default function WorkspacePage() {
                         type="number"
                         value={withdrawalFeePercent || ''}
                         onChange={(e) => setWithdrawalFeePercent(Number(e.target.value))}
-                        className="w-full px-2.5 py-1.5 text-xs rounded-lg glass-input font-semibold focus:ring-2 focus:ring-green-500/50 outline-none"
+                        className={workspaceLayoutStyles.inputField + " font-semibold"}
                       />
                     </div>
                   </div>
@@ -463,7 +602,7 @@ export default function WorkspacePage() {
                         type="number"
                         value={conversionRate || ''}
                         onChange={(e) => setConversionRate(Number(e.target.value))}
-                        className="w-full px-2.5 py-1.5 text-xs rounded-lg glass-input font-semibold focus:ring-2 focus:ring-green-500/50 outline-none"
+                        className={workspaceLayoutStyles.inputField + " font-semibold"}
                       />
                     </div>
                     {/* Currency Code */}
@@ -473,7 +612,7 @@ export default function WorkspacePage() {
                         type="text"
                         value={currencySymbol}
                         onChange={(e) => setCurrencySymbol(e.target.value)}
-                        className="w-full px-2.5 py-1.5 text-xs rounded-lg glass-input font-semibold text-center focus:ring-2 focus:ring-green-500/50 outline-none"
+                        className={workspaceLayoutStyles.inputField + " font-semibold text-center"}
                       />
                     </div>
                   </div>
@@ -496,7 +635,7 @@ export default function WorkspacePage() {
                       <span>Net Earnings (USD):</span>
                       <span className="font-mono">${netEarningsUSD.toFixed(2)}</span>
                     </div>
-                    <div className="flex justify-between font-black text-xs text-emerald-400 font-mono bg-green-500/10 p-2 rounded-lg border border-green-500/20">
+                    <div className={workspaceLayoutStyles.calcResultBox}>
                       <span>Local Currency ({currencySymbol}):</span>
                       <span>{currencySymbol}{netEarningsLocal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
