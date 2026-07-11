@@ -178,7 +178,7 @@ export default function OrdersDashboard({ csvData, activeLayout }: { csvData: st
   const [now, setNow] = useState(Date.now());
   const router = useRouter();
   const tableRef = useRef<HTMLDivElement>(null);
-  const canSeeWorkload = dbUser ? (dbUser.role === 'super_admin' || dbUser.showWorkloadMetrics !== false) : true;
+  const canSeeWorkload = dbUser?.role === 'super_admin' || dbUser?.showWorkloadMetrics === true;
 
   // Filters State
   const [visibleColumns, setVisibleColumns] = useState<string[]>([]);

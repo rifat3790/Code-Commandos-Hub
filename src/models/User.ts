@@ -36,7 +36,7 @@ const UserSchema: Schema = new Schema({
   skills: { type: [String], default: [] },
   role: { type: String, enum: ['super_admin', 'admin', 'user', 'banned'], default: 'user' },
   callingAllowed: { type: Boolean, default: true },
-  showWorkloadMetrics: { type: Boolean, default: true },
+  showWorkloadMetrics: { type: Boolean, default: false },
   allowedMenus: { type: [String], default: undefined },
   trackerFilters: { type: Object },
   issuesFilters: { type: Object },
