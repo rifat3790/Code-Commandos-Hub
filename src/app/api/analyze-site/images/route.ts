@@ -131,9 +131,60 @@ export async function GET(request: Request) {
     // Remove duplicates from final resolved URLs
     const finalImages = Array.from(new Set(resolvedImages));
 
+    // Scrape video elements
+    const videoSet = new Set<string>();
+
+    // 1. Scrape <video src="..."> tags
+    const videoSrcRegex = /<video [^>]*src=["']([^"']+)["']/gi;
+    let videoMatch;
+    while ((videoMatch = videoSrcRegex.exec(html)) !== null) {
+      videoSet.add(videoMatch[1]);
+    }
+
+    // 2. Scrape <source src="..."> tags inside video tags
+    const sourceSrcRegex = /<source [^>]*src=["']([^"']+)["']/gi;
+    while ((videoMatch = sourceSrcRegex.exec(html)) !== null) {
+      videoSet.add(videoMatch[1]);
+    }
+
+    // 3. Scrape iframe embed video sources (YouTube & Vimeo)
+    const iframeSrcRegex = /<iframe [^>]*src=["']([^"']+)["']/gi;
+    while ((videoMatch = iframeSrcRegex.exec(html)) !== null) {
+      const src = videoMatch[1];
+      if (src.includes('youtube.com/') || src.includes('youtu.be/') || src.includes('vimeo.com/')) {
+        videoSet.add(src);
+      }
+    }
+
+    // 4. Look for direct video links (.mp4, .webm, .ogg, .mov)
+    const directVideoRegex = /["']([^"']+\.(?:mp4|webm|ogg|mov)(?:\?[^"']*)?)["']/gi;
+    while ((videoMatch = directVideoRegex.exec(html)) !== null) {
+      videoSet.add(videoMatch[1]);
+    }
+
+    const resolvedVideos: string[] = [];
+    videoSet.forEach(vid => {
+      let resolved = vid.trim();
+      if (resolved.startsWith('//')) {
+        resolved = 'https:' + resolved;
+      } else if (resolved.startsWith('/')) {
+        resolved = origin + resolved;
+      } else if (!/^https?:\/\//i.test(resolved)) {
+        if (resolved.startsWith('.') || resolved.includes('/') || resolved.endsWith('.mp4') || resolved.endsWith('.webm')) {
+          resolved = origin + '/' + resolved.replace(/^\.\//, '');
+        } else {
+          return;
+        }
+      }
+      resolvedVideos.push(resolved);
+    });
+
+    const finalVideos = Array.from(new Set(resolvedVideos));
+
     return NextResponse.json({
       success: true,
-      images: finalImages
+      images: finalImages,
+      videos: finalVideos
     });
 
   } catch (error: any) {

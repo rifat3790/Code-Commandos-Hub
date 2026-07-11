@@ -96,6 +96,7 @@ export default function AuditSuitePage() {
   const [isExtensionInstalled, setIsExtensionInstalled] = useState(false);
   const [extensionProgress, setExtensionProgress] = useState<{percent: number, message: string} | null>(null);
   const [detectedImages, setDetectedImages] = useState<string[]>([]);
+  const [detectedVideos, setDetectedVideos] = useState<string[]>([]);
   const [isLoadingImages, setIsLoadingImages] = useState(false);
   const [isZippingImages, setIsZippingImages] = useState(false);
   const [techInfo, setTechInfo] = useState<{ 
@@ -389,6 +390,8 @@ Report generated on Code Commandos Speed Audit Suite.`;
     setTechInfo(null);
     setCollections([]);
     setAllProducts([]);
+    setDetectedImages([]);
+    setDetectedVideos([]);
     setFetchProgress({ current: 0, total: 0 });
     
     const timestamp = new Date().toLocaleTimeString();
@@ -626,6 +629,7 @@ Report generated on Code Commandos Speed Audit Suite.`;
     }
     setIsLoadingImages(true);
     setDetectedImages([]);
+    setDetectedVideos([]);
     addLog('Scraping theme and media assets from storefront HTML...', 'info');
 
     try {
@@ -638,14 +642,15 @@ Report generated on Code Commandos Speed Audit Suite.`;
       const data = await res.json();
 
       if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Failed to scrape images.');
+        throw new Error(data.error || 'Failed to scrape media assets.');
       }
 
       setDetectedImages(data.images || []);
-      addLog(`Media Scrape Complete! Discovered ${data.images?.length || 0} unique images.`, 'success');
+      setDetectedVideos(data.videos || []);
+      addLog(`Media Scrape Complete! Discovered ${data.images?.length || 0} images and ${data.videos?.length || 0} videos.`, 'success');
     } catch (err: any) {
-      addLog(`Image loading failed: ${err.message}`, 'error');
-      alert(`Failed to load images: ${err.message}`);
+      addLog(`Media loading failed: ${err.message}`, 'error');
+      alert(`Failed to load media assets: ${err.message}`);
     } finally {
       setIsLoadingImages(false);
     }
@@ -959,31 +964,30 @@ Report generated on Code Commandos Speed Audit Suite.`;
         )}
       </div>
 
-      {/* Tabs Selector Navigation */}
-      <div className="flex border-b border-glass-border">
-        <button
-          onClick={() => setActiveTab('inspect')}
-          className={activeTab === 'inspect' ? auditStyles.tabBtnActive : auditStyles.tabBtnInactive}
-        >
-          <Globe className="w-4 h-4" />
-          <span>Intelligence Inspector</span>
-        </button>
-        
-        <button
-          onClick={() => setActiveTab('speed')}
-          className={activeTab === 'speed' ? auditStyles.tabBtnActive : auditStyles.tabBtnInactive}
-        >
-          <Gauge className="w-4 h-4" />
-          <span>Speed Optimizer</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('seo')}
-          className={activeTab === 'seo' ? auditStyles.tabBtnActive : auditStyles.tabBtnInactive}
-        >
-          <FileSearch className="w-4 h-4" />
-          <span>SEO & Schema Auditor</span>
-        </button>
+      {/* Tabs Selector Navigation - Premium Glassy Pills UI */}
+      <div className="bg-[#0b0b0d]/75 border border-white/5 p-1.5 rounded-2xl flex flex-wrap sm:flex-nowrap gap-1.5 backdrop-blur-xl relative z-10 w-fit">
+        {[
+          { id: 'inspect', name: 'Intelligence Inspector', icon: Globe },
+          { id: 'speed', name: 'Speed Optimizer', icon: Gauge },
+          { id: 'seo', name: 'SEO & Schema Auditor', icon: FileSearch }
+        ].map((tab) => {
+          const isActive = activeTab === tab.id;
+          const Icon = tab.icon;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as any)}
+              className={`relative px-5 py-3 rounded-xl font-extrabold text-xs uppercase tracking-wider flex items-center gap-2.5 transition-all duration-300 select-none cursor-pointer z-10 ${
+                isActive 
+                  ? 'text-green-400 bg-green-500/10 border border-green-500/30 shadow-[0_0_20px_rgba(34,197,94,0.15)] font-black' 
+                  : 'text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'
+              }`}
+            >
+              <Icon className={`w-4 h-4 ${isActive ? 'text-green-400 animate-pulse' : 'text-gray-500'}`} />
+              <span>{tab.name}</span>
+            </button>
+          );
+        })}
       </div>
 
       {/* Tab Panels */}
@@ -1027,14 +1031,21 @@ Report generated on Code Commandos Speed Audit Suite.`;
                       <Sparkles className="w-3.5 h-3.5 text-yellow-500 animate-pulse" />
                       <span>Media Asset Inspector</span>
                     </span>
-                    {detectedImages.length > 0 && (
-                      <span className={auditStyles.badge}>
-                        {detectedImages.length} IMAGES
-                      </span>
-                    )}
+                    <div className="flex gap-2">
+                      {detectedImages.length > 0 && (
+                        <span className={auditStyles.badge}>
+                          {detectedImages.length} IMAGES
+                        </span>
+                      )}
+                      {detectedVideos.length > 0 && (
+                        <span className="px-2 py-0.5 rounded bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 text-[10px] font-bold uppercase">
+                          {detectedVideos.length} VIDEOS
+                        </span>
+                      )}
+                    </div>
                   </div>
 
-                  {detectedImages.length === 0 ? (
+                  {detectedImages.length === 0 && detectedVideos.length === 0 ? (
                     <button
                       onClick={handleLoadImages}
                       disabled={isLoadingImages}
@@ -1045,7 +1056,7 @@ Report generated on Code Commandos Speed Audit Suite.`;
                       ) : (
                         <FolderSync className="w-4 h-4 text-yellow-500" />
                       )}
-                      <span>Load Store Images</span>
+                      <span>Load Store Media Assets</span>
                     </button>
                   ) : (
                     <div className="space-y-4 animate-in fade-in duration-300">
@@ -1068,15 +1079,53 @@ Report generated on Code Commandos Speed Audit Suite.`;
                           ) : (
                             <Download className="w-3.5 h-3.5 stroke-[3]" />
                           )}
-                          <span>Download All (ZIP)</span>
+                          <span>Download Images (ZIP)</span>
                         </button>
                       </div>
 
-                      {/* Image grid */}
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-h-[300px] overflow-y-auto pr-1">
+                      {/* Media assets grid */}
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-h-[350px] overflow-y-auto pr-1">
+                        {/* Videos */}
+                        {detectedVideos.map((vid, idx) => (
+                          <div 
+                            key={`vid-${idx}`}
+                            className="group relative aspect-square bg-black/60 rounded-xl overflow-hidden border border-glass-border hover:border-yellow-500/30 transition-all"
+                          >
+                            {vid.includes('youtube.com') || vid.includes('youtu.be') || vid.includes('vimeo.com') ? (
+                              <div className="w-full h-full flex flex-col items-center justify-center bg-gray-950 border border-white/5 p-2">
+                                <Play className="w-8 h-8 text-red-500 fill-current animate-pulse" />
+                                <span className="text-[9px] text-gray-400 font-bold uppercase mt-1 text-center truncate w-full">Embed Video</span>
+                              </div>
+                            ) : (
+                              <video 
+                                src={vid}
+                                className="w-full h-full object-cover"
+                                muted
+                                loop
+                                playsInline
+                                onMouseOver={e => e.currentTarget.play()}
+                                onMouseOut={e => e.currentTarget.pause()}
+                              />
+                            )}
+                            <div className="absolute top-2 left-2 z-10 px-1.5 py-0.2 bg-black/85 border border-yellow-500/35 rounded text-[8px] font-black text-yellow-400 uppercase tracking-widest">
+                              VIDEO
+                            </div>
+                            <div className="absolute inset-0 bg-black/75 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all duration-200">
+                              <button
+                                onClick={() => handleDownloadSingleImage(vid)}
+                                className="p-2 bg-yellow-500 rounded-lg text-black hover:scale-110 active:scale-95 transition-all cursor-pointer shadow-lg shadow-yellow-500/25"
+                                title="Download video"
+                              >
+                                <Download className="w-3.5 h-3.5 stroke-[3]" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+
+                        {/* Images */}
                         {detectedImages.map((img, idx) => (
                           <div 
-                            key={idx}
+                            key={`img-${idx}`}
                             className="group relative aspect-square bg-black/60 rounded-xl overflow-hidden border border-glass-border hover:border-yellow-500/30 transition-all"
                           >
                             {/* eslint-disable-next-line @next/next/no-img-element */}
