@@ -306,6 +306,51 @@ export default function ChatbotWidget() {
     }
   };
 
+  const handleDeleteConversation = async (e: React.MouseEvent, targetUid: string) => {
+    e.stopPropagation();
+    if (!targetUid || targetUid === 'ai_assistant') return;
+    
+    if (!window.confirm("Are you sure you want to delete the entire conversation? This action cannot be undone.")) return;
+
+    try {
+      const myId = isAdminOrSuperAdmin ? 'admin' : user?.uid;
+      if (!myId) return;
+
+      const msgsToDelete = messages.filter(m => {
+        const amISender = m.senderUid === myId || m.senderUid === user?.uid;
+        const amIReceiver = m.receiverUid === myId || m.receiverUid === user?.uid;
+        const isOtherSender = m.senderUid === targetUid;
+        const isOtherReceiver = m.receiverUid === targetUid;
+        return (amISender && isOtherReceiver) || (amIReceiver && isOtherSender);
+      });
+
+      if (msgsToDelete.length === 0) {
+        toast.error("No messages found to delete");
+        return;
+      }
+
+      const deletePromises = msgsToDelete.map(msg => deleteDoc(doc(db, 'chats', msg.id)));
+      await Promise.all(deletePromises);
+
+      toast.success("Conversation deleted successfully", {
+        style: {
+          background: '#0c0c0e',
+          color: '#10B981',
+          border: '1px solid rgba(16, 185, 129, 0.2)',
+          fontSize: '11px',
+          fontWeight: 'bold',
+        }
+      });
+      
+      if (activeChatUser === targetUid) {
+        setActiveChatUser(null);
+      }
+    } catch (error) {
+      console.error("Error deleting conversation: ", error);
+      toast.error("Failed to delete conversation");
+    }
+  };
+
   const highlightText = (text: string, search: string) => {
     if (!search.trim()) return text;
     const parts = text.split(new RegExp(`(${search.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')})`, 'gi'));
@@ -408,6 +453,13 @@ export default function ChatbotWidget() {
                     >
                       <Search className="w-4.5 h-4.5" />
                     </button>
+                    <button
+                      onClick={(e) => handleDeleteConversation(e, activeChatUser)}
+                      className="p-1 hover:bg-red-500/20 hover:text-red-800 rounded transition-all hover:scale-105 text-black ml-0.5"
+                      title="Delete Entire Conversation"
+                    >
+                      <Trash2 className="w-4.5 h-4.5" />
+                    </button>
                   </>
                 )}
                 <button onClick={() => setIsOpen(false)} className="text-black/80 hover:text-black hover:bg-black/10 p-1 rounded transition-colors">
@@ -448,28 +500,38 @@ export default function ChatbotWidget() {
                     <p className="text-gray-500 text-center text-sm mt-10">No users found.</p>
                   ) : (
                     chatList.map(c => (
-                      <button 
-                        key={c.uid}
-                        onClick={() => { setActiveChatUser(c.uid); setActiveChatName(c.name); }}
-                        className={`flex items-center justify-between p-3 rounded-xl border border-glass-border transition-colors text-left ${c.uid === 'ai_assistant' ? 'bg-green-500/10 hover:bg-green-500/20 border-green-500/20' : 'bg-gray-900 hover:bg-gray-800'}`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className={`w-10 h-10 rounded-full flex items-center justify-center ${c.uid === 'ai_assistant' ? 'bg-green-500 text-black' : 'bg-brand-green/20'}`}>
-                            {c.uid === 'ai_assistant' ? <Bot className="w-5 h-5" /> : <User className="w-5 h-5 text-brand-green" />}
+                      <div key={c.uid} className="relative group flex items-center">
+                        <button 
+                          onClick={() => { setActiveChatUser(c.uid); setActiveChatName(c.name); }}
+                          className={`flex-1 flex items-center justify-between p-3 rounded-xl border border-glass-border transition-colors text-left ${c.uid === 'ai_assistant' ? 'bg-green-500/10 hover:bg-green-500/20 border-green-500/20' : 'bg-gray-900 hover:bg-gray-800'}`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${c.uid === 'ai_assistant' ? 'bg-green-500 text-black' : 'bg-brand-green/20'}`}>
+                              {c.uid === 'ai_assistant' ? <Bot className="w-5 h-5" /> : <User className="w-5 h-5 text-brand-green" />}
+                            </div>
+                            <div>
+                              <p className={`font-medium text-sm ${c.uid === 'ai_assistant' ? 'text-green-400 font-bold' : 'text-white'}`}>{c.name}</p>
+                              <p className="text-gray-400 text-xs truncate max-w-[180px]">
+                                {c.lastMessage || 'Tap to reply'}
+                              </p>
+                            </div>
                           </div>
-                          <div>
-                            <p className={`font-medium text-sm ${c.uid === 'ai_assistant' ? 'text-green-400 font-bold' : 'text-white'}`}>{c.name}</p>
-                            <p className="text-gray-400 text-xs truncate max-w-[180px]">
-                              {c.lastMessage || 'Tap to reply'}
-                            </p>
-                          </div>
-                        </div>
-                        {c.unread > 0 && (
-                          <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
-                            {c.unread}
-                          </span>
+                          {c.unread > 0 && (
+                            <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+                              {c.unread}
+                            </span>
+                          )}
+                        </button>
+                        {c.uid !== 'ai_assistant' && (
+                          <button
+                            onClick={(e) => handleDeleteConversation(e, c.uid)}
+                            className="absolute right-3 opacity-0 group-hover:opacity-100 p-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 hover:scale-105 transition-all z-10"
+                            title="Delete Entire Conversation"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         )}
-                      </button>
+                      </div>
                     ))
                   )}
                 </div>
