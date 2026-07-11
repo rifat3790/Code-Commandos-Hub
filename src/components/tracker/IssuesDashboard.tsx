@@ -742,31 +742,7 @@ export default function IssuesDashboard({ csvData, activeLayout }: { csvData: st
                         );
                       }
 
-                      if (col.toLowerCase() === 'assign name') {
-                        return (
-                          <td key={col} className="px-5 py-3">
-                            <div className="flex flex-wrap gap-1.5 items-center">
-                              {String(val).split('/').map((part, pIdx) => {
-                                const trimmed = part.trim();
-                                if (!trimmed) return null;
-                                const isTeam = (trimmed.length <= 3 && trimmed === trimmed.toUpperCase()) || trimmed.length <= 2;
-                                return (
-                                  <span 
-                                    key={pIdx} 
-                                    className={`px-2 py-0.5 rounded text-xs font-medium border ${
-                                      isTeam 
-                                        ? 'bg-blue-500/10 text-blue-400 border-blue-500/20 shadow-[0_0_8px_rgba(59,130,246,0.05)]' 
-                                        : 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20 shadow-[0_0_8px_rgba(99,102,241,0.05)]'
-                                    }`}
-                                  >
-                                    {trimmed}
-                                  </span>
-                                );
-                              })}
-                            </div>
-                          </td>
-                        );
-                      }
+
 
                       if (col.toLowerCase() === 'urgency' || col.toLowerCase() === 'priority') {
                         const s = String(val).toLowerCase();
