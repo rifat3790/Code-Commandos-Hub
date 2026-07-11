@@ -130,6 +130,9 @@ export default function AdminDashboard() {
       const interval = setInterval(fetchActiveVisitors, 10000);
       return () => clearInterval(interval);
     }
+    if (activeTab === 'usage' || activeTab === 'users') {
+      fetchUsers();
+    }
   }, [activeTab, user]);
 
   const fetchUsers = async () => {
