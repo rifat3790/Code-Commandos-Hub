@@ -271,6 +271,121 @@ export default function OrdersDashboard({ csvData, activeLayout }: { csvData: st
           timelineHeaderCell: "px-5 py-4.5 text-amber-300 font-bold text-[11px] uppercase tracking-wider text-center sticky right-0 bg-[#141414] z-10 border-l border-amber-500/20 shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.5)]",
           timelineRowCell: "px-5 py-3 sticky right-0 bg-[#0d0d0d] group-hover:bg-[#181818] z-10 border-l border-amber-500/20 shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.4)] transition-colors"
         };
+      case 'obsidian':
+        return {
+          container: "bg-[#0c0d12] border border-[#1b1d26] rounded-xl shadow-[0_4px_24px_rgba(0,0,0,0.6)]",
+          headerBg: "bg-[#07080a] text-gray-400 font-bold uppercase tracking-wider text-[11px] border-b border-[#1f222e]",
+          headerCell: "px-5 py-4 text-gray-400 font-bold text-[11px] uppercase tracking-wider",
+          rowClass: "hover:bg-[#141722] border-b border-[#141620] transition-colors group even:bg-[#0c0d12] odd:bg-[#0e1017]",
+          cellText: "text-gray-300 font-normal",
+          idBadge: "font-mono text-xs px-2 py-0.5 bg-[#171a26] border border-[#262b3d] text-gray-400 rounded",
+          statusWip: "bg-[#10b981]/10 text-[#10b981] border border-[#10b981]/20 rounded-md px-2 py-0.5",
+          statusCancel: "bg-[#ef4444]/10 text-[#ef4444] border border-[#ef4444]/20 rounded-md px-2 py-0.5",
+          statusDone: "bg-[#8b5cf6]/10 text-[#8b5cf6] border border-[#8b5cf6]/20 rounded-md px-2 py-0.5",
+          statusDefault: "bg-[#4b5563]/10 text-[#9ca3af] border border-[#4b5563]/20 rounded-md px-2 py-0.5",
+          linkBtn: "inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#171a26] text-gray-300 border border-[#2b3046] hover:bg-[#202436] hover:text-white rounded-lg transition-colors text-xs font-semibold",
+          timelineLate: "bg-[#ef4444]/20 text-[#ef4444] border border-[#ef4444]/40 px-3 py-1 rounded font-bold text-xs uppercase animate-pulse shadow-[0_0_10px_rgba(239,68,68,0.1)]",
+          timelineCancel: "text-gray-600 font-bold",
+          timelineDone: "text-purple-400 font-bold",
+          timelineS: "text-red-400 font-bold animate-pulse",
+          timelineS2: "text-amber-505 font-semibold",
+          timelineSafe: "text-emerald-505 font-medium",
+          timelineDefault: "text-gray-400 font-medium",
+          timelineHeaderCell: "px-5 py-4 text-gray-400 font-bold text-[11px] uppercase tracking-wider text-center sticky right-0 bg-[#07080a] z-10 border-l border-[#1f222e] shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.5)]",
+          timelineRowCell: "px-5 py-3 sticky right-0 bg-[#0c0d12] group-hover:bg-[#141722] z-10 border-l border-[#141620] shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.4)] transition-colors"
+        };
+      case 'frost':
+        return {
+          container: "bg-slate-950/40 backdrop-blur-md border border-cyan-500/20 rounded-2xl shadow-[0_8px_32px_rgba(6,182,212,0.15)]",
+          headerBg: "bg-[#0a141d]/60 text-cyan-300 font-semibold tracking-wide text-xs uppercase border-b border-cyan-500/20",
+          headerCell: "px-5 py-4 text-cyan-300 font-semibold tracking-wide text-xs uppercase",
+          rowClass: "hover:bg-cyan-500/10 hover:shadow-[0_0_20px_rgba(6,182,212,0.15)] border-b border-cyan-500/10 transition-all duration-300 even:bg-cyan-950/5 odd:bg-slate-900/5",
+          cellText: "text-slate-200 font-medium",
+          idBadge: "font-mono text-xs px-2.5 py-1 bg-cyan-950/30 border border-cyan-500/30 text-cyan-200 rounded-lg",
+          statusWip: "bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 rounded-full px-3 py-1 shadow-[0_0_10px_rgba(6,182,212,0.1)]",
+          statusCancel: "bg-rose-500/10 text-rose-300 border border-rose-500/30 rounded-full px-3 py-1 shadow-[0_0_10px_rgba(244,63,94,0.1)]",
+          statusDone: "bg-purple-500/10 text-purple-300 border border-purple-500/30 rounded-full px-3 py-1 shadow-[0_0_10px_rgba(168,85,247,0.1)]",
+          statusDefault: "bg-slate-800/40 text-slate-400 border border-slate-700/30 rounded-full px-3 py-1",
+          linkBtn: "inline-flex items-center gap-1.5 px-3 py-1.5 bg-cyan-950/20 text-cyan-300 hover:text-white border border-cyan-500/30 hover:border-cyan-500/60 rounded-xl transition-all duration-300 text-xs font-semibold",
+          timelineLate: "bg-rose-500/20 text-rose-300 border border-rose-500/40 px-3 py-1 rounded-full font-bold text-xs uppercase animate-pulse shadow-[0_0_12px_rgba(244,63,94,0.2)]",
+          timelineCancel: "text-slate-400 font-bold",
+          timelineDone: "text-purple-300 font-bold",
+          timelineS: "text-rose-300 font-bold drop-shadow-[0_0_8px_rgba(244,63,94,0.3)] animate-pulse",
+          timelineS2: "text-amber-300 font-semibold drop-shadow-[0_0_8px_rgba(251,191,36,0.2)]",
+          timelineSafe: "text-cyan-300 font-medium drop-shadow-[0_0_8px_rgba(6,182,212,0.15)]",
+          timelineDefault: "text-cyan-200/80 font-medium",
+          timelineHeaderCell: "px-5 py-4 text-cyan-300 font-semibold tracking-wide text-xs uppercase text-center sticky right-0 bg-[#06101a] z-10 shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.5)] border-l border-cyan-500/20",
+          timelineRowCell: "px-5 py-3 sticky right-0 bg-[#0e1c28] group-hover:bg-[#162a3c] z-10 shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.4)] border-l border-cyan-500/20 transition-colors"
+        };
+      case 'tokyo':
+        return {
+          container: "bg-[#090515] border border-pink-500/20 rounded-none shadow-[0_0_20px_rgba(236,72,153,0.1)]",
+          headerBg: "bg-black text-pink-400 font-extrabold uppercase tracking-widest text-[11px] border-b-2 border-pink-500/50",
+          headerCell: "px-5 py-4 text-pink-400 font-bold text-xs tracking-wider uppercase",
+          rowClass: "hover:bg-pink-950/15 hover:shadow-[inset_4px_0_0_0_#ec4899] border-b border-pink-500/10 transition-all duration-200 even:bg-[#0c061d]/40 odd:bg-black/60",
+          cellText: "text-gray-300 font-semibold",
+          idBadge: "font-mono text-xs px-2.5 py-1 bg-black border border-cyan-500/30 text-cyan-400 rounded-none",
+          statusWip: "bg-cyan-500/10 text-cyan-400 border border-cyan-500/40 rounded-none px-3 py-1 shadow-[0_0_10px_rgba(6,182,212,0.2)] animate-pulse",
+          statusCancel: "bg-pink-500/10 text-pink-400 border border-pink-500/40 rounded-none px-3 py-1",
+          statusDone: "bg-purple-500/10 text-purple-400 border border-purple-500/40 rounded-none px-3 py-1 shadow-[0_0_10px_rgba(168,85,247,0.2)]",
+          statusDefault: "bg-gray-900 text-gray-500 border border-gray-800 rounded-none px-3 py-1",
+          linkBtn: "inline-flex items-center gap-1.5 px-3 py-1.5 bg-black text-pink-400 border border-pink-500/40 hover:bg-pink-950 hover:text-white rounded-none transition-all duration-200 text-xs font-mono",
+          timelineLate: "bg-pink-950 text-pink-400 border border-pink-500 px-3 py-1 font-extrabold text-xs uppercase animate-pulse shadow-[0_0_12px_rgba(236,72,153,0.3)]",
+          timelineCancel: "text-gray-600 font-bold",
+          timelineDone: "text-cyan-400 font-bold",
+          timelineS: "text-pink-505 font-bold animate-pulse",
+          timelineS2: "text-purple-405 font-semibold",
+          timelineSafe: "text-cyan-400 font-medium",
+          timelineDefault: "text-gray-500 font-medium",
+          timelineHeaderCell: "px-5 py-4 text-pink-400 font-bold text-xs tracking-wider uppercase text-center sticky right-0 bg-black z-10 border-l border-pink-500/20 shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.5)]",
+          timelineRowCell: "px-5 py-3 sticky right-0 bg-black group-hover:bg-[#150a29] z-10 border-l border-pink-500/20 shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.4)] transition-colors"
+        };
+      case 'emerald':
+        return {
+          container: "bg-[#030d07] border border-emerald-500/20 rounded-xl shadow-[0_8px_30px_rgba(16,185,129,0.05)]",
+          headerBg: "bg-[#05140b] text-emerald-300 font-bold uppercase tracking-wider text-[11px] border-b border-emerald-500/20",
+          headerCell: "px-5 py-4.5 text-emerald-300 font-bold text-[11px] uppercase tracking-wider",
+          rowClass: "hover:bg-emerald-950/20 hover:shadow-[inset_4px_0_0_0_#10b981] border-b border-emerald-500/10 transition-all duration-300 even:bg-[#041209]/30 odd:bg-black/50",
+          cellText: "text-gray-300 font-medium",
+          idBadge: "font-mono text-xs px-2.5 py-1 bg-black border border-emerald-500/30 text-emerald-300 rounded-md",
+          statusWip: "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 rounded-md px-2.5 py-1 shadow-[0_0_10px_rgba(16,185,129,0.1)]",
+          statusCancel: "bg-red-500/10 text-red-400 border border-red-500/30 rounded-md px-2.5 py-1",
+          statusDone: "bg-indigo-500/10 text-indigo-300 border border-indigo-500/30 rounded-md px-2.5 py-1",
+          statusDefault: "bg-gray-800 text-gray-400 border border-gray-700 rounded-md px-2.5 py-1",
+          linkBtn: "inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#04140a] text-emerald-300 border border-emerald-500/20 hover:border-emerald-500 hover:bg-emerald-500 hover:text-black rounded-lg transition-all duration-300 text-xs font-semibold",
+          timelineLate: "bg-gradient-to-r from-red-600 to-orange-600 text-white border border-red-500 px-3 py-1 rounded font-bold text-xs uppercase animate-pulse shadow-[0_0_10px_rgba(220,38,38,0.2)]",
+          timelineCancel: "text-gray-600 font-bold",
+          timelineDone: "text-emerald-300 font-bold",
+          timelineS: "text-red-400 font-bold animate-pulse",
+          timelineS2: "text-yellow-400 font-semibold",
+          timelineSafe: "text-emerald-400 font-medium",
+          timelineDefault: "text-gray-500 font-medium",
+          timelineHeaderCell: "px-5 py-4.5 text-emerald-300 font-bold text-[11px] uppercase tracking-wider text-center sticky right-0 bg-[#05140b] z-10 border-l border-emerald-500/20 shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.5)]",
+          timelineRowCell: "px-5 py-3 sticky right-0 bg-[#030d07] group-hover:bg-[#05170d] z-10 border-l border-emerald-500/20 shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.4)] transition-colors"
+        };
+      case 'cosmic':
+        return {
+          container: "bg-[#070514] border border-violet-500/20 rounded-2xl shadow-[0_8px_32px_rgba(139,92,246,0.15)]",
+          headerBg: "bg-gradient-to-r from-violet-950/60 via-fuchsia-950/40 to-indigo-950/60 text-fuchsia-200 border-b border-fuchsia-500/20",
+          headerCell: "px-5 py-4 text-fuchsia-200 font-semibold tracking-wide text-xs uppercase",
+          rowClass: "hover:bg-gradient-to-r hover:from-violet-500/10 hover:to-fuchsia-500/10 border-b border-violet-500/10 transition-all duration-300 even:bg-[#0a071d]/40 odd:bg-black/60",
+          cellText: "text-slate-200 font-medium",
+          idBadge: "font-mono text-xs px-2.5 py-1 bg-violet-950/30 border border-violet-500/30 text-violet-300 rounded-xl",
+          statusWip: "bg-fuchsia-500/10 text-fuchsia-300 border border-fuchsia-500/30 rounded-full px-3 py-1 shadow-[0_0_10px_rgba(217,70,239,0.15)] animate-pulse",
+          statusCancel: "bg-rose-500/10 text-rose-300 border border-rose-500/30 rounded-full px-3 py-1 shadow-[0_0_10px_rgba(244,63,94,0.15)]",
+          statusDone: "bg-indigo-500/10 text-indigo-300 border border-indigo-500/30 rounded-full px-3 py-1 shadow-[0_0_10px_rgba(99,102,241,0.15)]",
+          statusDefault: "bg-[#18182e]/50 text-slate-400 border border-slate-700/30 rounded-full px-3 py-1",
+          linkBtn: "inline-flex items-center gap-1.5 px-3 py-1.5 bg-violet-950/20 text-violet-300 hover:text-white border border-violet-500/30 hover:border-violet-500/60 rounded-xl transition-all duration-300 text-xs font-semibold shadow-[0_2px_8px_rgba(139,92,246,0.1)]",
+          timelineLate: "bg-gradient-to-r from-rose-500/20 to-pink-500/20 text-rose-300 border border-rose-500/40 px-3 py-1 rounded-full font-bold text-xs uppercase animate-pulse shadow-[0_0_12px_rgba(244,63,94,0.25)]",
+          timelineCancel: "text-slate-500 font-bold",
+          timelineDone: "text-indigo-400 font-bold",
+          timelineS: "text-fuchsia-400 font-bold drop-shadow-[0_0_8px_rgba(217,70,239,0.3)] animate-pulse",
+          timelineS2: "text-violet-400 font-semibold drop-shadow-[0_0_8px_rgba(139,92,246,0.2)]",
+          timelineSafe: "text-indigo-300 font-medium drop-shadow-[0_0_8px_rgba(99,102,241,0.2)]",
+          timelineDefault: "text-violet-300/80 font-medium",
+          timelineHeaderCell: "px-5 py-4 text-fuchsia-200 font-semibold tracking-wide text-xs uppercase text-center sticky right-0 bg-[#070514] z-10 shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.5)] border-l border-violet-500/20",
+          timelineRowCell: "px-5 py-3 sticky right-0 bg-[#0b0821] group-hover:bg-[#150f38] z-10 shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.4)] border-l border-violet-500/20 transition-colors"
+        };
       default: // Neon Glassmorphic (Legacy-like but premium)
         return {
           container: "glass-panel overflow-hidden border border-glass-border rounded-xl",

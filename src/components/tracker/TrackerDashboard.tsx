@@ -26,7 +26,12 @@ export default function TrackerDashboard({
     { id: 'slate', name: 'Layout 2: Clean Slate & Platinum' },
     { id: 'aurora', name: 'Layout 3: Aurora Gradient' },
     { id: 'cyber', name: 'Layout 4: Cyber-Chrono (Green)' },
-    { id: 'gold', name: 'Layout 5: Royal Gold & Onyx' }
+    { id: 'gold', name: 'Layout 5: Royal Gold & Onyx' },
+    { id: 'obsidian', name: 'Layout 6: Obsidian Minimalist' },
+    { id: 'frost', name: 'Layout 7: Glassmorphism Frost (Ice)' },
+    { id: 'tokyo', name: 'Layout 8: Tokyo Midnight (Neon)' },
+    { id: 'emerald', name: 'Layout 9: Emerald Forest (Velvet)' },
+    { id: 'cosmic', name: 'Layout 10: Cosmic Nebula' }
   ];
 
   const handleLayoutChange = (e: React.ChangeEvent<HTMLSelectElement>) => {

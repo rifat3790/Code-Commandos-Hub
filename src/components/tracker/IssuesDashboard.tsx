@@ -218,6 +218,96 @@ export default function IssuesDashboard({ csvData, activeLayout }: { csvData: st
           urgencyLow: "bg-gray-850 text-gray-300 border border-gray-700 px-2.5 py-1 rounded-md text-xs",
           linkBtn: "inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#1a1a1a] text-amber-300 border border-amber-500/20 hover:border-amber-500 hover:bg-amber-500 hover:text-black rounded-lg transition-all duration-300 text-xs font-semibold shadow-sm"
         };
+      case 'obsidian':
+        return {
+          container: "bg-[#0c0d12] border border-[#1b1d26] rounded-xl shadow-[0_4px_24px_rgba(0,0,0,0.6)]",
+          headerBg: "bg-[#07080a] text-gray-400 font-bold uppercase tracking-wider text-[11px] border-b border-[#1f222e]",
+          headerCell: "px-5 py-4 text-gray-400 font-bold text-[11px] uppercase tracking-wider",
+          rowClass: "hover:bg-[#141722] border-b border-[#141620] transition-colors group even:bg-[#0c0d12] odd:bg-[#0e1017]",
+          cellText: "text-gray-300 font-normal",
+          dateText: "font-mono text-xs text-gray-400",
+          teamBadge: "px-2 py-0.5 bg-[#171a26] border border-[#262b3d] text-gray-400 rounded text-xs",
+          statusOpen: "bg-[#10b981]/10 text-[#10b981] border border-[#10b981]/20 rounded-md px-2 py-0.5",
+          statusClose: "bg-[#8b5cf6]/10 text-[#8b5cf6] border border-[#8b5cf6]/20 rounded-md px-2 py-0.5",
+          statusIssue: "bg-[#ef4444]/10 text-[#ef4444] border border-[#ef4444]/20 rounded-md px-2 py-0.5",
+          statusDefault: "bg-[#4b5563]/10 text-[#9ca3af] border border-[#4b5563]/20 rounded-md px-2 py-0.5",
+          urgencyHigh: "bg-[#ef4444]/15 text-[#ef4444] border border-[#ef4444]/30 px-2 py-0.5 rounded-md font-bold text-xs animate-pulse",
+          urgencyMedium: "bg-[#f59e0b]/15 text-[#f59e0b] border border-[#f59e0b]/30 px-2 py-0.5 rounded-md font-semibold text-xs",
+          urgencyLow: "bg-[#3b82f6]/15 text-[#3b82f6] border border-[#3b82f6]/30 px-2 py-0.5 rounded-md text-xs",
+          linkBtn: "inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#171a26] text-gray-300 border border-[#2b3046] hover:bg-[#202436] hover:text-white rounded-lg transition-colors text-xs font-semibold"
+        };
+      case 'frost':
+        return {
+          container: "bg-slate-950/40 backdrop-blur-md border border-cyan-500/20 rounded-2xl shadow-[0_8px_32px_rgba(6,182,212,0.15)]",
+          headerBg: "bg-[#0a141d]/60 text-cyan-300 font-semibold tracking-wide text-xs uppercase border-b border-cyan-500/20",
+          headerCell: "px-5 py-4 text-cyan-300 font-semibold tracking-wide text-xs uppercase",
+          rowClass: "hover:bg-cyan-500/10 hover:shadow-[0_0_20px_rgba(6,182,212,0.15)] border-b border-cyan-500/10 transition-all duration-300 even:bg-cyan-950/5 odd:bg-slate-900/5",
+          cellText: "text-slate-200 font-medium",
+          dateText: "font-mono text-xs text-cyan-300/75",
+          teamBadge: "px-2.5 py-0.5 bg-cyan-500/10 border border-cyan-500/20 text-cyan-300 rounded-full text-xs",
+          statusOpen: "bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 rounded-full px-3 py-1 shadow-[0_0_10px_rgba(6,182,212,0.1)]",
+          statusClose: "bg-purple-500/10 text-purple-300 border border-purple-500/30 rounded-full px-3 py-1 shadow-[0_0_10px_rgba(168,85,247,0.1)]",
+          statusIssue: "bg-rose-500/10 text-rose-300 border border-rose-500/30 rounded-full px-3 py-1 shadow-[0_0_10px_rgba(244,63,94,0.1)] animate-pulse",
+          statusDefault: "bg-slate-800/40 text-slate-400 border border-slate-700/30 rounded-full px-3 py-1",
+          urgencyHigh: "bg-rose-500/10 text-rose-300 border border-rose-500/30 px-2.5 py-1 rounded-full font-bold animate-pulse text-xs",
+          urgencyMedium: "bg-amber-500/10 text-amber-300 border border-amber-500/30 px-2.5 py-1 rounded-full font-semibold text-xs",
+          urgencyLow: "bg-blue-500/10 text-blue-300 border border-blue-500/30 px-2.5 py-1 rounded-full text-xs",
+          linkBtn: "inline-flex items-center gap-1.5 px-3 py-1.5 bg-cyan-950/20 text-cyan-300 hover:text-white border border-cyan-500/30 hover:border-cyan-500/60 rounded-xl transition-all duration-300 text-xs font-semibold"
+        };
+      case 'tokyo':
+        return {
+          container: "bg-[#090515] border border-pink-500/20 rounded-none shadow-[0_0_20px_rgba(236,72,153,0.1)]",
+          headerBg: "bg-black text-pink-400 font-extrabold uppercase tracking-widest text-[11px] border-b-2 border-pink-500/50",
+          headerCell: "px-5 py-4 text-pink-400 font-bold text-xs tracking-wider uppercase",
+          rowClass: "hover:bg-pink-950/15 hover:shadow-[inset_4px_0_0_0_#ec4899] border-b border-pink-500/10 transition-all duration-200 even:bg-[#0c061d]/40 odd:bg-black/60",
+          cellText: "text-gray-300 font-semibold",
+          dateText: "font-mono text-xs text-pink-400/80",
+          teamBadge: "px-2 py-0.5 bg-black border border-cyan-500/30 text-cyan-400 text-xs font-mono rounded-none",
+          statusOpen: "bg-cyan-500/10 text-cyan-400 border border-cyan-500/40 rounded-none px-3 py-1 shadow-[0_0_10px_rgba(6,182,212,0.2)] animate-pulse font-mono",
+          statusClose: "bg-purple-500/10 text-purple-400 border border-purple-500/40 rounded-none px-3 py-1 font-mono",
+          statusIssue: "bg-pink-500/10 text-pink-400 border border-pink-500/40 rounded-none px-3 py-1 shadow-[0_0_10px_rgba(236,72,153,0.2)] animate-pulse font-mono",
+          statusDefault: "bg-gray-900 text-gray-500 border border-gray-800 rounded-none px-3 py-1 font-mono",
+          urgencyHigh: "bg-pink-500/10 text-pink-400 border border-pink-500/40 px-2 py-0.5 rounded-none font-bold animate-pulse text-xs font-mono",
+          urgencyMedium: "bg-purple-500/10 text-purple-400 border border-purple-500/40 px-2 py-0.5 rounded-none font-semibold text-xs font-mono",
+          urgencyLow: "bg-cyan-500/10 text-cyan-400 border border-cyan-500/40 px-2 py-0.5 rounded-none text-xs font-mono",
+          linkBtn: "inline-flex items-center gap-1.5 px-3 py-1.5 bg-black text-pink-400 border border-pink-500/40 hover:bg-pink-950 hover:text-white rounded-none transition-all duration-200 text-xs font-mono"
+        };
+      case 'emerald':
+        return {
+          container: "bg-[#030d07] border border-emerald-500/20 rounded-xl shadow-[0_8px_30px_rgba(16,185,129,0.05)]",
+          headerBg: "bg-[#05140b] text-emerald-300 font-bold uppercase tracking-wider text-[11px] border-b border-emerald-500/20",
+          headerCell: "px-5 py-4.5 text-emerald-300 font-bold text-[11px] uppercase tracking-wider",
+          rowClass: "hover:bg-emerald-950/20 hover:shadow-[inset_4px_0_0_0_#10b981] border-b border-emerald-500/10 transition-all duration-300 even:bg-[#041209]/30 odd:bg-black/50",
+          cellText: "text-gray-300 font-medium",
+          dateText: "font-mono text-xs text-emerald-400/80",
+          teamBadge: "px-2.5 py-0.5 bg-black border border-emerald-500/20 text-emerald-250 rounded-md text-xs font-semibold",
+          statusOpen: "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 rounded-md px-2.5 py-1 font-semibold shadow-[0_0_10px_rgba(16,185,129,0.1)]",
+          statusClose: "bg-indigo-500/10 text-indigo-300 border border-indigo-500/30 rounded-md px-2.5 py-1 font-semibold",
+          statusIssue: "bg-red-500/10 text-red-400 border border-red-500/30 rounded-md px-2.5 py-1 font-semibold animate-pulse",
+          statusDefault: "bg-gray-800 text-gray-400 border border-gray-700 rounded-md px-2.5 py-1",
+          urgencyHigh: "bg-red-500/10 text-red-450 border border-red-500/30 px-2.5 py-1 rounded-md font-bold text-xs animate-pulse",
+          urgencyMedium: "bg-amber-500/10 text-amber-400 border border-amber-500/30 px-2.5 py-1 rounded-md font-semibold text-xs",
+          urgencyLow: "bg-gray-850 text-gray-300 border border-gray-700 px-2.5 py-1 rounded-md text-xs",
+          linkBtn: "inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#04140a] text-emerald-300 border border-emerald-500/20 hover:border-emerald-500 hover:bg-emerald-500 hover:text-black rounded-lg transition-all duration-300 text-xs font-semibold"
+        };
+      case 'cosmic':
+        return {
+          container: "bg-[#070514] border border-violet-500/20 rounded-2xl shadow-[0_8px_32px_rgba(139,92,246,0.15)]",
+          headerBg: "bg-gradient-to-r from-violet-950/60 via-fuchsia-950/40 to-indigo-950/60 text-fuchsia-200 border-b border-fuchsia-500/20",
+          headerCell: "px-5 py-4 text-fuchsia-200 font-semibold tracking-wide text-xs uppercase",
+          rowClass: "hover:bg-gradient-to-r hover:from-violet-500/10 hover:to-fuchsia-500/10 border-b border-violet-500/10 transition-all duration-300 even:bg-[#0a071d]/40 odd:bg-black/60",
+          cellText: "text-slate-200 font-medium",
+          dateText: "font-mono text-xs text-violet-300/70",
+          teamBadge: "px-2.5 py-0.5 bg-violet-950/30 border border-violet-500/30 text-violet-300 rounded-xl text-xs font-medium",
+          statusOpen: "bg-fuchsia-500/10 text-fuchsia-300 border border-fuchsia-500/30 rounded-full px-3 py-1 shadow-[0_0_10px_rgba(217,70,239,0.15)] animate-pulse",
+          statusClose: "bg-indigo-500/10 text-indigo-300 border border-indigo-500/30 rounded-full px-3 py-1 shadow-[0_0_10px_rgba(99,102,241,0.15)]",
+          statusIssue: "bg-rose-500/10 text-rose-300 border border-rose-500/30 rounded-full px-3 py-1 shadow-[0_0_10px_rgba(244,63,94,0.15)] animate-pulse",
+          statusDefault: "bg-[#18182e]/50 text-slate-400 border border-slate-700/30 rounded-full px-3 py-1",
+          urgencyHigh: "bg-rose-500/10 text-rose-300 border border-rose-500/30 px-2.5 py-1 rounded-full font-bold animate-pulse text-xs",
+          urgencyMedium: "bg-violet-500/10 text-violet-300 border border-violet-500/30 px-2.5 py-1 rounded-full font-semibold text-xs",
+          urgencyLow: "bg-indigo-500/10 text-indigo-300 border border-indigo-500/30 px-2.5 py-1 rounded-full text-xs",
+          linkBtn: "inline-flex items-center gap-1.5 px-3 py-1.5 bg-violet-950/20 text-violet-300 hover:text-white border border-violet-500/30 hover:border-violet-500/60 rounded-xl transition-all duration-300 text-xs font-semibold shadow-[0_2px_8px_rgba(139,92,246,0.1)]"
+        };
       default: // Neon Glassmorphic (Legacy-like but premium)
         return {
           container: "glass-panel overflow-hidden border border-glass-border rounded-xl",
