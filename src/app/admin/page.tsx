@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { ShieldAlert, Check, X, Database, Phone, Video } from 'lucide-react';
+import { ShieldAlert, Check, X, Database, Phone, Video, Palette, Type, Square } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useWorkspaceStore } from '@/store/workspaceStore';
 import { useCall } from '@/context/CallContext';
@@ -18,7 +18,7 @@ export default function AdminDashboard() {
   const { startCall } = useCall();
   const router = useRouter();
   
-  const [activeTab, setActiveTab] = useState<'pending' | 'shopify' | 'users' | 'menus' | 'storage' | 'active-users'>('pending');
+  const [activeTab, setActiveTab] = useState<'pending' | 'shopify' | 'users' | 'menus' | 'storage' | 'active-users' | 'styles'>('pending');
   const [activeVisitors, setActiveVisitors] = useState<{count: number, list: any[]}>({ count: 0, list: [] });
   const [loadingActive, setLoadingActive] = useState(false);
   const [pendingChanges, setPendingChanges] = useState<any[]>([]);
@@ -287,6 +287,12 @@ export default function AdminDashboard() {
               className={`px-5 py-3 text-xs uppercase font-extrabold ${activeTab === 'menus' ? 'text-green-400 border-b-2 border-green-500' : 'text-gray-500 hover:text-white'}`}
             >
               Menu Settings
+            </button>
+            <button
+              onClick={() => setActiveTab('styles')}
+              className={`px-5 py-3 text-xs uppercase font-extrabold ${activeTab === 'styles' ? 'text-green-400 border-b-2 border-green-500' : 'text-gray-500 hover:text-white'}`}
+            >
+              Global Styles
             </button>
             <button
               onClick={() => setActiveTab('storage')}
@@ -705,6 +711,113 @@ export default function AdminDashboard() {
                 ))}
               </div>
             )}
+          </div>
+        </div>
+      ) : activeTab === 'styles' ? (
+        <div className="space-y-6">
+          <div className="bg-gray-900 border border-glass-border p-6 rounded-xl space-y-6">
+            <div>
+              <h2 className="text-white font-bold text-sm uppercase tracking-wider text-green-400 flex items-center gap-2">
+                <Palette className="w-5 h-5" /> Global Brand Styles (Super Admin Only)
+              </h2>
+              <p className="text-xs text-gray-400 mt-1">Configure the font family and card border radius across all pages. Changes will apply to all team members instantly.</p>
+            </div>
+
+            {/* Font Family Selection */}
+            <div className="space-y-3">
+              <label className="text-xs font-bold text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
+                <Type className="w-4 h-4 text-green-400" /> Font Family
+              </label>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {[
+                  { id: 'sans', name: 'Inter (Clean Sans)', fontClass: 'font-sans', desc: 'Modern high-readability sans-serif font.' },
+                  { id: 'roboto', name: 'Roboto (Neo Sans)', fontClass: 'font-sans', desc: 'Sleek standard typeface for clean visuals.' },
+                  { id: 'outfit', name: 'Outfit (Premium Tech)', fontClass: 'font-sans', desc: 'Elegant geometric font with a tech feeling.' },
+                  { id: 'montserrat', name: 'Montserrat (Modern Bold)', fontClass: 'font-sans', desc: 'Wide geometric sans-serif for strong layouts.' },
+                  { id: 'playfair', name: 'Playfair Display (Luxury)', fontClass: 'font-serif', desc: 'Classical serif typeface for luxury layouts.' },
+                  { id: 'lora', name: 'Lora (Classic Book)', fontClass: 'font-serif', desc: 'Contemporary elegant serif with curves.' },
+                  { id: 'fira-code', name: 'Fira Code (Hacker Mono)', fontClass: 'font-mono', desc: 'Clean monospace coding font with ligatures.' }
+                ].map((f) => {
+                  const isSelected = (storeSettings?.fontFamily || 'sans') === f.id;
+                  return (
+                    <div
+                      key={f.id}
+                      onClick={() => updateSettings({ fontFamily: f.id })}
+                      className={`p-4 rounded-xl border transition-all cursor-pointer text-left space-y-2 ${
+                        isSelected 
+                          ? 'border-green-500 bg-green-500/10' 
+                          : 'border-glass-border bg-black/40 hover:border-gray-600'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-white">{f.name}</span>
+                        {isSelected && <span className="w-2 h-2 rounded-full bg-green-400" />}
+                      </div>
+                      <p className="text-[10px] text-gray-400 leading-relaxed">{f.desc}</p>
+                      <div className="pt-1.5 border-t border-glass-border/40">
+                        <span className="text-xs text-green-300/80 font-medium block">Preview:</span>
+                        <span className="text-[11px] text-gray-300 mt-1 block line-clamp-1 leading-none font-bold">AaBbCc 123 - The quick brown fox</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Border Radius Selection */}
+            <div className="space-y-3 pt-4 border-t border-glass-border">
+              <label className="text-xs font-bold text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
+                <Square className="w-4 h-4 text-green-400" /> Card Border Radius
+              </label>
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+                {[
+                  { id: 'none', name: 'None (0px)', rClass: 'rounded-none' },
+                  { id: 'sm', name: 'Small (4px)', rClass: 'rounded-sm' },
+                  { id: 'md', name: 'Medium (8px)', rClass: 'rounded-md' },
+                  { id: 'lg', name: 'Large (12px)', rClass: 'rounded-lg' },
+                  { id: 'xl', name: 'Extra Large (16px)', rClass: 'rounded-xl' },
+                  { id: '2xl', name: 'Double XL (24px)', rClass: 'rounded-2xl' },
+                  { id: '3xl', name: 'Triple XL (32px)', rClass: 'rounded-3xl' }
+                ].map((r) => {
+                  const isSelected = (storeSettings?.borderRadius || 'xl') === r.id;
+                  return (
+                    <div
+                      key={r.id}
+                      onClick={() => updateSettings({ borderRadius: r.id })}
+                      className={`p-3.5 rounded-xl border transition-all cursor-pointer text-center space-y-3 flex flex-col items-center justify-between ${
+                        isSelected 
+                          ? 'border-green-500 bg-green-500/10' 
+                          : 'border-glass-border bg-black/40 hover:border-gray-600'
+                      }`}
+                    >
+                      <span className="text-[10px] font-bold text-white block leading-tight">{r.name}</span>
+                      
+                      {/* Mini visual live card preview of the border radius level */}
+                      <div className="w-12 h-12 bg-gray-800 border border-glass-border flex items-center justify-center overflow-hidden" style={{ borderRadius: 
+                        r.id === 'none' ? '0px' :
+                        r.id === 'sm' ? '4px' :
+                        r.id === 'md' ? '8px' :
+                        r.id === 'lg' ? '12px' :
+                        r.id === 'xl' ? '16px' :
+                        r.id === '2xl' ? '24px' : '32px'
+                      }}>
+                        <div className="w-6 h-6 bg-green-500/20 border border-green-500/30" style={{ borderRadius: 
+                          r.id === 'none' ? '0px' :
+                          r.id === 'sm' ? '2px' :
+                          r.id === 'md' ? '4px' :
+                          r.id === 'lg' ? '6px' :
+                          r.id === 'xl' ? '8px' :
+                          r.id === '2xl' ? '12px' : '16px'
+                        }} />
+                      </div>
+
+                      {isSelected && <span className="text-[9px] font-bold text-green-400 uppercase tracking-widest block">Active</span>}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
           </div>
         </div>
       ) : null}

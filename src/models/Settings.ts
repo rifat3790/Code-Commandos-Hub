@@ -10,6 +10,8 @@ export interface ISettings extends Document {
   workspaceLayout: string;
   messageHelperLayout: string;
   templatesLayout: string;
+  fontFamily: string;
+  borderRadius: string;
 }
 
 const SettingsSchema: Schema = new Schema({
@@ -21,7 +23,9 @@ const SettingsSchema: Schema = new Schema({
   homeLayout: { type: String, default: 'default' },
   workspaceLayout: { type: String, default: 'default' },
   messageHelperLayout: { type: String, default: 'default' },
-  templatesLayout: { type: String, default: 'default' }
+  templatesLayout: { type: String, default: 'default' },
+  fontFamily: { type: String, default: 'sans' },
+  borderRadius: { type: String, default: 'xl' }
 });
 
 export default mongoose.models.Settings || mongoose.model<ISettings>('Settings', SettingsSchema);

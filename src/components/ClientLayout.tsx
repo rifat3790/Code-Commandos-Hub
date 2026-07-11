@@ -169,11 +169,95 @@ function WorkspaceHydrator() {
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const pathname = usePathname();
+  const storeSettings = useWorkspaceStore(state => state.settings);
+
+  const activeFont = storeSettings?.fontFamily || 'sans';
+  const activeRadius = storeSettings?.borderRadius || 'xl';
+
+  const getGoogleFontLink = (font: string) => {
+    switch(font) {
+      case 'roboto':
+        return 'https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap';
+      case 'outfit':
+        return 'https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap';
+      case 'playfair':
+        return 'https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&display=swap';
+      case 'fira-code':
+        return 'https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;500;700&display=swap';
+      case 'montserrat':
+        return 'https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap';
+      case 'lora':
+        return 'https://fonts.googleapis.com/css2?family=Lora:wght@400;600;700&display=swap';
+      default:
+        return '';
+    }
+  };
+
+  const getFontFamilyCss = (font: string) => {
+    switch(font) {
+      case 'roboto':
+        return "'Roboto', ui-sans-serif, system-ui, sans-serif";
+      case 'outfit':
+        return "'Outfit', ui-sans-serif, system-ui, sans-serif";
+      case 'playfair':
+        return "'Playfair Display', Georgia, serif";
+      case 'fira-code':
+        return "'Fira Code', monospace";
+      case 'montserrat':
+        return "'Montserrat', ui-sans-serif, system-ui, sans-serif";
+      case 'lora':
+        return "'Lora', Georgia, serif";
+      default:
+        return "'Inter', ui-sans-serif, system-ui, sans-serif";
+    }
+  };
+
+  const getRadiusCssValues = (radius: string) => {
+    switch (radius) {
+      case 'none':
+        return { xs: '0px', sm: '0px', md: '0px', lg: '0px', xl: '0px', '2xl': '0px', '3xl': '0px' };
+      case 'sm':
+        return { xs: '1px', sm: '2px', md: '3px', lg: '4px', xl: '6px', '2xl': '8px', '3xl': '12px' };
+      case 'md':
+        return { xs: '2px', sm: '4px', md: '6px', lg: '8px', xl: '10px', '2xl': '12px', '3xl': '16px' };
+      case 'lg':
+        return { xs: '3px', sm: '6px', md: '8px', lg: '12px', xl: '14px', '2xl': '18px', '3xl': '24px' };
+      case 'xl':
+        return { xs: '4px', sm: '8px', md: '12px', lg: '16px', xl: '20px', '2xl': '24px', '3xl': '32px' };
+      case '2xl':
+        return { xs: '6px', sm: '12px', md: '16px', lg: '24px', xl: '28px', '2xl': '36px', '3xl': '48px' };
+      case '3xl':
+        return { xs: '8px', sm: '16px', md: '24px', lg: '32px', xl: '40px', '2xl': '48px', '3xl': '64px' };
+      default:
+        return { xs: '4px', sm: '8px', md: '12px', lg: '16px', xl: '20px', '2xl': '24px', '3xl': '32px' };
+    }
+  };
+
+  const fontUrl = getGoogleFontLink(activeFont);
+  const fontFamilyCss = getFontFamilyCss(activeFont);
+  const radiusVals = getRadiusCssValues(activeRadius);
 
   // Don't render the sidebar or standard layout structure for the login page
   if (pathname === '/login' || pathname === '/login/') {
     return (
       <AuthProvider>
+        {fontUrl && <link href={fontUrl} rel="stylesheet" />}
+        <style dangerouslySetInnerHTML={{ __html: `
+          :root {
+            --radius-xs: ${radiusVals.xs} !important;
+            --radius-sm: ${radiusVals.sm} !important;
+            --radius-md: ${radiusVals.md} !important;
+            --radius-lg: ${radiusVals.lg} !important;
+            --radius-xl: ${radiusVals.xl} !important;
+            --radius-2xl: ${radiusVals['2xl']} !important;
+            --radius-3xl: ${radiusVals['3xl']} !important;
+            --font-sans: ${fontFamilyCss} !important;
+            --font-geist-sans: ${fontFamilyCss} !important;
+          }
+          body, html, button, input, select, textarea, [class*="font-sans"] {
+            font-family: ${fontFamilyCss} !important;
+          }
+        `}} />
         {children}
       </AuthProvider>
     );
@@ -182,6 +266,23 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   return (
     <AuthProvider>
       <ThemeProvider>
+        {fontUrl && <link href={fontUrl} rel="stylesheet" />}
+        <style dangerouslySetInnerHTML={{ __html: `
+          :root {
+            --radius-xs: ${radiusVals.xs} !important;
+            --radius-sm: ${radiusVals.sm} !important;
+            --radius-md: ${radiusVals.md} !important;
+            --radius-lg: ${radiusVals.lg} !important;
+            --radius-xl: ${radiusVals.xl} !important;
+            --radius-2xl: ${radiusVals['2xl']} !important;
+            --radius-3xl: ${radiusVals['3xl']} !important;
+            --font-sans: ${fontFamilyCss} !important;
+            --font-geist-sans: ${fontFamilyCss} !important;
+          }
+          body, html, button, input, select, textarea, [class*="font-sans"] {
+            font-family: ${fontFamilyCss} !important;
+          }
+        `}} />
         <CallProvider>
           <HeartbeatTrigger />
           <WorkspaceHydrator />

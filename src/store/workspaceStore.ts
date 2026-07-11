@@ -20,7 +20,7 @@ interface WorkspaceState {
   downloads: DownloadItem[];
   credentials: StoreCredential[];
   memberProfile: MemberProfile;
-  settings: { enabledMenus: string[], adminEnabledMenus?: string[], userEnabledMenus?: string[], trackerLayout?: string, homeLayout?: string, workspaceLayout?: string, messageHelperLayout?: string, templatesLayout?: string };
+  settings: { enabledMenus: string[], adminEnabledMenus?: string[], userEnabledMenus?: string[], trackerLayout?: string, homeLayout?: string, workspaceLayout?: string, messageHelperLayout?: string, templatesLayout?: string, fontFamily?: string, borderRadius?: string };
   isHydrated: boolean;
   pendingModal: { isOpen: boolean; message: string };
 
@@ -55,7 +55,7 @@ interface WorkspaceState {
 
   updateProfile: (updates: Partial<MemberProfile>) => Promise<void>;
   logActivity: (title: string, type: RecentActivity['type'], details: string) => Promise<void>;
-  updateSettings: (settings: { enabledMenus?: string[], adminEnabledMenus?: string[], userEnabledMenus?: string[], trackerLayout?: string, homeLayout?: string, workspaceLayout?: string, messageHelperLayout?: string, templatesLayout?: string }) => Promise<void>;
+  updateSettings: (settings: { enabledMenus?: string[], adminEnabledMenus?: string[], userEnabledMenus?: string[], trackerLayout?: string, homeLayout?: string, workspaceLayout?: string, messageHelperLayout?: string, templatesLayout?: string, fontFamily?: string, borderRadius?: string }) => Promise<void>;
   exportBackup: () => string;
   importBackup: (dataStr: string) => boolean;
 }
@@ -159,7 +159,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
           })(),
           credentials: data.data.credentials || [],
           recentActivities: data.data.recentActivities || [],
-          settings: data.data.settings || { enabledMenus: ['Home', 'Workspace', 'Order Tracker', 'Personal Projects', 'Message Helper', 'Templates', 'Schema Builder', 'Audit Suite', 'Projects', 'Mockup Studio', 'AI Assistant', 'Team Notes', 'Downloads', 'Member Profile', 'Settings'], trackerLayout: 'default', homeLayout: 'default', workspaceLayout: 'default', messageHelperLayout: 'default', templatesLayout: 'default' },
+          settings: data.data.settings || { enabledMenus: ['Home', 'Workspace', 'Order Tracker', 'Personal Projects', 'Message Helper', 'Templates', 'Schema Builder', 'Audit Suite', 'Projects', 'Mockup Studio', 'AI Assistant', 'Team Notes', 'Downloads', 'Member Profile', 'Settings'], trackerLayout: 'default', homeLayout: 'default', workspaceLayout: 'default', messageHelperLayout: 'default', templatesLayout: 'default', fontFamily: 'sans', borderRadius: 'xl' },
           isHydrated: true
         });
       }
