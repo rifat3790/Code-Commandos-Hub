@@ -426,6 +426,85 @@ export async function GET(request: Request) {
       }
     }
 
+    const speedMetrics = {
+      pageSizeKb: html ? Math.round(html.length / 1024) : 0,
+      scriptCount: html ? (html.match(/<script/gi) || []).length : 0,
+      styleCount: html ? ((html.match(/<link[^>]*rel=["']stylesheet["']/gi) || []).length + (html.match(/<style/gi) || []).length) : 0,
+      imageCount: html ? (html.match(/<img/gi) || []).length : 0,
+      lazyImageCount: html ? (html.match(/<img[^>]*loading=["']lazy["']/gi) || []).length : 0,
+      preloadCount: html ? (html.match(/<link[^>]*rel=["'](?:preload|preconnect|dns-prefetch)["']/gi) || []).length : 0
+    };
+
+    // SEO Auditor Extractions
+    const titleMatch = html ? html.match(/<title[^>]*>([\s\S]*?)<\/title>/i) : null;
+    const seoTitle = titleMatch ? titleMatch[1].trim() : '';
+
+    const descMatch = html ? (html.match(/<meta[^>]*name=["']description["'][^>]*content=["']([\s\S]*?)["']/i) || html.match(/<meta[^>]*content=["']([\s\S]*?)["'][^>]*name=["']description["']/i)) : null;
+    const seoDescription = descMatch ? descMatch[1].trim() : '';
+
+    const h1Count = html ? (html.match(/<h1/gi) || []).length : 0;
+    const h2Count = html ? (html.match(/<h2/gi) || []).length : 0;
+
+    const ogTitleMatch = html ? html.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([\s\S]*?)["']/i) : null;
+    const ogTitle = ogTitleMatch ? ogTitleMatch[1].trim() : '';
+
+    const ogDescMatch = html ? html.match(/<meta[^>]*property=["']og:description["'][^>]*content=["']([\s\S]*?)["']/i) : null;
+    const ogDescription = ogDescMatch ? ogDescMatch[1].trim() : '';
+
+    const ogImageMatch = html ? html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([\s\S]*?)["']/i) : null;
+    const ogImage = ogImageMatch ? ogImageMatch[1].trim() : '';
+
+    // Extract Schemas from application/ld+json
+    const schemas: string[] = [];
+    const ldJsonMatches = html ? html.match(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi) : null;
+    if (ldJsonMatches) {
+      ldJsonMatches.forEach(scriptTag => {
+        const contentMatch = scriptTag.match(/<script[^>]*>([\s\S]*?)<\/script>/i);
+        if (contentMatch && contentMatch[1]) {
+          try {
+            const parsed = JSON.parse(contentMatch[1].trim());
+            const checkType = (obj: any) => {
+              if (obj && obj['@type']) {
+                if (typeof obj['@type'] === 'string') schemas.push(obj['@type']);
+                else if (Array.isArray(obj['@type'])) schemas.push(...obj['@type']);
+              }
+              if (obj && obj['@graph'] && Array.isArray(obj['@graph'])) {
+                obj['@graph'].forEach((g: any) => checkType(g));
+              }
+            };
+            checkType(parsed);
+          } catch (e) {}
+        }
+      });
+    }
+
+    // Images without ALT text
+    const imgTags = html ? (html.match(/<img[^>]*>/gi) || []) : [];
+    let imagesWithoutAlt = 0;
+    imgTags.forEach(tag => {
+      const hasAlt = /alt=["']([^"']*)["']/i.test(tag);
+      if (!hasAlt) {
+        imagesWithoutAlt++;
+      } else {
+        const altMatch = tag.match(/alt=["']([^"']*)["']/i);
+        if (altMatch && !altMatch[1].trim()) {
+          imagesWithoutAlt++;
+        }
+      }
+    });
+
+    const seoMetrics = {
+      seoTitle,
+      seoDescription,
+      h1Count,
+      h2Count,
+      ogTitle,
+      ogDescription,
+      ogImage,
+      schemas: Array.from(new Set(schemas)),
+      imagesWithoutAlt
+    };
+
     return NextResponse.json({
       success: true,
       isShopify,
@@ -438,7 +517,9 @@ export async function GET(request: Request) {
       socials: socialLinks,
       emails,
       isPasswordProtected: false,
-      sessionCookie
+      sessionCookie,
+      speedMetrics,
+      seoMetrics
     });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
