@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import Papa from 'papaparse';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Clock, CheckCircle2, FileSpreadsheet, ExternalLink, Filter, ChevronDown, Columns, DollarSign, Save, Download } from 'lucide-react';
+import { Search, Clock, CheckCircle2, FileSpreadsheet, ExternalLink, Filter, ChevronDown, Columns, DollarSign, Save, Download, Activity } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import toast from 'react-hot-toast';
@@ -153,6 +153,20 @@ function MultiSelectDropdown({
         )}
       </AnimatePresence>
     </div>
+  );
+}
+
+function HighlightMatch({ text, query }: { text: string; query: string }) {
+  if (!query || !query.trim()) return <>{text}</>;
+  const parts = String(text).split(new RegExp(`(${query.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')})`, 'gi'));
+  return (
+    <>
+      {parts.map((part, i) => 
+        part.toLowerCase() === query.toLowerCase() 
+          ? <span key={i} className="bg-yellow-500/30 text-yellow-300 px-0.5 rounded font-black">{part}</span> 
+          : part
+      )}
+    </>
   );
 }
 
@@ -631,27 +645,61 @@ export default function OrdersDashboard({ csvData, activeLayout }: { csvData: st
     }
   };
 
-  // Extract unique filter options dynamically from data
+  // Extract unique filter options dynamically from data with cascading logic
   const filterOptions = useMemo(() => {
+    // 1. Service Lines options (Always derived from all data)
     const serviceLines = new Set<string>();
+    data.forEach(d => {
+      if (d['Service Line']) serviceLines.add(d['Service Line'].trim());
+    });
+
+    // 2. Filter data by selected Service Line to derive Statuses, Teams, and Delivery Dates options
+    let dataForOtherFilters = data;
+    if (serviceLineFilter.length > 0) {
+      dataForOtherFilters = dataForOtherFilters.filter(d => {
+        const sl = (d['Service Line'] || '').trim().toLowerCase();
+        return serviceLineFilter.some(f => sl === f.toLowerCase());
+      });
+    }
+
     const statuses = new Set<string>();
     const teams = new Set<string>();
-    const names = new Set<string>();
     const deliveryDates = new Set<string>();
     deliveryDates.add('Today');
 
-    data.forEach(d => {
-      if (d['Service Line']) serviceLines.add(d['Service Line'].trim());
+    dataForOtherFilters.forEach(d => {
       if (d['Status']) statuses.add(d['Status'].trim());
       if (d['Deli_Date']) deliveryDates.add(d['Deli_Date'].trim());
-
       const at = d['Assign Team'];
       if (at && typeof at === 'string') {
         const parts = at.split('/').map(s => s.trim()).filter(Boolean);
         parts.forEach(p => {
           if (p.length <= 2) {
             teams.add(p.toUpperCase());
-          } else {
+          }
+        });
+      }
+    });
+
+    // 3. Filter data by selected Service Line AND selected Team to derive Names/Assignees options
+    let dataForNamesFilter = dataForOtherFilters;
+    if (teamFilter.length > 0) {
+      dataForNamesFilter = dataForNamesFilter.filter(d => {
+        const at = d['Assign Team'];
+        if (!at || typeof at !== 'string') return false;
+        const parts = at.split('/').map(s => s.trim().toLowerCase()).filter(Boolean);
+        const rowTeams = parts.filter(p => p.length <= 2);
+        return teamFilter.some(f => rowTeams.includes(f.toLowerCase()));
+      });
+    }
+
+    const names = new Set<string>();
+    dataForNamesFilter.forEach(d => {
+      const at = d['Assign Team'];
+      if (at && typeof at === 'string') {
+        const parts = at.split('/').map(s => s.trim()).filter(Boolean);
+        parts.forEach(p => {
+          if (p.length > 2) {
             names.add(p);
           }
         });
@@ -669,7 +717,28 @@ export default function OrdersDashboard({ csvData, activeLayout }: { csvData: st
         return a.localeCompare(b);
       })
     };
-  }, [data]);
+  }, [data, serviceLineFilter, teamFilter]);
+
+  // Automatically reset stale child filters when parent filters change
+  useEffect(() => {
+    if (serviceLineFilter.length > 0) {
+      const availableTeams = filterOptions.teams;
+      setTeamFilter(prev => prev.filter(t => availableTeams.includes(t)));
+      
+      const availableStatuses = filterOptions.statuses;
+      setStatusFilter(prev => prev.filter(s => availableStatuses.includes(s)));
+
+      const availableDates = filterOptions.deliveryDates;
+      setDeliveryDateFilter(prev => prev.filter(d => availableDates.includes(d)));
+    }
+  }, [serviceLineFilter, filterOptions.teams, filterOptions.statuses, filterOptions.deliveryDates]);
+
+  useEffect(() => {
+    if (teamFilter.length > 0) {
+      const availableNames = filterOptions.names;
+      setNameFilter(prev => prev.filter(n => availableNames.includes(n)));
+    }
+  }, [teamFilter, filterOptions.names]);
 
   // Apply filters
   const filteredData = useMemo(() => {
@@ -753,6 +822,43 @@ export default function OrdersDashboard({ csvData, activeLayout }: { csvData: st
     }, 0);
   }, [filteredData]);
 
+  // Real-time Team Workload calculation
+  const teamWorkload = useMemo(() => {
+    const workload: Record<string, { count: number; value: number; members: Set<string> }> = {};
+    
+    data.forEach(d => {
+      const status = (d['Status'] || '').toLowerCase();
+      if (!status.includes('wip')) return;
+
+      const valStr = d['Value'] || d['Amount'] || "0";
+      const numStr = String(valStr).replace(/[^0-9.-]+/g, "");
+      const value = parseFloat(numStr) || 0;
+
+      const at = d['Assign Team'];
+      if (at && typeof at === 'string') {
+        const parts = at.split('/').map(s => s.trim()).filter(Boolean);
+        const rowTeams = parts.filter(p => p.length <= 2).map(t => t.toUpperCase());
+        const rowNames = parts.filter(p => p.length > 2);
+
+        rowTeams.forEach(team => {
+          if (!workload[team]) {
+            workload[team] = { count: 0, value: 0, members: new Set() };
+          }
+          workload[team].count += 1;
+          workload[team].value += value;
+          rowNames.forEach(name => workload[team].members.add(name));
+        });
+      }
+    });
+
+    return Object.entries(workload).map(([team, stats]) => ({
+      team,
+      count: stats.count,
+      value: stats.value,
+      members: Array.from(stats.members).join(', ')
+    })).sort((a, b) => b.count - a.count);
+  }, [data]);
+
   const getStatusColor = (status: string) => {
     const s = (status || "").toLowerCase();
     if (s.includes('wip')) return 'bg-green-500/20 text-green-400 border-green-500/30';
@@ -831,6 +937,73 @@ export default function OrdersDashboard({ csvData, activeLayout }: { csvData: st
           />
         </div>
       </div>
+
+      {/* Team Workload Breakdown Card Panel - Premium and Interactive */}
+      {teamWorkload.length > 0 && (
+        <div className="glass-panel p-5 space-y-4">
+          <div className="flex justify-between items-center border-b border-glass-border pb-3">
+            <div>
+              <h3 className="text-sm font-extrabold uppercase tracking-wider text-purple-400 flex items-center gap-2">
+                <Activity className="w-4 h-4 text-purple-400 animate-pulse" />
+                <span>Team Workload & Active Assignment Metrics</span>
+              </h3>
+              <p className="text-xs text-gray-500 mt-0.5">Real-time status of active WIP orders, workload load factor, and pipeline value distribution per team.</p>
+            </div>
+            <div className="px-3 py-1 bg-white/5 border border-glass-border rounded-xl text-[10px] text-gray-400 font-mono flex items-center gap-1.5">
+              <Clock className="w-3.5 h-3.5 text-green-400 animate-spin" />
+              <span>Auto-Refresh Active</span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {teamWorkload.map((tw) => {
+              const maxWip = 8; // Max target WIP threshold
+              const percentage = Math.min(100, (tw.count / maxWip) * 100);
+              const isOverloaded = tw.count >= maxWip;
+
+              return (
+                <div key={tw.team} className="p-4 bg-white/5 border border-glass-border rounded-2xl hover:border-purple-500/30 hover:bg-white/10 transition-all duration-300 group">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <span className="px-2 py-0.5 bg-purple-500/20 text-purple-300 border border-purple-500/30 rounded text-[10px] font-black uppercase tracking-widest font-mono">
+                        Team {tw.team}
+                      </span>
+                      <p className="text-xs text-gray-400 mt-2 truncate max-w-[180px]" title={tw.members}>
+                        Members: <span className="text-gray-300 font-medium">{tw.members || 'None'}</span>
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-lg font-black text-white">{tw.count}</span>
+                      <span className="text-gray-500 text-[10px] block">Active WIP</span>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 space-y-1.5">
+                    <div className="flex justify-between text-[10px] font-bold text-gray-400">
+                      <span>Load Factor</span>
+                      <span className={isOverloaded ? 'text-red-400' : percentage > 70 ? 'text-yellow-400' : 'text-green-400'}>
+                        {Math.round(percentage)}% {isOverloaded ? '(Overloaded)' : ''}
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-900 rounded-full h-1.5 overflow-hidden">
+                      <div 
+                        className={`h-1.5 rounded-full transition-all duration-500 ${
+                          isOverloaded ? 'bg-red-500' : percentage > 70 ? 'bg-amber-500' : 'bg-gradient-to-r from-green-500 to-emerald-400'
+                        }`}
+                        style={{ width: `${percentage}%` }}
+                      />
+                    </div>
+                    <div className="flex justify-between items-center text-[10px] font-semibold text-gray-500 pt-1">
+                      <span>Active Pipeline Value</span>
+                      <span className="text-yellow-400">${tw.value.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Filters Bar */}
       <div className="glass-panel p-4 flex flex-wrap items-center gap-3">
@@ -995,7 +1168,7 @@ export default function OrdersDashboard({ csvData, activeLayout }: { csvData: st
 
                         return (
                           <td key={col} className={`px-5 py-3 ${layoutStyles.cellText}`}>
-                            {val}
+                            <HighlightMatch text={String(val || '')} query={searchQuery} />
                           </td>
                         );
                       })}
