@@ -371,6 +371,30 @@ export default function IssuesDashboard({ csvData }: { csvData: string }) {
     return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
   };
 
+  const renderIssueStatusBadge = (status: string) => {
+    const s = (status || "").toLowerCase();
+    let colorClasses = "bg-gray-500/10 text-gray-400 border-gray-500/20 hover:bg-gray-500/20";
+    let dotColor = "bg-gray-400";
+    
+    if (s.includes('open')) {
+      colorClasses = "bg-emerald-500/10 text-emerald-400 border-emerald-500/20 shadow-[0_0_12px_rgba(16,185,129,0.1)] hover:bg-emerald-500/20";
+      dotColor = "bg-emerald-400 animate-pulse";
+    } else if (s.includes('close') || s.includes('done')) {
+      colorClasses = "bg-purple-500/10 text-purple-400 border-purple-500/20 shadow-[0_0_12px_rgba(168,85,247,0.1)] hover:bg-purple-500/20";
+      dotColor = "bg-purple-400";
+    } else if (s.includes('issue')) {
+      colorClasses = "bg-rose-500/10 text-rose-400 border-rose-500/20 shadow-[0_0_12px_rgba(244,63,94,0.1)] hover:bg-rose-500/20";
+      dotColor = "bg-rose-400 animate-pulse";
+    }
+
+    return (
+      <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${colorClasses} transition-all duration-300`}>
+        <span className={`w-1.5 h-1.5 rounded-full ${dotColor}`} />
+        <span>{status || 'None'}</span>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row gap-6 justify-between items-start md:items-center">
@@ -483,17 +507,17 @@ export default function IssuesDashboard({ csvData }: { csvData: string }) {
         </div>
       </div>
 
-      <div ref={tableRef} className="glass-panel overflow-hidden border border-glass-border rounded-xl">
+      <div ref={tableRef} className="glass-panel-heavy overflow-hidden border border-glass-border rounded-2xl shadow-[0_4px_30px_rgba(0,0,0,0.4)]">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm whitespace-nowrap">
-            <thead className="bg-gray-900/90 text-gray-300 font-medium border-b border-glass-border">
+            <thead className="bg-gradient-to-r from-gray-950 via-gray-900/60 to-gray-950 text-gray-400 font-semibold tracking-wider text-xs uppercase border-b border-glass-border">
               <tr>
                 {allColumns.filter(c => visibleColumns.includes(c)).map(col => (
-                  <th key={col} className="px-5 py-4 tracking-wide">{col}</th>
+                  <th key={col} className="px-6 py-4.5 tracking-wide text-gray-400 font-semibold text-xs uppercase">{col}</th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-glass-border">
+            <tbody className="divide-y divide-glass-border/30">
               <AnimatePresence>
                 {filteredData.map((row, idx) => (
                   <motion.tr
@@ -502,17 +526,23 @@ export default function IssuesDashboard({ csvData }: { csvData: string }) {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0 }}
                     transition={{ duration: 0.1 }}
-                    className="hover:bg-gray-800/60 transition-colors group"
+                    className="hover:bg-red-950/10 hover:shadow-[inset_4px_0_0_0_#ef4444] border-b border-glass-border/30 transition-all duration-300 group even:bg-gray-900/10 odd:bg-gray-950/5"
                   >
                     {allColumns.filter(c => visibleColumns.includes(c)).map(col => {
                       const val = row[col];
                       
                       if (col.toLowerCase().includes('url') || col.toLowerCase().includes('link') || String(val).startsWith('http')) {
                         return (
-                          <td key={col} className="px-5 py-3 text-gray-300">
+                          <td key={col} className="px-6 py-3.5 text-gray-300">
                              {val && val !== '' ? (
-                                <a href={String(val).startsWith('http') ? val : `https://${val}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 px-2 py-1 bg-purple-500/10 text-purple-400 hover:text-purple-300 hover:bg-purple-500/20 rounded-md transition-colors border border-purple-500/20">
-                                  Link <ExternalLink className="w-3 h-3" />
+                                <a 
+                                  href={String(val).startsWith('http') ? val : `https://${val}`} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer" 
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-purple-500/10 to-indigo-500/10 hover:from-purple-500/20 hover:to-indigo-500/20 text-purple-300 hover:text-purple-200 rounded-lg transition-all duration-300 border border-purple-500/20 hover:border-purple-500/40 hover:scale-[1.02] active:scale-[0.98] shadow-sm"
+                                >
+                                  <span className="text-xs font-semibold">Open</span>
+                                  <ExternalLink className="w-3.5 h-3.5" />
                                 </a>
                              ) : (
                                 <span className="text-gray-600">-</span>
@@ -523,17 +553,88 @@ export default function IssuesDashboard({ csvData }: { csvData: string }) {
 
                       if (col.toLowerCase() === 'status') {
                         return (
-                          <td key={col} className="px-5 py-3">
-                            <span className={`px-2 py-1 rounded-md text-xs font-semibold border ${getStatusColor(val)} inline-block`}>
-                              {val || 'None'}
+                          <td key={col} className="px-6 py-3.5">
+                            {renderIssueStatusBadge(val)}
+                          </td>
+                        );
+                      }
+
+                      if (col.toLowerCase() === 'date') {
+                        return (
+                          <td key={col} className="px-6 py-3.5">
+                            <span className="font-mono text-xs text-gray-400">
+                              {val}
                             </span>
                           </td>
                         );
                       }
 
+                      if (col.toLowerCase() === 'team') {
+                        return (
+                          <td key={col} className="px-6 py-3.5">
+                            <span className="px-2 py-0.5 bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded text-xs font-medium">
+                              {val}
+                            </span>
+                          </td>
+                        );
+                      }
+
+                      if (col.toLowerCase() === 'assign name') {
+                        return (
+                          <td key={col} className="px-6 py-3.5">
+                            <div className="flex flex-wrap gap-1.5 items-center">
+                              {String(val).split('/').map((part, pIdx) => {
+                                const trimmed = part.trim();
+                                if (!trimmed) return null;
+                                const isTeam = (trimmed.length <= 3 && trimmed === trimmed.toUpperCase()) || trimmed.length <= 2;
+                                return (
+                                  <span 
+                                    key={pIdx} 
+                                    className={`px-2 py-0.5 rounded text-xs font-medium border ${
+                                      isTeam 
+                                        ? 'bg-blue-500/10 text-blue-400 border-blue-500/20 shadow-[0_0_8px_rgba(59,130,246,0.05)]' 
+                                        : 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20 shadow-[0_0_8px_rgba(99,102,241,0.05)]'
+                                    }`}
+                                  >
+                                    {trimmed}
+                                  </span>
+                                );
+                              })}
+                            </div>
+                          </td>
+                        );
+                      }
+
+                      if (col.toLowerCase() === 'urgency' || col.toLowerCase() === 'priority') {
+                        const s = String(val).toLowerCase();
+                        let badgeStyle = "bg-gray-500/10 text-gray-400 border-gray-500/20";
+                        if (s.includes('high') || s.includes('critical') || s.includes('urgent')) {
+                          badgeStyle = "bg-rose-500/15 text-rose-400 border-rose-500/30 font-bold animate-pulse shadow-[0_0_10px_rgba(244,63,94,0.1)]";
+                        } else if (s.includes('medium') || s.includes('warn')) {
+                          badgeStyle = "bg-amber-500/15 text-amber-400 border-amber-500/30 font-semibold shadow-[0_0_10px_rgba(245,158,11,0.05)]";
+                        } else if (s.includes('low') || s.includes('minor')) {
+                          badgeStyle = "bg-blue-500/15 text-blue-400 border-blue-500/30 shadow-[0_0_10px_rgba(59,130,246,0.05)]";
+                        }
+                        return (
+                          <td key={col} className="px-6 py-3.5">
+                            <span className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${badgeStyle}`}>
+                              {val}
+                            </span>
+                          </td>
+                        );
+                      }
+
+                      if (col.toLowerCase().includes('description') || col.toLowerCase().includes('remarks') || col.toLowerCase().includes('detail')) {
+                        return (
+                          <td key={col} className="px-6 py-3.5 max-w-xs md:max-w-md truncate text-gray-300 font-medium group-hover:text-white transition-colors duration-200">
+                            {val}
+                          </td>
+                        );
+                      }
+
                       return (
-                        <td key={col} className="px-5 py-3 text-gray-300">
-                          {val}
+                        <td key={col} className="px-6 py-3.5 text-gray-300">
+                          <span className="group-hover:text-white transition-colors duration-200">{val}</span>
                         </td>
                       );
                     })}

@@ -527,21 +527,62 @@ export default function OrdersDashboard({ csvData }: { csvData: string }) {
 
   const getTimelineStyle = (timeline: string) => {
     const t = (timeline || "").toLowerCase();
-    if (t.includes('order late')) return 'bg-red-600 text-white border border-red-500 shadow-lg shadow-red-600/30 px-3 py-1 rounded-lg font-bold tracking-wide text-xs uppercase animate-pulse';
-    if (t.includes('cancel') || t.includes('done') || t.includes('delivered')) return 'text-gray-400 font-bold';
+    if (t.includes('order late')) {
+      return 'bg-rose-500/20 text-rose-400 border border-rose-500/30 px-3 py-1 rounded-full font-bold tracking-wider text-[11px] uppercase animate-pulse shadow-[0_0_12px_rgba(244,63,94,0.2)]';
+    }
+    if (t.includes('cancel')) {
+      return 'bg-gray-800/50 text-gray-500 border border-gray-700/30 px-3 py-1 rounded-full font-medium text-xs';
+    }
+    if (t.includes('done') || t.includes('complete') || t.includes('delivered')) {
+      return 'bg-purple-500/10 text-purple-400 border border-purple-500/20 px-3 py-1 rounded-full font-semibold text-xs shadow-[0_0_10px_rgba(168,85,247,0.1)]';
+    }
+    
+    // Active timer countdowns
     if (t.includes('s')) {
       const hasDays = t.includes('d');
-      if (!hasDays || t.match(/^0d/)) return 'text-red-500 font-extrabold';
+      if (!hasDays || t.match(/^0d/)) {
+        return 'bg-rose-500/15 text-rose-400 border border-rose-500/20 px-3 py-1 rounded-full font-bold text-xs animate-pulse shadow-[0_0_10px_rgba(244,63,94,0.1)]';
+      }
       const dMatch = t.match(/(\d+)d/);
-      if (dMatch && parseInt(dMatch[1]) <= 2) return 'text-yellow-400 font-bold';
-      return 'text-green-400 font-medium';
+      if (dMatch && parseInt(dMatch[1]) <= 2) {
+        return 'bg-amber-500/10 text-amber-400 border border-amber-500/20 px-3 py-1 rounded-full font-semibold text-xs shadow-[0_0_10px_rgba(245,158,11,0.1)]';
+      }
+      return 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-3 py-1 rounded-full font-medium text-xs shadow-[0_0_10px_rgba(16,185,129,0.1)]';
     }
+    
     if (t.includes('day')) {
       const days = parseInt(t);
-      if (days <= 2) return 'text-yellow-400 font-bold';
-      return 'text-green-400 font-medium';
+      if (days <= 2) {
+        return 'bg-amber-500/10 text-amber-400 border border-amber-500/20 px-3 py-1 rounded-full font-semibold text-xs';
+      }
+      return 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-3 py-1 rounded-full font-medium text-xs';
     }
-    return 'text-gray-300';
+    
+    return 'bg-gray-800/40 text-gray-300 border border-gray-700/20 px-3 py-1 rounded-full font-medium text-xs';
+  };
+
+  const renderStatusBadge = (status: string) => {
+    const s = (status || "").toLowerCase();
+    let colorClasses = "bg-gray-500/10 text-gray-400 border-gray-500/20 hover:bg-gray-500/20";
+    let dotColor = "bg-gray-400";
+    
+    if (s.includes('wip')) {
+      colorClasses = "bg-emerald-500/10 text-emerald-400 border-emerald-500/20 shadow-[0_0_12px_rgba(16,185,129,0.1)] hover:bg-emerald-500/20";
+      dotColor = "bg-emerald-400 animate-pulse";
+    } else if (s.includes('cancel')) {
+      colorClasses = "bg-rose-500/10 text-rose-400 border-rose-500/20 shadow-[0_0_12px_rgba(244,63,94,0.1)] hover:bg-rose-500/20";
+      dotColor = "bg-rose-400";
+    } else if (s.includes('done') || s.includes('complete') || s.includes('delivered')) {
+      colorClasses = "bg-purple-500/10 text-purple-400 border-purple-500/20 shadow-[0_0_12px_rgba(168,85,247,0.1)] hover:bg-purple-500/20";
+      dotColor = "bg-purple-400";
+    }
+
+    return (
+      <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${colorClasses} transition-all duration-300`}>
+        <span className={`w-1.5 h-1.5 rounded-full ${dotColor}`} />
+        <span>{status || 'None'}</span>
+      </div>
+    );
   };
 
   return (
@@ -678,18 +719,18 @@ export default function OrdersDashboard({ csvData }: { csvData: string }) {
       </div>
 
       {/* Main Table */}
-      <div ref={tableRef} className="glass-panel overflow-hidden border border-glass-border rounded-xl">
+      <div ref={tableRef} className="glass-panel-heavy overflow-hidden border border-glass-border rounded-2xl shadow-[0_4px_30px_rgba(0,0,0,0.4)]">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm whitespace-nowrap">
-            <thead className="bg-gray-900/90 text-gray-300 font-medium border-b border-glass-border">
+            <thead className="bg-gradient-to-r from-gray-950 via-gray-900/60 to-gray-950 text-gray-400 font-semibold tracking-wider text-xs uppercase border-b border-glass-border">
               <tr>
                 {allColumns.filter(c => visibleColumns.includes(c)).map(col => (
-                  <th key={col} className="px-5 py-4 tracking-wide">{col}</th>
+                  <th key={col} className="px-6 py-4.5 tracking-wide text-gray-400 font-semibold text-xs uppercase">{col}</th>
                 ))}
-                <th className="px-5 py-4 tracking-wide sticky right-0 bg-gray-900/90 shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.3)] border-l border-glass-border text-purple-300">Live Timeline</th>
+                <th className="px-6 py-4.5 tracking-wide sticky right-0 bg-gray-950/95 z-10 shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.5)] border-l border-glass-border text-purple-400 text-xs uppercase font-semibold text-center">Live Timeline</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-glass-border">
+            <tbody className="divide-y divide-glass-border/30">
               <AnimatePresence>
                 {filteredData.map((row, idx) => {
                   let displayTimeline = row['_originalTimeline'];
@@ -713,58 +754,112 @@ export default function OrdersDashboard({ csvData }: { csvData: string }) {
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0 }}
                       transition={{ duration: 0.1 }}
-                      className="hover:bg-gray-800/60 transition-colors group"
+                      className="hover:bg-purple-950/10 hover:shadow-[inset_4px_0_0_0_#a855f7] border-b border-glass-border/30 transition-all duration-300 group even:bg-gray-900/10 odd:bg-gray-950/5"
                     >
                       {allColumns.filter(c => visibleColumns.includes(c)).map(col => {
                         const val = row[col];
                         
                         if (col.toLowerCase().includes('link') || col.toLowerCase().includes('sheet') || String(val).startsWith('http')) {
                           return (
-                            <td key={col} className="px-5 py-3 text-gray-300">
+                            <td key={col} className="px-6 py-3.5 text-gray-300">
                                {val && val !== '' ? (
-                                  <a href={String(val).startsWith('http') ? val : `https://${val}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 px-2 py-1 bg-purple-500/10 text-purple-400 hover:text-purple-300 hover:bg-purple-500/20 rounded-md transition-colors border border-purple-500/20">
-                                    Link <ExternalLink className="w-3 h-3" />
+                                  <a 
+                                    href={String(val).startsWith('http') ? val : `https://${val}`} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer" 
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-purple-500/10 to-indigo-500/10 hover:from-purple-500/20 hover:to-indigo-500/20 text-purple-300 hover:text-purple-200 rounded-lg transition-all duration-300 border border-purple-500/20 hover:border-purple-500/40 hover:scale-[1.02] active:scale-[0.98] shadow-sm"
+                                  >
+                                    <span className="text-xs font-semibold">Open</span>
+                                    <ExternalLink className="w-3.5 h-3.5" />
                                   </a>
                                ) : (
                                   <span className="text-gray-600">-</span>
-                               )}
+                                )}
                             </td>
                           );
                         }
 
                         if (col.toLowerCase() === 'status') {
                           return (
-                            <td key={col} className="px-5 py-3">
-                              <span className={`px-2 py-1 rounded-md text-xs font-semibold border ${getStatusColor(val)} inline-block`}>
-                                {val || 'None'}
-                              </span>
+                            <td key={col} className="px-6 py-3.5">
+                              {renderStatusBadge(val)}
                             </td>
                           );
                         }
 
                         if (col.toLowerCase() === 'order id') {
                            return (
-                             <td key={col} className="px-5 py-3 font-mono text-gray-400 text-xs">
-                               {val}
+                             <td key={col} className="px-6 py-3.5">
+                               <span className="font-mono text-xs px-2.5 py-1 bg-gray-900/90 border border-glass-border hover:border-purple-500/30 text-purple-300 font-semibold rounded-lg shadow-[inset_0_1px_2px_rgba(0,0,0,0.4)] transition-colors">
+                                 {val}
+                               </span>
+                             </td>
+                           );
+                        }
+
+                        if (col.toLowerCase() === 'value' || col.toLowerCase() === 'amount' || col.toLowerCase() === 'price') {
+                           return (
+                             <td key={col} className="px-6 py-3.5">
+                               <span className="font-bold text-emerald-400 drop-shadow-[0_0_6px_rgba(16,185,129,0.15)] tabular-nums text-sm">
+                                 {val}
+                               </span>
+                             </td>
+                           );
+                        }
+
+                        if (col.toLowerCase() === 'assign team') {
+                           return (
+                             <td key={col} className="px-6 py-3.5">
+                               <div className="flex flex-wrap gap-1.5 items-center">
+                                 {String(val).split('/').map((part, pIdx) => {
+                                   const trimmed = part.trim();
+                                   if (!trimmed) return null;
+                                   const isTeam = trimmed.length <= 3 && trimmed === trimmed.toUpperCase();
+                                   return (
+                                     <span 
+                                       key={pIdx} 
+                                       className={`px-2 py-0.5 rounded text-xs font-medium border ${
+                                         isTeam 
+                                           ? 'bg-blue-500/10 text-blue-400 border-blue-500/20 shadow-[0_0_8px_rgba(59,130,246,0.05)]' 
+                                           : 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20 shadow-[0_0_8px_rgba(99,102,241,0.05)]'
+                                       }`}
+                                     >
+                                       {trimmed}
+                                     </span>
+                                   );
+                                 })}
+                               </div>
+                             </td>
+                           );
+                        }
+
+                        if (col.toLowerCase() === 'client name' || col.toLowerCase() === 'profile name') {
+                           return (
+                             <td key={col} className="px-6 py-3.5">
+                               <span className="font-medium text-white group-hover:text-purple-200 transition-colors duration-200">
+                                 {val}
+                               </span>
                              </td>
                            );
                         }
 
                         return (
-                          <td key={col} className="px-5 py-3 text-gray-300">
-                            {val}
+                          <td key={col} className="px-6 py-3.5 text-gray-300">
+                            <span className="group-hover:text-white transition-colors duration-200">{val}</span>
                           </td>
                         );
                       })}
                       
-                      <td className="px-5 py-3 sticky right-0 bg-gray-900 group-hover:bg-gray-800 shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.3)] border-l border-glass-border transition-colors">
-                        <div className="flex items-center gap-2">
-                          {!displayTimeline?.toUpperCase().includes('ORDER LATE') && (
-                            <Clock className={`w-4 h-4 ${getTimelineStyle(displayTimeline)}`} />
-                          )}
-                          <span className={`${getTimelineStyle(displayTimeline)} tabular-nums tracking-tight ${displayTimeline?.toUpperCase().includes('ORDER LATE') ? 'inline-block text-center w-full' : ''}`}>
-                            {displayTimeline}
-                          </span>
+                      <td className="px-6 py-3.5 sticky right-0 bg-gray-905 group-hover:bg-[#12182b] z-10 shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.5)] border-l border-glass-border transition-colors">
+                        <div className="flex items-center justify-center">
+                          <div className={`flex items-center gap-1.5 ${getTimelineStyle(displayTimeline)}`}>
+                            {!displayTimeline?.toUpperCase().includes('ORDER LATE') && !displayTimeline?.toUpperCase().includes('CANCEL') && !displayTimeline?.toUpperCase().includes('DONE') && !displayTimeline?.toUpperCase().includes('DELIVERED') && (
+                              <Clock className="w-3.5 h-3.5" />
+                            )}
+                            <span className="tabular-nums tracking-tight font-mono">
+                              {displayTimeline}
+                            </span>
+                          </div>
                         </div>
                       </td>
                     </motion.tr>
@@ -782,6 +877,7 @@ export default function OrdersDashboard({ csvData }: { csvData: string }) {
           </table>
         </div>
       </div>
+
     </div>
   );
 }
