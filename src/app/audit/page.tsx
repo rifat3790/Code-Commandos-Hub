@@ -98,6 +98,15 @@ export default function AuditSuitePage() {
   const [detectedImages, setDetectedImages] = useState<string[]>([]);
   const [detectedVideos, setDetectedVideos] = useState<string[]>([]);
   const [isLoadingImages, setIsLoadingImages] = useState(false);
+  const [lighthouseMetrics, setLighthouseMetrics] = useState<{
+    score: number;
+    fcp: number;
+    lcp: number;
+    tbt: number;
+    cls: number;
+    speedIndex: number;
+  } | null>(null);
+  const [isLoadingLighthouse, setIsLoadingLighthouse] = useState(false);
   const [isZippingImages, setIsZippingImages] = useState(false);
   const [techInfo, setTechInfo] = useState<{ 
     technology: string; 
@@ -325,8 +334,13 @@ export default function AuditSuitePage() {
     return Math.max(15, Math.round(score));
   }, [techInfo]);
 
+  const activeBaseScore = useMemo(() => {
+    if (lighthouseMetrics) return lighthouseMetrics.score;
+    return baseSpeedScore;
+  }, [lighthouseMetrics, baseSpeedScore]);
+
   const speedScore = useMemo(() => {
-    let score = baseSpeedScore;
+    let score = activeBaseScore;
     AUDIT_CHECKLIST.forEach(item => {
       if (checkedItems[item.id]) {
         // Ticking items adds back performance weight, simulating optimization impact
@@ -334,7 +348,7 @@ export default function AuditSuitePage() {
       }
     });
     return Math.min(99, score);
-  }, [baseSpeedScore, checkedItems]);
+  }, [activeBaseScore, checkedItems]);
 
   const handleToggleAuditItem = (id: string) => {
     setCheckedItems(prev => ({
@@ -392,6 +406,7 @@ Report generated on Code Commandos Speed Audit Suite.`;
     setAllProducts([]);
     setDetectedImages([]);
     setDetectedVideos([]);
+    setLighthouseMetrics(null);
     setFetchProgress({ current: 0, total: 0 });
     
     const timestamp = new Date().toLocaleTimeString();
@@ -438,6 +453,49 @@ Report generated on Code Commandos Speed Audit Suite.`;
           'preload-routes': false // Always manual
         });
       }
+
+      // Trigger Google Lighthouse Performance Audit asynchronously
+      setIsLoadingLighthouse(true);
+      setLighthouseMetrics(null);
+      
+      const cleanUrlForPageSpeed = targetUrl.trim();
+      const pageSpeedUrl = `https://pagespeedonline.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(cleanUrlForPageSpeed)}&category=performance`;
+      
+      addLog('Launching Google Lighthouse remote performance engine...', 'info');
+      
+      fetch(pageSpeedUrl)
+        .then(res => res.json())
+        .then(data => {
+          if (data && data.lighthouseResult) {
+            const result = data.lighthouseResult;
+            const perfScore = Math.round((result.categories.performance?.score || 0) * 100);
+            
+            const fcp = result.audits['first-contentful-paint']?.numericValue || 0;
+            const lcp = result.audits['largest-contentful-paint']?.numericValue || 0;
+            const tbt = result.audits['total-blocking-time']?.numericValue || 0;
+            const cls = result.audits['cumulative-layout-shift']?.numericValue || 0;
+            const speedIndex = result.audits['speed-index']?.numericValue || 0;
+
+            setLighthouseMetrics({
+              score: perfScore,
+              fcp: Math.round(fcp),
+              lcp: Math.round(lcp),
+              tbt: Math.round(tbt),
+              cls: Number(cls.toFixed(3)),
+              speedIndex: Math.round(speedIndex)
+            });
+            
+            addLog(`Google Lighthouse Mobile Score: ${perfScore}/100`, 'success');
+          } else {
+            addLog('Lighthouse API returned unexpected format. Falling back to synthetic estimation.', 'error');
+          }
+        })
+        .catch(err => {
+          addLog(`Lighthouse engine connection failed: ${err.message}. Using synthetic estimation.`, 'error');
+        })
+        .finally(() => {
+          setIsLoadingLighthouse(false);
+        });
 
       if (detectData.theme?.originalName) addLog(`Original Theme Match: ${detectData.theme.originalName}`, 'success');
       if (detectData.theme?.name) addLog(`Theme renamed to: ${detectData.theme.name}`, 'info');
@@ -913,9 +971,21 @@ Report generated on Code Commandos Speed Audit Suite.`;
               className={auditStyles.btnPrimary + " h-10 px-6 flex items-center justify-center gap-2 shrink-0"}
             >
               {scanStatus === 'detecting' || scanStatus === 'fetching_products' || scanStatus === 'mapping_collections' ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <Loader2 className="w-4 h-4 animate-spin text-black" />
               ) : (
-                <Play className="w-4 h-4 fill-current" />
+                <svg 
+                  className="w-4 h-4 text-black" 
+                  viewBox="0 0 24 24" 
+                  fill="none" 
+                  stroke="currentColor" 
+                  strokeWidth="2.5" 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round"
+                  style={{ animation: 'spin 3s linear infinite' }}
+                >
+                  <path d="M21 12a9 9 0 0 1-9 9m9-9a9 9 0 0 0-9-9m9 9H3m9-9a9 9 0 0 0-9 9m9 9a9 9 0 0 1-9-9m9 9V3" />
+                  <circle cx="12" cy="12" r="3" fill="currentColor" className="animate-pulse" />
+                </svg>
               )}
               <span>Analyze Site</span>
             </button>
@@ -1431,6 +1501,63 @@ Report generated on Code Commandos Speed Audit Suite.`;
                       <span className="text-sm font-bold text-blue-400">{techInfo.speedMetrics.preloadCount} assets</span>
                     </div>
                   </div>
+                </div>
+              )}
+
+              {/* Real Google Lighthouse Audit Results Card */}
+              {(isLoadingLighthouse || lighthouseMetrics) && (
+                <div className={auditStyles.cardContainer}>
+                  <div className="flex justify-between items-center border-b border-glass-border pb-1">
+                    <span className="text-[10px] text-gray-400 font-extrabold uppercase tracking-wider block">
+                      Google Lighthouse Core Web Vitals
+                    </span>
+                    <span className="px-2 py-0.5 bg-green-500/10 text-green-400 border border-green-500/20 rounded text-[9px] font-black tracking-widest uppercase">
+                      Official API
+                    </span>
+                  </div>
+
+                  {isLoadingLighthouse ? (
+                    <div className="py-8 flex flex-col items-center justify-center space-y-3">
+                      <Loader2 className="w-8 h-8 animate-spin text-green-400" />
+                      <div className="text-center">
+                        <p className="text-xs font-extrabold text-green-400 uppercase tracking-widest animate-pulse">Lighthouse Audit in Progress...</p>
+                        <p className="text-[10px] text-gray-500 mt-1">Google PageSpeed Server is running performance audits on the target domain.</p>
+                      </div>
+                    </div>
+                  ) : lighthouseMetrics ? (
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4 pt-2">
+                      <div className="p-3 bg-black/40 border border-glass-border rounded-xl">
+                        <span className="text-[9px] text-gray-500 block uppercase font-bold">First Contentful Paint</span>
+                        <span className="text-sm font-bold text-white font-mono">{(lighthouseMetrics.fcp / 1000).toFixed(2)}s</span>
+                        <span className="text-[9px] text-green-400 block mt-0.5">FCP</span>
+                      </div>
+                      <div className="p-3 bg-black/40 border border-glass-border rounded-xl">
+                        <span className="text-[9px] text-gray-500 block uppercase font-bold">Largest Contentful Paint</span>
+                        <span className="text-sm font-bold text-white font-mono">{(lighthouseMetrics.lcp / 1000).toFixed(2)}s</span>
+                        <span className="text-[9px] text-green-400 block mt-0.5">LCP</span>
+                      </div>
+                      <div className="p-3 bg-black/40 border border-glass-border rounded-xl">
+                        <span className="text-[9px] text-gray-500 block uppercase font-bold">Total Blocking Time</span>
+                        <span className="text-sm font-bold text-white font-mono">{lighthouseMetrics.tbt} ms</span>
+                        <span className="text-[9px] text-green-400 block mt-0.5">TBT</span>
+                      </div>
+                      <div className="p-3 bg-black/40 border border-glass-border rounded-xl">
+                        <span className="text-[9px] text-gray-500 block uppercase font-bold">Cumulative Layout Shift</span>
+                        <span className="text-sm font-bold text-white font-mono">{lighthouseMetrics.cls}</span>
+                        <span className="text-[9px] text-green-400 block mt-0.5">CLS</span>
+                      </div>
+                      <div className="p-3 bg-black/40 border border-glass-border rounded-xl">
+                        <span className="text-[9px] text-gray-500 block uppercase font-bold">Speed Index</span>
+                        <span className="text-sm font-bold text-white font-mono">{(lighthouseMetrics.speedIndex / 1000).toFixed(2)}s</span>
+                        <span className="text-[9px] text-green-400 block mt-0.5">SI</span>
+                      </div>
+                      <div className="p-3 bg-black/40 border border-glass-border rounded-xl">
+                        <span className="text-[9px] text-gray-500 block uppercase font-bold">Lighthouse Score</span>
+                        <span className={`text-sm font-black font-mono ${lighthouseMetrics.score >= 90 ? 'text-green-400' : lighthouseMetrics.score >= 70 ? 'text-yellow-400' : 'text-red-400'}`}>{lighthouseMetrics.score}/100</span>
+                        <span className="text-[9px] text-gray-500 block mt-0.5">Performance</span>
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               )}
 
