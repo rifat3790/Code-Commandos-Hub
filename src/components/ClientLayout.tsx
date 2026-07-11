@@ -111,6 +111,18 @@ function ProtectedMainContent({ children }: { children: React.ReactNode }) {
     );
   }
 
+  // Track usage history
+  useEffect(() => {
+    if (isHydrated && dbUser && currentMenuName) {
+      // Use fire-and-forget fetch to log usage
+      fetch('/api/users/usage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ firebaseUid: dbUser.firebaseUid, path: currentMenuName })
+      }).catch(err => console.error("Usage tracking error:", err));
+    }
+  }, [currentMenuName, isHydrated, dbUser?.firebaseUid]);
+
   return (
     <AnimatePresence mode="wait">
       <motion.div

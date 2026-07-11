@@ -2,10 +2,11 @@
 
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { ShieldAlert, Check, X, Database, Phone, Video, Palette, Type, Square } from 'lucide-react';
+import { ShieldAlert, Check, X, Database, Phone, Video, Palette, Type, Square, Calendar } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useWorkspaceStore } from '@/store/workspaceStore';
 import { useCall } from '@/context/CallContext';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const allAvailableMenus = [
   'Home', 'Workspace', 'Order Tracker', 'Personal Projects', 'Message Helper', 'Templates', 'Schema Builder',
@@ -18,7 +19,10 @@ export default function AdminDashboard() {
   const { startCall } = useCall();
   const router = useRouter();
   
-  const [activeTab, setActiveTab] = useState<'pending' | 'shopify' | 'users' | 'menus' | 'storage' | 'active-users' | 'styles'>('pending');
+  const [activeTab, setActiveTab] = useState<'pending' | 'shopify' | 'users' | 'menus' | 'storage' | 'active-users' | 'styles' | 'usage'>('pending');
+  const [selectedUserUsage, setSelectedUserUsage] = useState<any>(null);
+  const [isUsageModalOpen, setIsUsageModalOpen] = useState(false);
+  
   const [activeVisitors, setActiveVisitors] = useState<{count: number, list: any[]}>({ count: 0, list: [] });
   const [loadingActive, setLoadingActive] = useState(false);
   const [pendingChanges, setPendingChanges] = useState<any[]>([]);
@@ -308,6 +312,12 @@ export default function AdminDashboard() {
               className={`px-5 py-3 text-xs uppercase font-extrabold ${activeTab === 'storage' ? 'text-green-400 border-b-2 border-green-500' : 'text-gray-500 hover:text-white'}`}
             >
               Storage Stats
+            </button>
+            <button
+              onClick={() => setActiveTab('usage')}
+              className={`px-5 py-3 text-xs uppercase font-extrabold ${activeTab === 'usage' ? 'text-green-400 border-b-2 border-green-500' : 'text-gray-500 hover:text-white'}`}
+            >
+              Usage History
             </button>
           </>
         )}
@@ -882,7 +892,96 @@ export default function AdminDashboard() {
 
           </div>
         </div>
+      ) : activeTab === 'usage' ? (
+        <div className="space-y-6">
+          <div className="bg-gray-900 border border-glass-border p-4 rounded-xl space-y-4">
+            <h2 className="text-white font-bold text-sm uppercase tracking-wider">User Usage History</h2>
+            <p className="text-xs text-gray-400">View what pages users have visited by date.</p>
+          </div>
+          <div className="relative w-full md:w-1/2 mb-4">
+            <input
+              type="text"
+              placeholder="Search users..."
+              value={userSearch}
+              onChange={(e) => setUserSearch(e.target.value)}
+              className="w-full px-4 py-2 bg-gray-900 border border-glass-border rounded-lg text-sm text-white focus:outline-none focus:border-green-500 transition-colors"
+            />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {allUsers
+              .filter(u => 
+                u.email?.toLowerCase().includes(userSearch.toLowerCase()) || 
+                u.name?.toLowerCase().includes(userSearch.toLowerCase()) ||
+                u.teamName?.toLowerCase().includes(userSearch.toLowerCase())
+              )
+              .map((u) => (
+              <div key={u._id} className="p-4 bg-gray-900 border border-glass-border rounded-xl flex flex-col justify-between space-y-4 hover:border-brand-green transition-colors">
+                <div>
+                  <h3 className="font-bold text-white text-sm truncate">{u.name || u.email}</h3>
+                  <p className="text-xs text-gray-400 mt-1">{u.email}</p>
+                  {u.teamName && <p className="text-[10px] text-gray-500 mt-1 uppercase">Team: {u.teamName}</p>}
+                </div>
+                <button
+                  onClick={() => { setSelectedUserUsage(u); setIsUsageModalOpen(true); }}
+                  className="w-full py-2 bg-brand-green/10 text-brand-green text-xs font-bold rounded hover:bg-brand-green/20 transition-colors uppercase border border-brand-green/20"
+                >
+                  View History
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
       ) : null}
+
+      {/* Usage History Modal */}
+      <AnimatePresence>
+        {isUsageModalOpen && selectedUserUsage && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ scale: 0.95 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.95 }}
+              className="bg-gray-900 border border-glass-border rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl max-h-[85vh] flex flex-col"
+            >
+              <div className="flex items-center justify-between p-4 border-b border-glass-border bg-gray-950">
+                <h3 className="font-bold text-white uppercase text-sm">
+                  Usage History: <span className="text-brand-green">{selectedUserUsage.name || selectedUserUsage.email}</span>
+                </h3>
+                <button onClick={() => setIsUsageModalOpen(false)} className="p-1 hover:bg-white/10 rounded transition-colors">
+                  <X className="w-5 h-5 text-gray-400" />
+                </button>
+              </div>
+              <div className="p-4 overflow-y-auto flex-1 space-y-4">
+                {(!selectedUserUsage.usageHistory || selectedUserUsage.usageHistory.length === 0) ? (
+                  <p className="text-gray-500 text-sm text-center py-8">No usage history recorded yet.</p>
+                ) : (
+                  [...selectedUserUsage.usageHistory].reverse().map((record: any, i: number) => (
+                    <div key={i} className="bg-black/40 border border-glass-border rounded-xl p-4 transition-all hover:bg-black/60">
+                      <h4 className="font-bold text-white text-xs uppercase tracking-wider mb-3 flex items-center gap-2">
+                        <Calendar className="w-4 h-4 text-brand-green" /> {record.date}
+                      </h4>
+                      <div className="flex flex-wrap gap-2">
+                        {record.pages && record.pages.length > 0 ? record.pages.map((page: string, idx: number) => (
+                          <span key={idx} className="px-2.5 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-xs text-gray-300 font-medium">
+                            {page}
+                          </span>
+                        )) : (
+                          <span className="text-xs text-gray-500 italic">No specific pages logged for this day.</span>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
