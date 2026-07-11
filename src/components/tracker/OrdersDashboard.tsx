@@ -938,73 +938,6 @@ export default function OrdersDashboard({ csvData, activeLayout }: { csvData: st
         </div>
       </div>
 
-      {/* Team Workload Breakdown Card Panel - Premium and Interactive */}
-      {teamWorkload.length > 0 && (
-        <div className="glass-panel p-5 space-y-4">
-          <div className="flex justify-between items-center border-b border-glass-border pb-3">
-            <div>
-              <h3 className="text-sm font-extrabold uppercase tracking-wider text-purple-400 flex items-center gap-2">
-                <Activity className="w-4 h-4 text-purple-400 animate-pulse" />
-                <span>Team Workload & Active Assignment Metrics</span>
-              </h3>
-              <p className="text-xs text-gray-500 mt-0.5">Real-time status of active WIP orders, workload load factor, and pipeline value distribution per team.</p>
-            </div>
-            <div className="px-3 py-1 bg-white/5 border border-glass-border rounded-xl text-[10px] text-gray-400 font-mono flex items-center gap-1.5">
-              <Clock className="w-3.5 h-3.5 text-green-400 animate-spin" />
-              <span>Auto-Refresh Active</span>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {teamWorkload.map((tw) => {
-              const maxWip = 8; // Max target WIP threshold
-              const percentage = Math.min(100, (tw.count / maxWip) * 100);
-              const isOverloaded = tw.count >= maxWip;
-
-              return (
-                <div key={tw.team} className="p-4 bg-white/5 border border-glass-border rounded-2xl hover:border-purple-500/30 hover:bg-white/10 transition-all duration-300 group">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <span className="px-2 py-0.5 bg-purple-500/20 text-purple-300 border border-purple-500/30 rounded text-[10px] font-black uppercase tracking-widest font-mono">
-                        Team {tw.team}
-                      </span>
-                      <p className="text-xs text-gray-400 mt-2 truncate max-w-[180px]" title={tw.members}>
-                        Members: <span className="text-gray-300 font-medium">{tw.members || 'None'}</span>
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-lg font-black text-white">{tw.count}</span>
-                      <span className="text-gray-500 text-[10px] block">Active WIP</span>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 space-y-1.5">
-                    <div className="flex justify-between text-[10px] font-bold text-gray-400">
-                      <span>Load Factor</span>
-                      <span className={isOverloaded ? 'text-red-400' : percentage > 70 ? 'text-yellow-400' : 'text-green-400'}>
-                        {Math.round(percentage)}% {isOverloaded ? '(Overloaded)' : ''}
-                      </span>
-                    </div>
-                    <div className="w-full bg-gray-900 rounded-full h-1.5 overflow-hidden">
-                      <div 
-                        className={`h-1.5 rounded-full transition-all duration-500 ${
-                          isOverloaded ? 'bg-red-500' : percentage > 70 ? 'bg-amber-500' : 'bg-gradient-to-r from-green-500 to-emerald-400'
-                        }`}
-                        style={{ width: `${percentage}%` }}
-                      />
-                    </div>
-                    <div className="flex justify-between items-center text-[10px] font-semibold text-gray-500 pt-1">
-                      <span>Active Pipeline Value</span>
-                      <span className="text-yellow-400">${tw.value.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
       {/* Filters Bar */}
       <div className="glass-panel p-4 flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2 mr-2 text-gray-400">
@@ -1085,6 +1018,73 @@ export default function OrdersDashboard({ csvData, activeLayout }: { csvData: st
           </button>
         </div>
       </div>
+
+      {/* Team Workload Breakdown Card Panel - Premium and Interactive */}
+      {teamWorkload.length > 0 && (
+        <div className="glass-panel p-5 space-y-4">
+          <div className="flex justify-between items-center border-b border-glass-border pb-3">
+            <div>
+              <h3 className="text-sm font-extrabold uppercase tracking-wider text-purple-400 flex items-center gap-2">
+                <Activity className="w-4 h-4 text-purple-400 animate-pulse" />
+                <span>Team Workload & Active Assignment Metrics</span>
+              </h3>
+              <p className="text-xs text-gray-500 mt-0.5">Real-time status of active WIP orders, workload load factor, and pipeline value distribution per team.</p>
+            </div>
+            <div className="px-3 py-1 bg-white/5 border border-glass-border rounded-xl text-[10px] text-gray-400 font-mono flex items-center gap-1.5">
+              <Clock className="w-3.5 h-3.5 text-green-400 animate-spin" />
+              <span>Auto-Refresh Active</span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {teamWorkload.map((tw) => {
+              const maxWip = 8; // Max target WIP threshold
+              const percentage = Math.min(100, (tw.count / maxWip) * 100);
+              const isOverloaded = tw.count >= maxWip;
+
+              return (
+                <div key={tw.team} className="p-4 bg-white/5 border border-glass-border rounded-2xl hover:border-purple-500/30 hover:bg-white/10 transition-all duration-300 group">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <span className="px-2 py-0.5 bg-purple-500/20 text-purple-300 border border-purple-500/30 rounded text-[10px] font-black uppercase tracking-widest font-mono">
+                        Team {tw.team}
+                      </span>
+                      <p className="text-xs text-gray-400 mt-2 truncate max-w-[180px]" title={tw.members}>
+                        Members: <span className="text-gray-300 font-medium">{tw.members || 'None'}</span>
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-lg font-black text-white">{tw.count}</span>
+                      <span className="text-gray-500 text-[10px] block">Active WIP</span>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 space-y-1.5">
+                    <div className="flex justify-between text-[10px] font-bold text-gray-400">
+                      <span>Load Factor</span>
+                      <span className={isOverloaded ? 'text-red-400' : percentage > 70 ? 'text-yellow-400' : 'text-green-400'}>
+                        {Math.round(percentage)}% {isOverloaded ? '(Overloaded)' : ''}
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-900 rounded-full h-1.5 overflow-hidden">
+                      <div 
+                        className={`h-1.5 rounded-full transition-all duration-500 ${
+                          isOverloaded ? 'bg-red-500' : percentage > 70 ? 'bg-amber-500' : 'bg-gradient-to-r from-green-500 to-emerald-400'
+                        }`}
+                        style={{ width: `${percentage}%` }}
+                      />
+                    </div>
+                    <div className="flex justify-between items-center text-[10px] font-semibold text-gray-500 pt-1">
+                      <span>Active Pipeline Value</span>
+                      <span className="text-yellow-400">${tw.value.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Main Table */}
       <div ref={tableRef} className={layoutStyles.container}>
