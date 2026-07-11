@@ -170,6 +170,15 @@ export default function AdminDashboard() {
     fetchUsers();
   };
 
+  const handleToggleWorkloadPermission = async (userId: string, currentAllowed: boolean) => {
+    await fetch('/api/users/roles', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ promoterUid: user?.uid, targetUserId: userId, showWorkloadMetrics: !currentAllowed })
+    });
+    fetchUsers();
+  };
+
   const handleSaveUserPermissions = async (userId: string, menus: string[] | null) => {
     await fetch('/api/users/roles', {
       method: 'POST',
@@ -416,6 +425,15 @@ export default function AdminDashboard() {
                       className={`px-2 py-0.5 rounded font-extrabold uppercase text-[9px] border transition-colors ${u.callingAllowed !== false ? 'bg-green-500/10 border-green-500/20 text-green-400 hover:bg-green-500/20' : 'bg-red-500/10 border-red-500/20 text-red-400 hover:bg-red-500/20'}`}
                     >
                       {u.callingAllowed !== false ? 'Allowed' : 'Blocked'}
+                    </button>
+                  </div>
+                  <div className="flex items-center justify-between text-xs text-gray-500 mt-2 pt-2 border-t border-white/5">
+                    <span>Workload Metrics:</span>
+                    <button
+                      onClick={() => handleToggleWorkloadPermission(u._id, u.showWorkloadMetrics !== false)}
+                      className={`px-2 py-0.5 rounded font-extrabold uppercase text-[9px] border transition-colors ${u.showWorkloadMetrics !== false ? 'bg-green-500/10 border-green-500/20 text-green-400 hover:bg-green-500/20' : 'bg-red-500/10 border-red-500/20 text-red-400 hover:bg-red-500/20'}`}
+                    >
+                      {u.showWorkloadMetrics !== false ? 'Allowed' : 'Blocked'}
                     </button>
                   </div>
                   <div className="flex items-center justify-between text-xs text-gray-500 mt-2 pt-2 border-t border-white/5">

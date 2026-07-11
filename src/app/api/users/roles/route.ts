@@ -14,7 +14,7 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const { promoterUid, targetUserId, newRole, callingAllowed, allowedMenus } = await req.json();
+    const { promoterUid, targetUserId, newRole, callingAllowed, allowedMenus, showWorkloadMetrics } = await req.json();
 
     if (!promoterUid || !targetUserId) {
       return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });
@@ -36,6 +36,9 @@ export async function POST(req: Request) {
     }
     if (callingAllowed !== undefined) {
       updateObj.callingAllowed = callingAllowed;
+    }
+    if (showWorkloadMetrics !== undefined) {
+      updateObj.showWorkloadMetrics = showWorkloadMetrics;
     }
     if (allowedMenus !== undefined) {
       updateObj.allowedMenus = allowedMenus === null ? undefined : allowedMenus;
