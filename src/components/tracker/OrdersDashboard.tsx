@@ -156,7 +156,7 @@ function MultiSelectDropdown({
   );
 }
 
-export default function OrdersDashboard({ csvData }: { csvData: string }) {
+export default function OrdersDashboard({ csvData, activeLayout }: { csvData: string; activeLayout?: string }) {
   const { user, dbUser } = useAuth();
   const [data, setData] = useState<any[]>([]);
   const [allColumns, setAllColumns] = useState<string[]>([]);
@@ -174,6 +174,128 @@ export default function OrdersDashboard({ csvData }: { csvData: string }) {
   const [deliveryDateFilter, setDeliveryDateFilter] = useState<string[]>([]);
 
   const [isSavingFilter, setIsSavingFilter] = useState(false);
+
+  // Layout Classes Map
+  const layoutStyles = useMemo(() => {
+    const layout = activeLayout || 'default';
+    switch (layout) {
+      case 'slate':
+        return {
+          container: "bg-gray-900 border border-gray-800 rounded-none shadow-none",
+          headerBg: "bg-[#0b0f19] text-gray-300 font-bold uppercase tracking-widest text-[11px] border-b border-gray-800",
+          headerCell: "px-5 py-3.5 text-gray-300 font-bold text-[11px] uppercase tracking-widest",
+          rowClass: "hover:bg-gray-800/40 border-b border-gray-800/60 transition-colors group even:bg-gray-900/10 odd:bg-gray-950/5",
+          cellText: "text-gray-300 font-normal",
+          idBadge: "font-mono text-xs px-2 py-0.5 bg-gray-800 border border-gray-700 text-gray-300 rounded-none",
+          statusWip: "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-none px-2 py-0.5",
+          statusCancel: "bg-rose-500/10 text-rose-400 border border-rose-500/20 rounded-none px-2 py-0.5",
+          statusDone: "bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-none px-2 py-0.5",
+          statusDefault: "bg-gray-800 text-gray-400 border border-gray-700 rounded-none px-2 py-0.5",
+          linkBtn: "inline-flex items-center gap-1 px-2.5 py-1 bg-gray-850 text-gray-300 border border-gray-700 hover:bg-gray-750 hover:text-white transition-all text-xs font-semibold rounded-none",
+          timelineLate: "bg-rose-600 text-white border border-rose-500 px-2 py-0.5 rounded-none font-bold text-xs uppercase animate-pulse",
+          timelineCancel: "text-gray-500 font-bold",
+          timelineDone: "text-gray-400 font-bold",
+          timelineS: "text-rose-500 font-bold",
+          timelineS2: "text-amber-500 font-bold",
+          timelineSafe: "text-emerald-500 font-medium",
+          timelineDefault: "text-gray-400 font-medium",
+          timelineHeaderCell: "px-5 py-3.5 text-gray-300 font-bold text-[11px] uppercase tracking-widest text-center sticky right-0 bg-[#0b0f19] z-10 shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.3)] border-l border-gray-800",
+          timelineRowCell: "px-5 py-3 sticky right-0 bg-gray-900 group-hover:bg-[#1f2937]/50 z-10 shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.3)] border-l border-gray-800 transition-colors"
+        };
+      case 'aurora':
+        return {
+          container: "glass-panel overflow-hidden border border-indigo-500/20 rounded-3xl shadow-[0_8px_32px_rgba(99,102,241,0.15)]",
+          headerBg: "bg-gradient-to-r from-blue-950/40 via-indigo-950/30 to-purple-950/40 text-indigo-200 border-b border-indigo-500/20",
+          headerCell: "px-5 py-4 text-indigo-300 font-semibold text-xs tracking-wider uppercase",
+          rowClass: "hover:bg-gradient-to-r hover:from-blue-500/5 hover:to-indigo-500/5 border-b border-indigo-500/10 transition-all duration-300 even:bg-indigo-950/5 odd:bg-purple-950/5",
+          cellText: "text-gray-300 font-medium",
+          idBadge: "font-mono text-xs px-2.5 py-1 bg-gradient-to-r from-blue-500/10 to-indigo-500/10 border border-indigo-500/30 text-indigo-300 rounded-xl",
+          statusWip: "bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 rounded-full px-3 py-1 shadow-[0_0_10px_rgba(16,185,129,0.1)]",
+          statusCancel: "bg-rose-500/10 text-rose-300 border border-rose-500/30 rounded-full px-3 py-1 shadow-[0_0_10px_rgba(244,63,94,0.1)]",
+          statusDone: "bg-purple-500/10 text-purple-300 border border-purple-500/30 rounded-full px-3 py-1 shadow-[0_0_10px_rgba(168,85,247,0.1)]",
+          statusDefault: "bg-gray-800/40 text-gray-400 border border-gray-700/30 rounded-full px-3 py-1",
+          linkBtn: "inline-flex items-center gap-1 px-3 py-1.5 bg-gradient-to-r from-blue-600/20 to-indigo-600/20 text-indigo-300 hover:text-white border border-indigo-500/30 hover:border-indigo-500/60 rounded-xl transition-all duration-300 text-xs font-semibold hover:scale-[1.02] shadow-[0_2px_8px_rgba(99,102,241,0.1)]",
+          timelineLate: "bg-gradient-to-r from-rose-500/20 to-pink-500/20 text-rose-300 border border-rose-500/40 px-3 py-1.5 rounded-full font-bold text-xs uppercase animate-pulse shadow-[0_0_12px_rgba(244,63,94,0.2)]",
+          timelineCancel: "text-gray-400 font-bold",
+          timelineDone: "text-indigo-400 font-bold",
+          timelineS: "text-rose-400 font-bold drop-shadow-[0_0_8px_rgba(244,63,94,0.3)] animate-pulse",
+          timelineS2: "text-amber-400 font-semibold drop-shadow-[0_0_8px_rgba(251,191,36,0.2)]",
+          timelineSafe: "text-emerald-400 font-medium drop-shadow-[0_0_8px_rgba(16,185,129,0.15)]",
+          timelineDefault: "text-indigo-300/80 font-medium",
+          timelineHeaderCell: "px-5 py-4 text-indigo-300 font-semibold text-xs tracking-wider uppercase text-center sticky right-0 bg-[#0f111a] z-10 shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.5)] border-l border-indigo-500/20",
+          timelineRowCell: "px-5 py-3 sticky right-0 bg-[#121422] group-hover:bg-[#1a1e35] z-10 shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.4)] border-l border-indigo-500/20 transition-colors"
+        };
+      case 'cyber':
+        return {
+          container: "bg-[#05070a] border border-emerald-500/20 rounded-none shadow-[0_0_20px_rgba(16,185,129,0.05)]",
+          headerBg: "bg-black text-emerald-400 font-mono tracking-widest text-xs uppercase border-b-2 border-emerald-500/30",
+          headerCell: "px-5 py-4 text-emerald-400 font-mono tracking-wider text-xs uppercase",
+          rowClass: "hover:bg-emerald-950/10 hover:shadow-[inset_4px_0_0_0_#10b981] border-b border-emerald-500/5 transition-all duration-200 font-mono text-gray-300",
+          cellText: "text-gray-300 font-mono text-xs",
+          idBadge: "font-mono text-xs px-2 py-0.5 bg-black border border-emerald-500/30 text-emerald-400",
+          statusWip: "bg-emerald-950 text-emerald-400 border border-emerald-500/50 rounded-none px-2 py-0.5",
+          statusCancel: "bg-red-950 text-red-400 border border-red-500/50 rounded-none px-2 py-0.5",
+          statusDone: "bg-purple-950 text-purple-400 border border-purple-500/50 rounded-none px-2 py-0.5",
+          statusDefault: "bg-gray-900 text-gray-400 border border-gray-700 rounded-none px-2 py-0.5",
+          linkBtn: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-black text-emerald-400 border border-emerald-500/30 hover:bg-emerald-950 hover:border-emerald-500 transition-colors text-xs font-mono",
+          timelineLate: "bg-red-950 text-red-400 border border-red-500 px-3 py-1 font-bold text-xs uppercase animate-pulse",
+          timelineCancel: "text-gray-500 font-bold",
+          timelineDone: "text-emerald-450 font-bold",
+          timelineS: "text-red-505 font-bold animate-pulse",
+          timelineS2: "text-yellow-505 font-semibold",
+          timelineSafe: "text-emerald-400 font-medium",
+          timelineDefault: "text-gray-500 font-medium",
+          timelineHeaderCell: "px-5 py-4 text-emerald-400 font-mono tracking-wider text-xs uppercase text-center sticky right-0 bg-black z-10 border-l border-emerald-500/20",
+          timelineRowCell: "px-5 py-3 sticky right-0 bg-black group-hover:bg-emerald-950/20 z-10 border-l border-emerald-500/20 transition-colors"
+        };
+      case 'gold':
+        return {
+          container: "bg-[#0b0b0b] border border-amber-500/20 rounded-xl shadow-[0_8px_30px_rgba(217,119,6,0.05)]",
+          headerBg: "bg-[#141414] text-amber-300 font-bold uppercase tracking-wider text-[11px] border-b border-amber-500/20",
+          headerCell: "px-5 py-4.5 text-amber-300 font-bold text-[11px] uppercase tracking-wider",
+          rowClass: "hover:bg-amber-500/5 hover:shadow-[inset_4px_0_0_0_#d97706] border-b border-amber-500/10 transition-all duration-300 even:bg-[#111111]/30 odd:bg-black/40",
+          cellText: "text-gray-200 font-medium",
+          idBadge: "font-mono text-xs px-2.5 py-1 bg-black border border-amber-500/30 text-amber-200 rounded-lg",
+          statusWip: "bg-amber-500/10 text-amber-400 border border-amber-500/30 rounded-md px-2.5 py-1",
+          statusCancel: "bg-red-500/10 text-red-400 border border-red-500/30 rounded-md px-2.5 py-1",
+          statusDone: "bg-[#d97706]/10 text-amber-200 border border-amber-600/30 rounded-md px-2.5 py-1",
+          statusDefault: "bg-gray-800 text-gray-400 border border-gray-700 rounded-md px-2.5 py-1",
+          linkBtn: "inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#1a1a1a] text-amber-300 border border-amber-500/20 hover:border-amber-500 hover:bg-amber-500 hover:text-black rounded-lg transition-all duration-300 text-xs font-semibold shadow-sm",
+          timelineLate: "bg-gradient-to-r from-red-600/20 to-amber-600/20 text-red-400 border border-red-500/40 px-3 py-1 rounded-full font-bold text-xs uppercase animate-pulse shadow-[0_0_10px_rgba(220,38,38,0.15)]",
+          timelineCancel: "text-gray-500 font-bold",
+          timelineDone: "text-amber-200 font-bold",
+          timelineS: "text-red-400 font-bold animate-pulse",
+          timelineS2: "text-amber-400 font-semibold",
+          timelineSafe: "text-amber-200/90 font-medium",
+          timelineDefault: "text-gray-400 font-medium",
+          timelineHeaderCell: "px-5 py-4.5 text-amber-300 font-bold text-[11px] uppercase tracking-wider text-center sticky right-0 bg-[#141414] z-10 border-l border-amber-500/20 shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.5)]",
+          timelineRowCell: "px-5 py-3 sticky right-0 bg-[#0d0d0d] group-hover:bg-[#181818] z-10 border-l border-amber-500/20 shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.4)] transition-colors"
+        };
+      default: // Neon Glassmorphic (Legacy-like but premium)
+        return {
+          container: "glass-panel overflow-hidden border border-glass-border rounded-xl",
+          headerBg: "bg-gray-900/90 text-gray-300 font-medium border-b border-glass-border",
+          headerCell: "px-5 py-4 tracking-wide text-gray-300 font-medium text-sm",
+          rowClass: "hover:bg-gray-800/60 border-b border-glass-border/30 transition-colors group even:bg-gray-900/5 odd:bg-gray-950/5",
+          cellText: "text-gray-300 font-normal",
+          idBadge: "font-mono text-gray-400 text-xs px-1.5 py-0.5 bg-gray-900/50 rounded",
+          statusWip: "bg-green-500/20 text-green-400 border border-green-500/30 rounded px-2 py-0.5",
+          statusCancel: "bg-red-500/20 text-red-400 border border-red-500/30 rounded px-2 py-0.5",
+          statusDone: "bg-purple-500/20 text-purple-400 border border-purple-500/30 rounded px-2 py-0.5",
+          statusDefault: "bg-gray-500/20 text-gray-400 border border-gray-500/30 rounded px-2 py-0.5",
+          linkBtn: "inline-flex items-center gap-1 px-2 py-1 bg-purple-500/10 text-purple-400 hover:text-purple-300 hover:bg-purple-500/20 rounded-md transition-colors border border-purple-500/20 text-xs font-semibold",
+          timelineLate: "bg-red-600 text-white border border-red-500 shadow-lg shadow-red-600/30 px-3 py-1 rounded-lg font-bold tracking-wide text-xs uppercase animate-pulse",
+          timelineCancel: "text-gray-400 font-bold",
+          timelineDone: "text-gray-400 font-bold",
+          timelineS: "text-red-500 font-extrabold",
+          timelineS2: "text-yellow-400 font-bold",
+          timelineSafe: "text-green-400 font-medium",
+          timelineDefault: "text-gray-300 font-medium",
+          timelineHeaderCell: "px-5 py-4 tracking-wide sticky right-0 bg-gray-900/90 shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.3)] border-l border-glass-border text-purple-300 text-sm font-medium",
+          timelineRowCell: "px-5 py-3 sticky right-0 bg-gray-900 group-hover:bg-gray-800 shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.3)] border-l border-glass-border transition-colors"
+        };
+    }
+  }, [activeLayout]);
 
   useEffect(() => {
     const refreshInterval = setInterval(() => {
@@ -677,18 +799,18 @@ export default function OrdersDashboard({ csvData }: { csvData: string }) {
       </div>
 
       {/* Main Table */}
-      <div ref={tableRef} className="glass-panel overflow-hidden border border-glass-border rounded-xl">
+      <div ref={tableRef} className={layoutStyles.container}>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm whitespace-nowrap">
-            <thead className="bg-gray-900/90 text-gray-300 font-medium border-b border-glass-border">
+            <thead className={layoutStyles.headerBg}>
               <tr>
                 {allColumns.filter(c => visibleColumns.includes(c)).map(col => (
-                  <th key={col} className="px-5 py-4 tracking-wide">{col}</th>
+                  <th key={col} className={layoutStyles.headerCell}>{col}</th>
                 ))}
-                <th className="px-5 py-4 tracking-wide sticky right-0 bg-gray-900/90 shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.3)] border-l border-glass-border text-purple-300">Live Timeline</th>
+                <th className={layoutStyles.timelineHeaderCell}>Live Timeline</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-glass-border">
+            <tbody className="divide-y divide-glass-border/30">
               <AnimatePresence>
                 {filteredData.map((row, idx) => {
                   let displayTimeline = row['_originalTimeline'];
@@ -712,16 +834,16 @@ export default function OrdersDashboard({ csvData }: { csvData: string }) {
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0 }}
                       transition={{ duration: 0.1 }}
-                      className="hover:bg-gray-800/60 transition-colors group"
+                      className={layoutStyles.rowClass}
                     >
                       {allColumns.filter(c => visibleColumns.includes(c)).map(col => {
                         const val = row[col];
 
                         if (col.toLowerCase().includes('link') || col.toLowerCase().includes('sheet') || String(val).startsWith('http')) {
                           return (
-                            <td key={col} className="px-5 py-3 text-gray-300">
+                            <td key={col} className="px-5 py-3">
                               {val && val !== '' ? (
-                                <a href={String(val).startsWith('http') ? val : `https://${val}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 px-2 py-1 bg-purple-500/10 text-purple-400 hover:text-purple-300 hover:bg-purple-500/20 rounded-md transition-colors border border-purple-500/20">
+                                <a href={String(val).startsWith('http') ? val : `https://${val}`} target="_blank" rel="noopener noreferrer" className={layoutStyles.linkBtn}>
                                   Link <ExternalLink className="w-3 h-3" />
                                 </a>
                               ) : (
@@ -734,7 +856,12 @@ export default function OrdersDashboard({ csvData }: { csvData: string }) {
                         if (col.toLowerCase() === 'status') {
                           return (
                             <td key={col} className="px-5 py-3">
-                              <span className={`px-2 py-1 rounded-md text-xs font-semibold border ${getStatusColor(val)} inline-block`}>
+                              <span className={`inline-block font-semibold border ${
+                                (val || '').toLowerCase().includes('wip') ? layoutStyles.statusWip :
+                                (val || '').toLowerCase().includes('cancel') ? layoutStyles.statusCancel :
+                                ((val || '').toLowerCase().includes('done') || (val || '').toLowerCase().includes('complete') || (val || '').toLowerCase().includes('delivered')) ? layoutStyles.statusDone :
+                                layoutStyles.statusDefault
+                              }`}>
                                 {val || 'None'}
                               </span>
                             </td>
@@ -743,25 +870,45 @@ export default function OrdersDashboard({ csvData }: { csvData: string }) {
 
                         if (col.toLowerCase() === 'order id') {
                           return (
-                            <td key={col} className="px-5 py-3 font-mono text-gray-400 text-xs">
-                              {val}
+                            <td key={col} className="px-5 py-3">
+                              <span className={layoutStyles.idBadge}>
+                                {val}
+                              </span>
                             </td>
                           );
                         }
 
                         return (
-                          <td key={col} className="px-5 py-3 text-gray-300">
+                          <td key={col} className={`px-5 py-3 ${layoutStyles.cellText}`}>
                             {val}
                           </td>
                         );
                       })}
 
-                      <td className="px-5 py-3 sticky right-0 bg-gray-900 group-hover:bg-gray-800 shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.3)] border-l border-glass-border transition-colors">
+                      <td className={layoutStyles.timelineRowCell}>
                         <div className="flex items-center gap-2">
-                          {!displayTimeline?.toUpperCase().includes('ORDER LATE') && (
-                            <Clock className={`w-4 h-4 ${getTimelineStyle(displayTimeline)}`} />
+                          {!displayTimeline?.toUpperCase().includes('ORDER LATE') && !displayTimeline?.toUpperCase().includes('CANCEL') && !displayTimeline?.toUpperCase().includes('DONE') && !displayTimeline?.toUpperCase().includes('DELIVERED') && (
+                            <Clock className={`w-4 h-4 ${
+                              displayTimeline?.toLowerCase().includes('order late') ? layoutStyles.timelineLate :
+                              displayTimeline?.toLowerCase().includes('cancel') ? layoutStyles.timelineCancel :
+                              (displayTimeline?.toLowerCase().includes('done') || displayTimeline?.toLowerCase().includes('delivered')) ? layoutStyles.timelineDone :
+                              displayTimeline?.toLowerCase().includes('s') && (!displayTimeline?.toLowerCase().includes('d') || displayTimeline?.toLowerCase().match(/^0d/)) ? layoutStyles.timelineS :
+                              displayTimeline?.toLowerCase().includes('s') && displayTimeline?.toLowerCase().match(/(\d+)d/) && parseInt(displayTimeline?.toLowerCase().match(/(\d+)d/)?.[1] || '0') <= 2 ? layoutStyles.timelineS2 :
+                              displayTimeline?.toLowerCase().includes('day') && parseInt(displayTimeline?.toLowerCase() || '0') <= 2 ? layoutStyles.timelineS2 :
+                              displayTimeline?.toLowerCase().includes('day') || displayTimeline?.toLowerCase().includes('s') ? layoutStyles.timelineSafe :
+                              layoutStyles.timelineDefault
+                            }`} />
                           )}
-                          <span className={`${getTimelineStyle(displayTimeline)} tabular-nums tracking-tight ${displayTimeline?.toUpperCase().includes('ORDER LATE') ? 'inline-block text-center w-full' : ''}`}>
+                          <span className={`${
+                            displayTimeline?.toLowerCase().includes('order late') ? layoutStyles.timelineLate :
+                            displayTimeline?.toLowerCase().includes('cancel') ? layoutStyles.timelineCancel :
+                            (displayTimeline?.toLowerCase().includes('done') || displayTimeline?.toLowerCase().includes('delivered')) ? layoutStyles.timelineDone :
+                            displayTimeline?.toLowerCase().includes('s') && (!displayTimeline?.toLowerCase().includes('d') || displayTimeline?.toLowerCase().match(/^0d/)) ? layoutStyles.timelineS :
+                            displayTimeline?.toLowerCase().includes('s') && displayTimeline?.toLowerCase().match(/(\d+)d/) && parseInt(displayTimeline?.toLowerCase().match(/(\d+)d/)?.[1] || '0') <= 2 ? layoutStyles.timelineS2 :
+                            displayTimeline?.toLowerCase().includes('day') && parseInt(displayTimeline?.toLowerCase() || '0') <= 2 ? layoutStyles.timelineS2 :
+                            displayTimeline?.toLowerCase().includes('day') || displayTimeline?.toLowerCase().includes('s') ? layoutStyles.timelineSafe :
+                            layoutStyles.timelineDefault
+                          } tabular-nums tracking-tight ${displayTimeline?.toUpperCase().includes('ORDER LATE') ? 'inline-block text-center w-full' : ''}`}>
                             {displayTimeline}
                           </span>
                         </div>

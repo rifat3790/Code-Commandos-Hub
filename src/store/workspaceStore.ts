@@ -20,7 +20,7 @@ interface WorkspaceState {
   downloads: DownloadItem[];
   credentials: StoreCredential[];
   memberProfile: MemberProfile;
-  settings: { enabledMenus: string[], adminEnabledMenus?: string[], userEnabledMenus?: string[] };
+  settings: { enabledMenus: string[], adminEnabledMenus?: string[], userEnabledMenus?: string[], trackerLayout?: string };
   isHydrated: boolean;
   pendingModal: { isOpen: boolean; message: string };
 
@@ -55,7 +55,7 @@ interface WorkspaceState {
 
   updateProfile: (updates: Partial<MemberProfile>) => Promise<void>;
   logActivity: (title: string, type: RecentActivity['type'], details: string) => Promise<void>;
-  updateSettings: (settings: { enabledMenus?: string[], adminEnabledMenus?: string[], userEnabledMenus?: string[] }) => Promise<void>;
+  updateSettings: (settings: { enabledMenus?: string[], adminEnabledMenus?: string[], userEnabledMenus?: string[], trackerLayout?: string }) => Promise<void>;
   exportBackup: () => string;
   importBackup: (dataStr: string) => boolean;
 }

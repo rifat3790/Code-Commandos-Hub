@@ -125,7 +125,7 @@ function MultiSelectDropdown({
   );
 }
 
-export default function IssuesDashboard({ csvData }: { csvData: string }) {
+export default function IssuesDashboard({ csvData, activeLayout }: { csvData: string; activeLayout?: string }) {
   const { user, dbUser } = useAuth();
   const [data, setData] = useState<any[]>([]);
   const [allColumns, setAllColumns] = useState<string[]>([]);
@@ -141,6 +141,103 @@ export default function IssuesDashboard({ csvData }: { csvData: string }) {
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
   const [assignTeamFilter, setAssignTeamFilter] = useState<string[]>([]);
   const [nameFilter, setNameFilter] = useState<string[]>([]);
+
+  // Layout Classes Map
+  const layoutStyles = useMemo(() => {
+    const layout = activeLayout || 'default';
+    switch (layout) {
+      case 'slate':
+        return {
+          container: "bg-gray-900 border border-gray-800 rounded-none shadow-none",
+          headerBg: "bg-[#0b0f19] text-gray-300 font-bold uppercase tracking-widest text-[11px] border-b border-gray-800",
+          headerCell: "px-5 py-3.5 text-gray-300 font-bold text-[11px] uppercase tracking-widest",
+          rowClass: "hover:bg-gray-800/40 border-b border-gray-800/60 transition-colors group even:bg-gray-900/10 odd:bg-gray-950/5",
+          cellText: "text-gray-300 font-normal",
+          dateText: "font-mono text-xs text-gray-400",
+          teamBadge: "px-2 py-0.5 bg-gray-800 border border-gray-700 text-gray-400 rounded-none text-xs",
+          statusOpen: "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-none px-2 py-0.5",
+          statusClose: "bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-none px-2 py-0.5",
+          statusIssue: "bg-rose-500/10 text-rose-400 border border-rose-500/20 rounded-none px-2 py-0.5",
+          statusDefault: "bg-gray-800 text-gray-400 border border-gray-700 rounded-none px-2 py-0.5",
+          urgencyHigh: "bg-rose-500/10 text-rose-455 border border-rose-500/20 px-2 py-0.5 rounded-none font-bold text-xs",
+          urgencyMedium: "bg-amber-500/10 text-amber-455 border border-amber-500/20 px-2 py-0.5 rounded-none font-semibold text-xs",
+          urgencyLow: "bg-blue-500/10 text-blue-455 border border-blue-500/20 px-2 py-0.5 rounded-none text-xs",
+          linkBtn: "inline-flex items-center gap-1 px-2.5 py-1 bg-gray-850 text-gray-300 border border-gray-700 hover:bg-gray-750 hover:text-white transition-all text-xs font-semibold rounded-none"
+        };
+      case 'aurora':
+        return {
+          container: "glass-panel overflow-hidden border border-indigo-500/20 rounded-3xl shadow-[0_8px_32px_rgba(99,102,241,0.15)]",
+          headerBg: "bg-gradient-to-r from-blue-950/40 via-indigo-950/30 to-purple-950/40 text-indigo-200 border-b border-indigo-500/20",
+          headerCell: "px-5 py-4 text-indigo-300 font-semibold text-xs tracking-wider uppercase",
+          rowClass: "hover:bg-gradient-to-r hover:from-blue-500/5 hover:to-indigo-500/5 border-b border-indigo-500/10 transition-all duration-300 even:bg-indigo-950/5 odd:bg-purple-950/5",
+          cellText: "text-gray-300 font-medium",
+          dateText: "font-mono text-xs text-indigo-300/75",
+          teamBadge: "px-2.5 py-0.5 bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 rounded-full text-xs",
+          statusOpen: "bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 rounded-full px-3 py-1 shadow-[0_0_10px_rgba(16,185,129,0.1)]",
+          statusClose: "bg-purple-500/10 text-purple-300 border border-purple-500/30 rounded-full px-3 py-1 shadow-[0_0_10px_rgba(168,85,247,0.1)]",
+          statusIssue: "bg-rose-500/10 text-rose-300 border border-rose-500/30 rounded-full px-3 py-1 shadow-[0_0_10px_rgba(244,63,94,0.1)]",
+          statusDefault: "bg-gray-850 text-gray-400 border border-gray-700/30 rounded-full px-3 py-1",
+          urgencyHigh: "bg-rose-500/10 text-rose-300 border border-rose-500/30 px-2.5 py-1 rounded-full font-bold animate-pulse text-xs",
+          urgencyMedium: "bg-amber-500/10 text-amber-300 border border-amber-500/30 px-2.5 py-1 rounded-full font-semibold text-xs",
+          urgencyLow: "bg-blue-500/10 text-blue-300 border border-blue-500/30 px-2.5 py-1 rounded-full text-xs",
+          linkBtn: "inline-flex items-center gap-1 px-3 py-1.5 bg-gradient-to-r from-blue-600/20 to-indigo-600/20 text-indigo-300 hover:text-white border border-indigo-500/30 hover:border-indigo-500/60 rounded-xl transition-all duration-300 text-xs font-semibold hover:scale-[1.02] shadow-[0_2px_8px_rgba(99,102,241,0.1)]"
+        };
+      case 'cyber':
+        return {
+          container: "bg-[#05070a] border border-emerald-500/20 rounded-none shadow-[0_0_20px_rgba(16,185,129,0.05)]",
+          headerBg: "bg-black text-emerald-400 font-mono tracking-widest text-xs uppercase border-b-2 border-emerald-500/30",
+          headerCell: "px-5 py-4 text-emerald-400 font-mono tracking-wider text-xs uppercase",
+          rowClass: "hover:bg-emerald-950/10 hover:shadow-[inset_4px_0_0_0_#10b981] border-b border-emerald-500/5 transition-all duration-200 font-mono text-gray-300",
+          cellText: "text-gray-300 font-mono text-xs",
+          dateText: "font-mono text-xs text-emerald-500/70",
+          teamBadge: "px-2 py-0.5 bg-black border border-emerald-500/30 text-emerald-400 text-xs font-mono",
+          statusOpen: "bg-emerald-950 text-emerald-400 border border-emerald-500/50 rounded-none px-2 py-0.5 font-mono",
+          statusClose: "bg-purple-955 text-purple-400 border border-purple-500/50 rounded-none px-2 py-0.5 font-mono",
+          statusIssue: "bg-red-955 text-red-400 border border-red-500/50 rounded-none px-2 py-0.5 font-mono animate-pulse",
+          statusDefault: "bg-gray-900 text-gray-500 border border-gray-800 rounded-none px-2 py-0.5 font-mono",
+          urgencyHigh: "bg-red-955 text-red-400 border border-red-500/50 px-2 py-0.5 rounded-none font-bold animate-pulse text-xs font-mono",
+          urgencyMedium: "bg-yellow-955 text-yellow-400 border border-yellow-500/50 px-2 py-0.5 rounded-none font-semibold text-xs font-mono",
+          urgencyLow: "bg-blue-955 text-blue-400 border border-blue-500/50 px-2 py-0.5 rounded-none text-xs font-mono",
+          linkBtn: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-black text-emerald-400 border border-emerald-500/30 hover:bg-emerald-950 hover:border-emerald-500 transition-colors text-xs font-mono"
+        };
+      case 'gold':
+        return {
+          container: "bg-[#0b0b0b] border border-amber-500/20 rounded-xl shadow-[0_8px_30px_rgba(217,119,6,0.05)]",
+          headerBg: "bg-[#141414] text-amber-300 font-bold uppercase tracking-wider text-[11px] border-b border-amber-500/20",
+          headerCell: "px-5 py-4.5 text-amber-300 font-bold text-[11px] uppercase tracking-wider",
+          rowClass: "hover:bg-amber-500/5 hover:shadow-[inset_4px_0_0_0_#d97706] border-b border-amber-500/10 transition-all duration-300 even:bg-[#111111]/30 odd:bg-black/40",
+          cellText: "text-gray-200 font-medium",
+          dateText: "font-mono text-xs text-amber-500/70",
+          teamBadge: "px-2.5 py-0.5 bg-black border border-amber-500/20 text-amber-200 rounded-md text-xs font-semibold",
+          statusOpen: "bg-amber-500/10 text-amber-400 border border-amber-500/30 rounded-md px-2.5 py-1 font-semibold",
+          statusClose: "bg-[#d97706]/10 text-amber-200 border border-amber-600/30 rounded-md px-2.5 py-1 font-semibold",
+          statusIssue: "bg-red-500/10 text-red-400 border border-red-500/30 rounded-md px-2.5 py-1 font-semibold animate-pulse",
+          statusDefault: "bg-gray-800 text-gray-400 border border-gray-700 rounded-md px-2.5 py-1",
+          urgencyHigh: "bg-red-500/10 text-red-450 border border-red-500/30 px-2.5 py-1 rounded-md font-bold text-xs",
+          urgencyMedium: "bg-amber-500/10 text-amber-400 border border-amber-500/30 px-2.5 py-1 rounded-md font-semibold text-xs",
+          urgencyLow: "bg-gray-850 text-gray-300 border border-gray-700 px-2.5 py-1 rounded-md text-xs",
+          linkBtn: "inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#1a1a1a] text-amber-300 border border-amber-500/20 hover:border-amber-500 hover:bg-amber-500 hover:text-black rounded-lg transition-all duration-300 text-xs font-semibold shadow-sm"
+        };
+      default: // Neon Glassmorphic (Legacy-like but premium)
+        return {
+          container: "glass-panel overflow-hidden border border-glass-border rounded-xl",
+          headerBg: "bg-gray-900/90 text-gray-300 font-medium border-b border-glass-border",
+          headerCell: "px-5 py-4 tracking-wide text-gray-300 font-medium text-sm",
+          rowClass: "hover:bg-gray-800/60 border-b border-glass-border/30 transition-colors group even:bg-gray-900/5 odd:bg-gray-950/5",
+          cellText: "text-gray-300 font-normal",
+          dateText: "font-mono text-xs text-gray-400",
+          teamBadge: "px-2 py-0.5 bg-gray-900 border border-glass-border rounded text-xs text-gray-400",
+          statusOpen: "bg-green-500/20 text-green-400 border border-green-500/30 rounded px-2 py-0.5",
+          statusClose: "bg-purple-500/20 text-purple-400 border border-purple-500/30 rounded px-2 py-0.5",
+          statusIssue: "bg-red-500/20 text-red-400 border border-red-500/30 rounded px-2 py-0.5",
+          statusDefault: "bg-gray-500/20 text-gray-400 border border-gray-500/30 rounded px-2 py-0.5",
+          urgencyHigh: "bg-red-500/20 text-red-400 border border-red-500/30 px-2 py-0.5 rounded text-xs",
+          urgencyMedium: "bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 px-2 py-0.5 rounded text-xs",
+          urgencyLow: "bg-blue-500/20 text-blue-400 border border-blue-500/30 px-2 py-0.5 rounded text-xs",
+          linkBtn: "inline-flex items-center gap-1 px-2 py-1 bg-purple-500/10 text-purple-400 hover:text-purple-300 hover:bg-purple-500/20 rounded-md transition-colors border border-purple-500/20 text-xs font-semibold"
+        };
+    }
+  }, [activeLayout]);
 
   useEffect(() => {
     Papa.parse(csvData, {
@@ -482,17 +579,17 @@ export default function IssuesDashboard({ csvData }: { csvData: string }) {
         </div>
       </div>
 
-      <div ref={tableRef} className="glass-panel overflow-hidden border border-glass-border rounded-xl">
+      <div ref={tableRef} className={layoutStyles.container}>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm whitespace-nowrap">
-            <thead className="bg-gray-900/90 text-gray-300 font-medium border-b border-glass-border">
+            <thead className={layoutStyles.headerBg}>
               <tr>
                 {allColumns.filter(c => visibleColumns.includes(c)).map(col => (
-                  <th key={col} className="px-5 py-4 tracking-wide">{col}</th>
+                  <th key={col} className={layoutStyles.headerCell}>{col}</th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-glass-border">
+            <tbody className="divide-y divide-glass-border/30">
               <AnimatePresence>
                 {filteredData.map((row, idx) => (
                   <motion.tr
@@ -501,7 +598,7 @@ export default function IssuesDashboard({ csvData }: { csvData: string }) {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0 }}
                     transition={{ duration: 0.1 }}
-                    className="hover:bg-gray-800/60 transition-colors group"
+                    className={layoutStyles.rowClass}
                   >
                     {allColumns.filter(c => visibleColumns.includes(c)).map(col => {
                       const val = row[col];
@@ -510,7 +607,7 @@ export default function IssuesDashboard({ csvData }: { csvData: string }) {
                         return (
                           <td key={col} className="px-5 py-3 text-gray-300">
                             {val && val !== '' ? (
-                              <a href={String(val).startsWith('http') ? val : `https://${val}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 px-2 py-1 bg-purple-500/10 text-purple-400 hover:text-purple-300 hover:bg-purple-500/20 rounded-md transition-colors border border-purple-500/20">
+                              <a href={String(val).startsWith('http') ? val : `https://${val}`} target="_blank" rel="noopener noreferrer" className={layoutStyles.linkBtn}>
                                 Link <ExternalLink className="w-3 h-3" />
                               </a>
                             ) : (
@@ -523,15 +620,82 @@ export default function IssuesDashboard({ csvData }: { csvData: string }) {
                       if (col.toLowerCase() === 'status') {
                         return (
                           <td key={col} className="px-5 py-3">
-                            <span className={`px-2 py-1 rounded-md text-xs font-semibold border ${getStatusColor(val)} inline-block`}>
+                            <span className={`inline-block font-semibold border ${
+                              (val || '').toLowerCase().includes('open') ? layoutStyles.statusOpen :
+                              ((val || '').toLowerCase().includes('close') || (val || '').toLowerCase().includes('done')) ? layoutStyles.statusClose :
+                              (val || '').toLowerCase().includes('issue') ? layoutStyles.statusIssue :
+                              layoutStyles.statusDefault
+                            }`}>
                               {val || 'None'}
                             </span>
                           </td>
                         );
                       }
 
+                      if (col.toLowerCase() === 'date') {
+                        return (
+                          <td key={col} className="px-5 py-3">
+                            <span className={layoutStyles.dateText}>
+                              {val}
+                            </span>
+                          </td>
+                        );
+                      }
+
+                      if (col.toLowerCase() === 'team') {
+                        return (
+                          <td key={col} className="px-5 py-3">
+                            <span className={layoutStyles.teamBadge}>
+                              {val}
+                            </span>
+                          </td>
+                        );
+                      }
+
+                      if (col.toLowerCase() === 'assign name') {
+                        return (
+                          <td key={col} className="px-5 py-3">
+                            <div className="flex flex-wrap gap-1.5 items-center">
+                              {String(val).split('/').map((part, pIdx) => {
+                                const trimmed = part.trim();
+                                if (!trimmed) return null;
+                                const isTeam = (trimmed.length <= 3 && trimmed === trimmed.toUpperCase()) || trimmed.length <= 2;
+                                return (
+                                  <span 
+                                    key={pIdx} 
+                                    className={`px-2 py-0.5 rounded text-xs font-medium border ${
+                                      isTeam 
+                                        ? 'bg-blue-500/10 text-blue-400 border-blue-500/20 shadow-[0_0_8px_rgba(59,130,246,0.05)]' 
+                                        : 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20 shadow-[0_0_8px_rgba(99,102,241,0.05)]'
+                                    }`}
+                                  >
+                                    {trimmed}
+                                  </span>
+                                );
+                              })}
+                            </div>
+                          </td>
+                        );
+                      }
+
+                      if (col.toLowerCase() === 'urgency' || col.toLowerCase() === 'priority') {
+                        const s = String(val).toLowerCase();
+                        return (
+                          <td key={col} className="px-5 py-3">
+                            <span className={`inline-block font-semibold border ${
+                              s.includes('high') || s.includes('critical') || s.includes('urgent') ? layoutStyles.urgencyHigh :
+                              s.includes('medium') || s.includes('warn') ? layoutStyles.urgencyMedium :
+                              s.includes('low') || s.includes('minor') ? layoutStyles.urgencyLow :
+                              layoutStyles.statusDefault
+                            }`}>
+                              {val}
+                            </span>
+                          </td>
+                        );
+                      }
+
                       return (
-                        <td key={col} className="px-5 py-3 text-gray-300">
+                        <td key={col} className={`px-5 py-3 ${layoutStyles.cellText}`}>
                           {val}
                         </td>
                       );
