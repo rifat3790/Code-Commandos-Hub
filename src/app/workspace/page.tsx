@@ -46,7 +46,7 @@ export default function WorkspacePage() {
   const [isSavingCalc, setIsSavingCalc] = useState(false);
 
   const isSuperAdmin = dbUser?.role === 'super_admin';
-  const activeWorkspaceLayout = store.settings?.workspaceLayout || 'default';
+  const activeWorkspaceLayout = store.settings?.globalLayout || 'default';
 
   const workspaceLayouts = [
     { id: 'default', name: 'Layout 1: Neon Glassmorphic' },
@@ -303,25 +303,6 @@ export default function WorkspacePage() {
 
   return (
     <div className={workspaceLayoutStyles.wrapper}>
-      {/* Super Admin Layout Selection UI */}
-      {isSuperAdmin && (
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-gray-900/60 border border-glass-border rounded-2xl backdrop-blur-md gap-4">
-          <div className="flex items-center gap-2 text-gray-300">
-            <Palette className="w-5 h-5 text-green-400 animate-spin-slow" />
-            <span className="text-sm font-semibold">Workspace Board Layout Theme (Super Admin Only)</span>
-          </div>
-          <select
-            value={activeWorkspaceLayout}
-            onChange={(e) => store.updateSettings({ workspaceLayout: e.target.value })}
-            className="bg-gray-950 text-white border border-glass-border px-4 py-2 rounded-xl text-sm outline-none focus:border-green-500 transition-colors cursor-pointer w-full sm:w-auto"
-          >
-            {workspaceLayouts.map((l) => (
-              <option key={l.id} value={l.id}>{l.name}</option>
-            ))}
-          </select>
-        </div>
-      )}
-
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>

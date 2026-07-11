@@ -217,7 +217,7 @@ export default function MessageHelperPage() {
   const [historyList, setHistoryList] = useState<{ id: string; text: string; date: string }[]>([]);
   const [copied, setCopied] = useState(false);
 
-  const activeMessageHelperLayout = store.settings?.messageHelperLayout || 'default';
+  const activeMessageHelperLayout = store.settings?.globalLayout || 'default';
   const isSuperAdmin = dbUser?.role === 'super_admin';
 
   const messageHelperLayouts = [
@@ -628,24 +628,7 @@ export default function MessageHelperPage() {
         )}
       </AnimatePresence>
 
-      {/* Super Admin Layout Selection UI */}
-      {isSuperAdmin && (
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-gray-900/60 border border-glass-border rounded-2xl backdrop-blur-md gap-4">
-          <div className="flex items-center gap-2 text-gray-300">
-            <Palette className="w-5 h-5 text-green-400 animate-spin-slow" />
-            <span className="text-sm font-semibold">Message Helper Layout Theme (Super Admin Only)</span>
-          </div>
-          <select
-            value={activeMessageHelperLayout}
-            onChange={(e) => store.updateSettings({ messageHelperLayout: e.target.value })}
-            className="bg-gray-955 text-white border border-glass-border px-4 py-2 rounded-xl text-sm outline-none focus:border-green-500 transition-colors cursor-pointer w-full sm:w-auto"
-          >
-            {messageHelperLayouts.map((l) => (
-              <option key={l.id} value={l.id}>{l.name}</option>
-            ))}
-          </select>
-        </div>
-      )}
+
 
       {/* Header */}
       <div>

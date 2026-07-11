@@ -5,7 +5,7 @@ import User from '@/models/User';
 
 export async function POST(req: Request) {
   try {
-    const { enabledMenus, adminEnabledMenus, userEnabledMenus, trackerLayout, homeLayout, workspaceLayout, messageHelperLayout, templatesLayout, fontFamily, borderRadius, firebaseUid } = await req.json();
+    const { enabledMenus, adminEnabledMenus, userEnabledMenus, trackerLayout, homeLayout, workspaceLayout, messageHelperLayout, templatesLayout, fontFamily, borderRadius, globalLayout, firebaseUid } = await req.json();
     if (!firebaseUid) {
       return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });
     }
@@ -29,6 +29,7 @@ export async function POST(req: Request) {
     if (templatesLayout !== undefined) updateData.templatesLayout = templatesLayout;
     if (fontFamily !== undefined) updateData.fontFamily = fontFamily;
     if (borderRadius !== undefined) updateData.borderRadius = borderRadius;
+    if (globalLayout !== undefined) updateData.globalLayout = globalLayout;
 
     const settings = await Settings.findOneAndUpdate(
       { id: 'global' }, 

@@ -115,7 +115,7 @@ export default function HomePage() {
 
   const displayName = user?.displayName || (user?.email ? user.email.split('@')[0] : 'Developer');
   const isSuperAdmin = dbUser?.role === 'super_admin';
-  const activeHomeLayout = store.settings?.homeLayout || 'default';
+  const activeHomeLayout = store.settings?.globalLayout || 'default';
 
   const homeLayouts = [
     { id: 'default', name: 'Layout 1: Neon Glassmorphic' },
@@ -422,24 +422,6 @@ export default function HomePage() {
         animate="show"
         className={homeLayoutStyles.wrapper}
       >
-        {/* Super Admin Layout Selection UI */}
-        {isSuperAdmin && (
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-gray-900/60 border border-glass-border rounded-2xl backdrop-blur-md gap-4">
-            <div className="flex items-center gap-2 text-gray-300">
-              <Palette className="w-5 h-5 text-green-400 animate-spin-slow" />
-              <span className="text-sm font-semibold">Homepage Layout Theme (Super Admin Only)</span>
-            </div>
-            <select
-              value={activeHomeLayout}
-              onChange={(e) => store.updateSettings({ homeLayout: e.target.value })}
-              className="bg-gray-950 text-white border border-glass-border px-4 py-2 rounded-xl text-sm outline-none focus:border-green-500 transition-colors cursor-pointer w-full sm:w-auto"
-            >
-              {homeLayouts.map((l) => (
-                <option key={l.id} value={l.id}>{l.name}</option>
-              ))}
-            </select>
-          </div>
-        )}
 
         {/* 1. Hero Section */}
         <motion.div variants={itemVariants} className={homeLayoutStyles.heroContainer}>

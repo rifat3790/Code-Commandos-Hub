@@ -720,7 +720,51 @@ export default function AdminDashboard() {
               <h2 className="text-white font-bold text-sm uppercase tracking-wider text-green-400 flex items-center gap-2">
                 <Palette className="w-5 h-5" /> Global Brand Styles (Super Admin Only)
               </h2>
-              <p className="text-xs text-gray-400 mt-1">Configure the font family and card border radius across all pages. Changes will apply to all team members instantly.</p>
+              <p className="text-xs text-gray-400 mt-1">Configure the layout themes, font family and card border radius across all pages. Changes will apply to all team members instantly.</p>
+            </div>
+
+            {/* Global Layout Theme Selection */}
+            <div className="space-y-3 pt-2">
+              <label className="text-xs font-bold text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
+                <Palette className="w-4 h-4 text-green-400" /> Global Dashboard Layout Theme
+              </label>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                {[
+                  { id: 'default', name: 'Layout 1: Neon Glassmorphic', desc: 'Futuristic glass-blur panels with neon green glow effects.' },
+                  { id: 'slate', name: 'Layout 2: Clean Slate & Platinum', desc: 'Minimalist corporate look. Solid flat panels and steel headers.' },
+                  { id: 'aurora', name: 'Layout 3: Aurora Gradient', desc: 'Soft purple-indigo aurora lighting with curved glass pannels.' },
+                  { id: 'cyber', name: 'Layout 4: Cyberpunk Matrix', desc: 'Deep hacker terminal console with green monospace syntax.' },
+                  { id: 'gold', name: 'Layout 5: Royal Gold & Onyx', desc: 'Premium gold gradient highlights on onyx black panels.' }
+                ].map((l) => {
+                  const isSelected = (storeSettings?.globalLayout || 'default') === l.id;
+                  return (
+                    <div
+                      key={l.id}
+                      onClick={() => updateSettings({ globalLayout: l.id })}
+                      className={`p-4 rounded-xl border transition-all cursor-pointer text-left space-y-2 flex flex-col justify-between ${
+                        isSelected 
+                          ? 'border-green-500 bg-green-500/10' 
+                          : 'border-glass-border bg-black/40 hover:border-gray-600'
+                      }`}
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-white">{l.name}</span>
+                          {isSelected && <span className="w-2 h-2 rounded-full bg-green-400" />}
+                        </div>
+                        <p className="text-[10px] text-gray-400 leading-relaxed">{l.desc}</p>
+                      </div>
+                      
+                      <div className="pt-2 border-t border-glass-border/30 flex justify-between items-center text-[9px] uppercase tracking-wider">
+                        <span className="text-gray-500">Status</span>
+                        <span className={isSelected ? 'text-green-400 font-bold' : 'text-gray-550 font-semibold'}>
+                          {isSelected ? 'Active' : 'Select'}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
 
             {/* Font Family Selection */}

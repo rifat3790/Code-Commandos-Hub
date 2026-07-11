@@ -49,7 +49,7 @@ export default function TemplatesPage() {
   const [activeCategory, setActiveCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
 
-  const activeTemplatesLayout = store.settings?.templatesLayout || 'default';
+  const activeTemplatesLayout = store.settings?.globalLayout || 'default';
   const isSuperAdmin = dbUser?.role === 'super_admin';
 
   const templatesLayouts = [
@@ -336,24 +336,6 @@ export default function TemplatesPage() {
 
   return (
     <div className={templatesStyles.wrapper}>
-      {/* Super Admin Layout Selection UI */}
-      {isSuperAdmin && (
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-gray-900/60 border border-glass-border rounded-2xl backdrop-blur-md gap-4 shrink-0">
-          <div className="flex items-center gap-2 text-gray-300">
-            <Palette className="w-5 h-5 text-green-400 animate-spin-slow" />
-            <span className="text-sm font-semibold">Template Center Layout Theme (Super Admin Only)</span>
-          </div>
-          <select
-            value={activeTemplatesLayout}
-            onChange={(e) => store.updateSettings({ templatesLayout: e.target.value })}
-            className="bg-gray-955 text-white border border-glass-border px-4 py-2 rounded-xl text-sm outline-none focus:border-green-500 transition-colors cursor-pointer w-full sm:w-auto"
-          >
-            {templatesLayouts.map((l) => (
-              <option key={l.id} value={l.id}>{l.name}</option>
-            ))}
-          </select>
-        </div>
-      )}
 
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0">
