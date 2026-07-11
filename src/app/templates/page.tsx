@@ -18,7 +18,22 @@ import {
   Variable,
   AlertCircle,
   RefreshCw,
-  Palette
+  Palette,
+  Sparkles,
+  Truck,
+  MessageSquare,
+  Edit,
+  Clock,
+  Send,
+  XCircle,
+  Video,
+  HelpCircle,
+  CreditCard,
+  Key,
+  Database,
+  Gift,
+  ShoppingBag,
+  Sliders
 } from 'lucide-react';
 import { useWorkspaceStore } from '@/store/workspaceStore';
 import { Template } from '@/types';
@@ -42,6 +57,25 @@ const CATEGORIES = [
   'Shopify',
   'Custom'
 ];
+
+const CATEGORY_ICONS: Record<string, any> = {
+  'All': Sparkles,
+  'Delivery': Truck,
+  'Update': MessageSquare,
+  'Revision': Edit,
+  'Extension': Clock,
+  'Followup': Send,
+  'Cancellation': XCircle,
+  'Meeting': Video,
+  'Support': HelpCircle,
+  'Payment Setup': CreditCard,
+  'Store Access': Key,
+  'Migration': Database,
+  'Review Request': Star,
+  'Tips Thanks': Gift,
+  'Shopify': ShoppingBag,
+  'Custom': Sliders
+};
 
 export default function TemplatesPage() {
   const store = useWorkspaceStore();
@@ -218,6 +252,11 @@ export default function TemplatesPage() {
     return text;
   }, [selectedTemplate, variableValues]);
 
+  const getCategoryCount = (category: string) => {
+    if (category === 'All') return store.templates.length;
+    return store.templates.filter(t => t.category === category).length;
+  };
+
   const handleCopy = () => {
     if (!compiledPreview) return;
     navigator.clipboard.writeText(compiledPreview);
@@ -361,28 +400,40 @@ export default function TemplatesPage() {
         </div>
       </div>
 
-      {/* Main Layout split grid */}
-      <div className={`grid grid-cols-1 lg:grid-cols-4 border border-glass-border rounded-2xl bg-gray-955/20 overflow-hidden min-h-[580px] h-[calc(100vh-180px)]`}>
-        
-        {/* Left Side: Category Navigation */}
-        <div className="border-r border-glass-border bg-gray-955/45 p-4 overflow-y-auto space-y-4">
-          <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Categories</span>
-          <nav className="space-y-1">
-            {CATEGORIES.map((cat) => (
-              <button
-                key={cat}
-                onClick={() => setActiveCategory(cat)}
-                className={activeCategory === cat ? templatesStyles.categoryBtnActive : templatesStyles.categoryBtnInactive}
-              >
-                <Folder className="w-4 h-4 shrink-0 text-gray-500" />
-                <span>{cat}</span>
-              </button>
-            ))}
-          </nav>
-        </div>
+      {/* Categories Horizontal Tabs Navigation - Premium Glassy Carousel UI */}
+      <div className="w-full bg-[#0b0b0d]/60 border border-white/5 p-2 rounded-2xl backdrop-blur-xl relative z-10 flex items-center overflow-x-auto scrollbar-none gap-2 select-none shadow-[0_4px_20px_rgba(0,0,0,0.4)] my-4">
+        {CATEGORIES.map((cat) => {
+          const isActive = activeCategory === cat;
+          const Icon = CATEGORY_ICONS[cat] || Folder;
+          const count = getCategoryCount(cat);
+          
+          return (
+            <button
+              key={cat}
+              onClick={() => setActiveCategory(cat)}
+              className={`relative px-4 py-2 rounded-xl font-extrabold text-[11px] uppercase tracking-wider flex items-center gap-2 transition-all duration-300 select-none cursor-pointer border shrink-0 ${
+                isActive 
+                  ? 'text-green-400 bg-green-500/10 border-green-500/30 shadow-[0_0_20px_rgba(34,197,94,0.15)] font-black' 
+                  : 'text-gray-400 hover:text-white hover:bg-white/5 border-transparent'
+              }`}
+            >
+              <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-green-400 animate-pulse' : 'text-gray-500'}`} />
+              <span>{cat}</span>
+              <span className={`px-1.5 py-0.5 rounded-md text-[9px] font-mono font-bold ${
+                isActive ? 'bg-green-500/20 text-green-300' : 'bg-white/5 text-gray-500'
+              }`}>
+                {count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
 
+      {/* Main Layout split grid */}
+      <div className={`grid grid-cols-1 lg:grid-cols-12 border border-glass-border rounded-2xl bg-gray-955/20 overflow-hidden min-h-[580px] h-[calc(100vh-220px)]`}>
+        
         {/* Center: Template Listing */}
-        <div className="lg:col-span-1 border-r border-glass-border flex flex-col bg-gray-955/15 h-full overflow-hidden">
+        <div className="lg:col-span-4 border-r border-glass-border flex flex-col bg-gray-955/15 h-full overflow-hidden">
           {/* Search bar */}
           <div className="p-3 border-b border-glass-border relative shrink-0">
             <Search className="absolute left-6 top-5.5 w-4.5 h-4.5 text-gray-500" />
@@ -431,7 +482,7 @@ export default function TemplatesPage() {
         </div>
 
         {/* Right Side: Preview & Mail composer layout */}
-        <div className="lg:col-span-2 flex flex-col overflow-hidden h-full">
+        <div className="lg:col-span-8 flex flex-col overflow-hidden h-full">
           {selectedTemplate ? (
             <div className="flex flex-col h-full overflow-hidden">
               
