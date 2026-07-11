@@ -1,14 +1,15 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { db } from '@/lib/firebase';
-import { collection, query, where, or, onSnapshot, addDoc, orderBy, serverTimestamp, getDocs, doc, updateDoc } from 'firebase/firestore';
-import { MessageCircle, X, Send, User, ChevronLeft, Phone, Video, Bot, Sparkles } from 'lucide-react';
+import { collection, query, where, or, onSnapshot, addDoc, orderBy, serverTimestamp, getDocs, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { MessageCircle, X, Send, User, ChevronLeft, Phone, Video, Bot, Sparkles, Trash2, Search } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useWorkspaceStore } from '@/store/workspaceStore';
 import { useCall } from '@/context/CallContext';
 import { useChat } from '@ai-sdk/react';
+import toast from 'react-hot-toast';
 
 interface ChatMessage {
   id: string;
@@ -31,6 +32,8 @@ export default function ChatbotWidget() {
   const [chatList, setChatList] = useState<{uid: string, name: string, unread: number, lastMessage?: string, lastTimestamp?: number}[]>([]);
   const [allUsers, setAllUsers] = useState<any[]>([]);
   const [isEmojiOpen, setIsEmojiOpen] = useState(false);
+  const [threadSearchQuery, setThreadSearchQuery] = useState('');
+  const [isThreadSearchOpen, setIsThreadSearchOpen] = useState(false);
   const emojiRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -186,6 +189,11 @@ export default function ChatbotWidget() {
   }, [messages, aiMessages, isOpen, activeChatUser]);
 
   useEffect(() => {
+    setThreadSearchQuery('');
+    setIsThreadSearchOpen(false);
+  }, [activeChatUser]);
+
+  useEffect(() => {
     if (!user || !isOpen || !activeChatUser || activeChatUser === 'ai_assistant') return;
 
     const msgsToUpdate = messages.filter(m => {
@@ -279,6 +287,35 @@ export default function ChatbotWidget() {
     }
   };
 
+  const handleDeleteMessage = async (msgId: string) => {
+    if (!msgId || msgId.startsWith('ai-')) return;
+    try {
+      await deleteDoc(doc(db, 'chats', msgId));
+      toast.success("Message deleted successfully", {
+        style: {
+          background: '#0c0c0e',
+          color: '#10B981',
+          border: '1px solid rgba(16, 185, 129, 0.2)',
+          fontSize: '11px',
+          fontWeight: 'bold',
+        }
+      });
+    } catch (error) {
+      console.error("Error deleting message: ", error);
+      toast.error("Failed to delete message");
+    }
+  };
+
+  const highlightText = (text: string, search: string) => {
+    if (!search.trim()) return text;
+    const parts = text.split(new RegExp(`(${search.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')})`, 'gi'));
+    return parts.map((part, i) => 
+      part.toLowerCase() === search.toLowerCase() 
+        ? <mark key={i} className="bg-yellow-300 text-black px-0.5 rounded font-semibold">{part}</mark> 
+        : part
+    );
+  };
+
   if (!user) return null;
 
   // Format AI messages to look like chat messages
@@ -292,18 +329,24 @@ export default function ChatbotWidget() {
     readStatus: true
   }));
 
-  const displayMessages = activeChatUser === 'ai_assistant'
-    ? aiDisplayMessages
-    : activeChatUser
-      ? messages.filter(m => {
-          const myId = isAdminOrSuperAdmin ? 'admin' : user.uid;
-          const amISender = m.senderUid === myId || m.senderUid === user.uid;
-          const amIReceiver = m.receiverUid === myId || m.receiverUid === user.uid;
-          const isOtherSender = m.senderUid === activeChatUser;
-          const isOtherReceiver = m.receiverUid === activeChatUser;
-          return (amISender && isOtherReceiver) || (amIReceiver && isOtherSender);
-        })
-      : [];
+  const displayMessages = useMemo(() => {
+    const threadMsgs = activeChatUser === 'ai_assistant'
+      ? aiDisplayMessages
+      : activeChatUser
+        ? messages.filter(m => {
+            const myId = isAdminOrSuperAdmin ? 'admin' : user.uid;
+            const amISender = m.senderUid === myId || m.senderUid === user.uid;
+            const amIReceiver = m.receiverUid === myId || m.receiverUid === user.uid;
+            const isOtherSender = m.senderUid === activeChatUser;
+            const isOtherReceiver = m.receiverUid === activeChatUser;
+            return (amISender && isOtherReceiver) || (amIReceiver && isOtherSender);
+          })
+        : [];
+    if (!threadSearchQuery.trim()) return threadMsgs;
+    return threadMsgs.filter(m => 
+      m.text.toLowerCase().includes(threadSearchQuery.toLowerCase())
+    );
+  }, [activeChatUser, aiDisplayMessages, messages, user, isAdminOrSuperAdmin, threadSearchQuery]);
 
   const totalUnread = chatList.reduce((acc, c) => acc + c.unread, 0);
 
@@ -355,6 +398,16 @@ export default function ChatbotWidget() {
                     >
                       <Video className="w-4.5 h-4.5" />
                     </button>
+                    <button
+                      onClick={() => {
+                        setIsThreadSearchOpen(!isThreadSearchOpen);
+                        if (isThreadSearchOpen) setThreadSearchQuery('');
+                      }}
+                      className={`p-1 rounded transition-all hover:scale-105 ${isThreadSearchOpen ? 'bg-black/20 text-black font-extrabold scale-110' : 'text-black hover:bg-black/10'}`}
+                      title="Search Chat History"
+                    >
+                      <Search className="w-4.5 h-4.5" />
+                    </button>
                   </>
                 )}
                 <button onClick={() => setIsOpen(false)} className="text-black/80 hover:text-black hover:bg-black/10 p-1 rounded transition-colors">
@@ -362,6 +415,29 @@ export default function ChatbotWidget() {
                 </button>
               </div>
             </div>
+
+            {/* Header Search Bar */}
+            {isThreadSearchOpen && activeChatUser && (
+              <div className="px-3 py-2 bg-gray-950 border-b border-glass-border flex items-center gap-2 shrink-0 text-left">
+                <Search className="w-3.5 h-3.5 text-gray-500 shrink-0" />
+                <input
+                  type="text"
+                  placeholder="Search in conversation..."
+                  value={threadSearchQuery}
+                  onChange={(e) => setThreadSearchQuery(e.target.value)}
+                  className="flex-1 bg-transparent border-none text-xs text-white focus:outline-none focus:ring-0 placeholder:text-gray-600 outline-none"
+                  autoFocus
+                />
+                {threadSearchQuery && (
+                  <button 
+                    onClick={() => setThreadSearchQuery('')}
+                    className="text-gray-500 hover:text-white text-[10px] uppercase font-bold tracking-wider cursor-pointer"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+            )}
 
             {/* Body */}
             <div className="flex-1 overflow-y-auto bg-gray-950/50 p-4 flex flex-col gap-3">
@@ -409,13 +485,25 @@ export default function ChatbotWidget() {
                     const myId = isAdminOrSuperAdmin ? 'admin' : user.uid;
                     const isMe = msg.senderUid === myId || msg.senderUid === user.uid;
                     return (
-                      <div key={msg.id || i} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
-                        <div className={`max-w-[85%] rounded-2xl px-4 py-2 ${
-                          isMe 
-                            ? 'bg-brand-green text-black rounded-tr-sm' 
-                            : 'bg-gray-800 text-gray-200 border border-glass-border rounded-tl-sm'
-                        }`}>
-                          <p className="text-sm whitespace-pre-wrap leading-relaxed">{msg.text}</p>
+                      <div key={msg.id || i} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} group w-full`}>
+                        <div className={`flex items-center gap-2 max-w-[85%] ${isMe ? 'flex-row-reverse animate-fade-in-right' : 'flex-row animate-fade-in-left'}`}>
+                          <div className={`rounded-2xl px-4 py-2 text-left ${
+                            isMe 
+                              ? 'bg-brand-green text-black rounded-tr-sm' 
+                              : 'bg-gray-800 text-gray-200 border border-glass-border rounded-tl-sm'
+                          }`}>
+                            <p className="text-sm whitespace-pre-wrap leading-relaxed">{highlightText(msg.text, threadSearchQuery)}</p>
+                          </div>
+                          
+                          {activeChatUser !== 'ai_assistant' && (
+                            <button
+                              onClick={() => handleDeleteMessage(msg.id)}
+                              className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 hover:scale-105 transition-all duration-200 cursor-pointer shrink-0"
+                              title="Delete Message from History"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          )}
                         </div>
                         <span className="text-[10px] text-gray-500 mt-1 mx-1">
                           {isMe ? 'You' : msg.senderName}
