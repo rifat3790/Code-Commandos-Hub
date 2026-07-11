@@ -5,7 +5,7 @@ import User from '@/models/User';
 
 export async function POST(req: Request) {
   try {
-    const { enabledMenus, adminEnabledMenus, userEnabledMenus, trackerLayout, firebaseUid } = await req.json();
+    const { enabledMenus, adminEnabledMenus, userEnabledMenus, trackerLayout, homeLayout, firebaseUid } = await req.json();
     if (!firebaseUid) {
       return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });
     }
@@ -23,6 +23,7 @@ export async function POST(req: Request) {
     if (adminEnabledMenus) updateData.adminEnabledMenus = adminEnabledMenus;
     if (userEnabledMenus) updateData.userEnabledMenus = userEnabledMenus;
     if (trackerLayout !== undefined) updateData.trackerLayout = trackerLayout;
+    if (homeLayout !== undefined) updateData.homeLayout = homeLayout;
 
     const settings = await Settings.findOneAndUpdate(
       { id: 'global' }, 

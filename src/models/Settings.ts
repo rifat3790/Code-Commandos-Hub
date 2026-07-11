@@ -6,6 +6,7 @@ export interface ISettings extends Document {
   adminEnabledMenus: string[];
   userEnabledMenus: string[];
   trackerLayout: string;
+  homeLayout: string;
 }
 
 const SettingsSchema: Schema = new Schema({
@@ -13,7 +14,8 @@ const SettingsSchema: Schema = new Schema({
   enabledMenus: { type: [String], default: [] },
   adminEnabledMenus: { type: [String], default: [] },
   userEnabledMenus: { type: [String], default: [] },
-  trackerLayout: { type: String, default: 'default' }
+  trackerLayout: { type: String, default: 'default' },
+  homeLayout: { type: String, default: 'default' }
 });
 
 export default mongoose.models.Settings || mongoose.model<ISettings>('Settings', SettingsSchema);
