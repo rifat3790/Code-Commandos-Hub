@@ -719,26 +719,7 @@ export default function OrdersDashboard({ csvData, activeLayout }: { csvData: st
     };
   }, [data, serviceLineFilter, teamFilter]);
 
-  // Automatically reset stale child filters when parent filters change
-  useEffect(() => {
-    if (serviceLineFilter.length > 0) {
-      const availableTeams = filterOptions.teams;
-      setTeamFilter(prev => prev.filter(t => availableTeams.includes(t)));
-      
-      const availableStatuses = filterOptions.statuses;
-      setStatusFilter(prev => prev.filter(s => availableStatuses.includes(s)));
 
-      const availableDates = filterOptions.deliveryDates;
-      setDeliveryDateFilter(prev => prev.filter(d => availableDates.includes(d)));
-    }
-  }, [serviceLineFilter, filterOptions.teams, filterOptions.statuses, filterOptions.deliveryDates]);
-
-  useEffect(() => {
-    if (teamFilter.length > 0) {
-      const availableNames = filterOptions.names;
-      setNameFilter(prev => prev.filter(n => availableNames.includes(n)));
-    }
-  }, [teamFilter, filterOptions.names]);
 
   // Apply filters
   const filteredData = useMemo(() => {
