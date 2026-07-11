@@ -257,6 +257,27 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
           body, html, button, input, select, textarea, [class*="font-sans"] {
             font-family: ${fontFamilyCss} !important;
           }
+          *:not(pre):not(code):not(.font-mono):not(kbd):not([class*="font-mono"]) {
+            font-family: ${fontFamilyCss} !important;
+          }
+          .rounded:not(.rounded-full), [class*="rounded-md"]:not(.rounded-full) {
+            border-radius: ${radiusVals.md} !important;
+          }
+          .rounded-sm:not(.rounded-full) {
+            border-radius: ${radiusVals.sm} !important;
+          }
+          .rounded-lg:not(.rounded-full) {
+            border-radius: ${radiusVals.lg} !important;
+          }
+          .rounded-xl:not(.rounded-full) {
+            border-radius: ${radiusVals.xl} !important;
+          }
+          .rounded-2xl:not(.rounded-full) {
+            border-radius: ${radiusVals['2xl']} !important;
+          }
+          .rounded-3xl:not(.rounded-full) {
+            border-radius: ${radiusVals['3xl']} !important;
+          }
         `}} />
         {children}
       </AuthProvider>
@@ -281,6 +302,27 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
           }
           body, html, button, input, select, textarea, [class*="font-sans"] {
             font-family: ${fontFamilyCss} !important;
+          }
+          *:not(pre):not(code):not(.font-mono):not(kbd):not([class*="font-mono"]) {
+            font-family: ${fontFamilyCss} !important;
+          }
+          .rounded:not(.rounded-full), [class*="rounded-md"]:not(.rounded-full) {
+            border-radius: ${radiusVals.md} !important;
+          }
+          .rounded-sm:not(.rounded-full) {
+            border-radius: ${radiusVals.sm} !important;
+          }
+          .rounded-lg:not(.rounded-full) {
+            border-radius: ${radiusVals.lg} !important;
+          }
+          .rounded-xl:not(.rounded-full) {
+            border-radius: ${radiusVals.xl} !important;
+          }
+          .rounded-2xl:not(.rounded-full) {
+            border-radius: ${radiusVals['2xl']} !important;
+          }
+          .rounded-3xl:not(.rounded-full) {
+            border-radius: ${radiusVals['3xl']} !important;
           }
         `}} />
         <CallProvider>
