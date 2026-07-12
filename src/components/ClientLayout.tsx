@@ -335,77 +335,79 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   return (
     <AuthProvider>
       <ThemeProvider>
-        {fontUrl && <link href={fontUrl} rel="stylesheet" />}
-        <style dangerouslySetInnerHTML={{ __html: styleCss }} />
-        
-        {isLoginPage ? (
-          <div className="h-screen w-screen bg-[#030712] overflow-hidden relative">
-            {children}
-          </div>
-        ) : (
-          <CallProvider>
-            {showProgress && (
-              <div className="fixed top-0 left-0 right-0 h-[2.5px] bg-transparent z-[9999] pointer-events-none">
-                <motion.div 
-                  initial={{ width: '0%' }}
-                  animate={{ width: `${navProgress}%` }}
-                  transition={{ ease: 'easeOut', duration: 0.25 }}
-                  className="h-full bg-gradient-to-r from-green-500 via-emerald-400 to-green-300 shadow-[0_0_8px_#10B981,0_0_12px_#34D399]"
-                />
-              </div>
-            )}
-            <HeartbeatTrigger />
-            <WorkspaceHydrator />
-            <div className="flex flex-col md:flex-row h-screen w-screen overflow-hidden bg-[#030712]">
-              {/* Sidebar - responsive built-in mobile/desktop */}
-              <Sidebar isMobileOpen={isMobileOpen} onCloseMobile={() => setIsMobileOpen(false)} />
-              
-              {/* Main Content container */}
-              <div className="flex-1 flex flex-col h-full overflow-hidden relative">
-                {/* Mobile Header Bar */}
-                <header className="md:hidden flex items-center justify-between px-4 py-3 bg-gray-950/80 border-b border-glass-border select-none shrink-0 z-30 backdrop-blur-md">
-                  <div className="flex items-center gap-2.5">
-                    <button 
-                      onClick={() => setIsMobileOpen(true)}
-                      className="p-2 rounded-lg bg-gray-900 border border-glass-border text-gray-400 hover:text-white transition-colors"
-                      aria-label="Toggle navigation menu"
-                    >
-                      <Menu className="w-5 h-5" />
-                    </button>
-                    <Link href="/" className="flex items-center gap-2">
-                      <div className="w-7.5 h-7.5 rounded-lg bg-brand-green flex items-center justify-center glow-green shrink-0" style={{ backgroundColor: 'var(--color-brand-green)' }}>
-                        <Terminal className="w-4.5 h-4.5 text-black stroke-[2.5]" />
-                      </div>
-                      <span className="font-bold text-sm tracking-wider text-white hidden sm:inline-block">CODE COMMANDOS HUB</span>
-                    </Link>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <NotificationBell />
-                    <FocusTimer />
-                  </div>
-                </header>
-
-                {/* Main page content scroll viewport */}
-                <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 relative bg-radial-[circle_at_top_right,rgba(16,185,129,0.03),transparent_40%]">
-                  <div className="hidden md:flex absolute top-6 right-8 z-50 items-center gap-4">
-                    <NotificationBell />
-                    <FocusTimer />
-                  </div>
-                  <ProtectedMainContent>{children}</ProtectedMainContent>
-                </main>
-              </div>
+        <CallProvider>
+          {fontUrl && <link href={fontUrl} rel="stylesheet" />}
+          <style dangerouslySetInnerHTML={{ __html: styleCss }} />
+          
+          {isLoginPage ? (
+            <div className="h-screen w-screen bg-[#030712] overflow-hidden relative">
+              {children}
             </div>
-          </CallProvider>
-        )}
-        
-        {/* Global Modals */}
-        {!isLoginPage && (
-          <>
-            <CommandMenu />
-            <GlobalPendingModal />
-            <ChatbotWidget />
-          </>
-        )}
+          ) : (
+            <>
+              {showProgress && (
+                <div className="fixed top-0 left-0 right-0 h-[2.5px] bg-transparent z-[9999] pointer-events-none">
+                  <motion.div 
+                    initial={{ width: '0%' }}
+                    animate={{ width: `${navProgress}%` }}
+                    transition={{ ease: 'easeOut', duration: 0.25 }}
+                    className="h-full bg-gradient-to-r from-green-500 via-emerald-400 to-green-300 shadow-[0_0_8px_#10B981,0_0_12px_#34D399]"
+                  />
+                </div>
+              )}
+              <HeartbeatTrigger />
+              <WorkspaceHydrator />
+              <div className="flex flex-col md:flex-row h-screen w-screen overflow-hidden bg-[#030712]">
+                {/* Sidebar - responsive built-in mobile/desktop */}
+                <Sidebar isMobileOpen={isMobileOpen} onCloseMobile={() => setIsMobileOpen(false)} />
+                
+                {/* Main Content container */}
+                <div className="flex-1 flex flex-col h-full overflow-hidden relative">
+                  {/* Mobile Header Bar */}
+                  <header className="md:hidden flex items-center justify-between px-4 py-3 bg-gray-950/80 border-b border-glass-border select-none shrink-0 z-30 backdrop-blur-md">
+                    <div className="flex items-center gap-2.5">
+                      <button 
+                        onClick={() => setIsMobileOpen(true)}
+                        className="p-2 rounded-lg bg-gray-900 border border-glass-border text-gray-400 hover:text-white transition-colors"
+                        aria-label="Toggle navigation menu"
+                      >
+                        <Menu className="w-5 h-5" />
+                      </button>
+                      <Link href="/" className="flex items-center gap-2">
+                        <div className="w-7.5 h-7.5 rounded-lg bg-brand-green flex items-center justify-center glow-green shrink-0" style={{ backgroundColor: 'var(--color-brand-green)' }}>
+                          <Terminal className="w-4.5 h-4.5 text-black stroke-[2.5]" />
+                        </div>
+                        <span className="font-bold text-sm tracking-wider text-white hidden sm:inline-block">CODE COMMANDOS HUB</span>
+                      </Link>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <NotificationBell />
+                      <FocusTimer />
+                    </div>
+                  </header>
+
+                  {/* Main page content scroll viewport */}
+                  <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 relative bg-radial-[circle_at_top_right,rgba(16,185,129,0.03),transparent_40%]">
+                    <div className="hidden md:flex absolute top-6 right-8 z-50 items-center gap-4">
+                      <NotificationBell />
+                      <FocusTimer />
+                    </div>
+                    <ProtectedMainContent>{children}</ProtectedMainContent>
+                  </main>
+                </div>
+              </div>
+            </>
+          )}
+          
+          {/* Global Modals */}
+          {!isLoginPage && (
+            <>
+              <CommandMenu />
+              <GlobalPendingModal />
+              <ChatbotWidget />
+            </>
+          )}
+        </CallProvider>
       </ThemeProvider>
     </AuthProvider>
   );
