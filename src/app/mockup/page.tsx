@@ -279,33 +279,52 @@ export default function MockupPage() {
     setBgRemoveProgress(0);
     setBgRemoveStatus('Initializing AI engine...');
     setBgRemoveError('');
-    try {
-      const config = {
-        publicPath: "https://static.imgly.com/@imgly/background-removal-data/1.4.3/dist/",
-        model: 'small', // Use small model for 8x faster loading and processing!
-        progress: (key: string, current: number, total: number) => {
-          const percent = Math.round((current / total) * 100);
-          setBgRemoveProgress(percent);
-          const taskName = key.includes('wasm') ? 'computing engine' : 'AI weights';
-          setBgRemoveStatus(`Downloading ${taskName}: ${percent}%`);
-        }
-      };
-      
-      setBgRemoveStatus('Removing background...');
-      const resultBlob = await imglyRemoveBackground(inputSource, config as any);
-      const url = URL.createObjectURL(resultBlob);
-      setBgRemoveResult(url);
-      setBgRemoveStatus('Success');
-      
-      // Confetti on success
-      confetti({ particleCount: 80, spread: 60, origin: { y: 0.8 } });
-    } catch (error: any) {
-      console.error('Background removal failed:', error);
-      setBgRemoveError(error?.message || 'Failed to remove background. Please verify your connection.');
-      setBgRemoveStatus('Failed');
-    } finally {
-      setBgRemoveLoading(false);
+    
+    const version = "1.7.0"; // Matches installed package version
+    const paths = [
+      `https://cdn.jsdelivr.net/npm/@imgly/background-removal-data@${version}/dist/`,
+      `https://static.imgly.com/@imgly/background-removal-data/${version}/dist/`,
+      `https://unpkg.com/@imgly/background-removal-data@${version}/dist/`
+    ];
+    
+    let lastError: any = null;
+    
+    for (let i = 0; i < paths.length; i++) {
+      const currentPath = paths[i];
+      try {
+        setBgRemoveStatus(`Initializing engine (${i + 1}/${paths.length})...`);
+        const config = {
+          publicPath: currentPath,
+          model: 'small', // Use small model for 8x faster loading and processing!
+          progress: (key: string, current: number, total: number) => {
+            const percent = Math.round((current / total) * 100);
+            setBgRemoveProgress(percent);
+            const taskName = key.includes('wasm') ? 'computing engine' : 'AI weights';
+            setBgRemoveStatus(`Downloading ${taskName}: ${percent}%`);
+          }
+        };
+        
+        setBgRemoveStatus('Removing background...');
+        const resultBlob = await imglyRemoveBackground(inputSource, config as any);
+        const url = URL.createObjectURL(resultBlob);
+        setBgRemoveResult(url);
+        setBgRemoveStatus('Success');
+        
+        // Confetti on success
+        confetti({ particleCount: 80, spread: 60, origin: { y: 0.8 } });
+        setBgRemoveLoading(false);
+        return; // Success, exit early!
+      } catch (error: any) {
+        console.warn(`Failed with CDN ${currentPath}:`, error);
+        lastError = error;
+      }
     }
+    
+    // If all fail
+    console.error('Background removal failed with all CDNs:', lastError);
+    setBgRemoveError(lastError?.message || 'Failed to remove background. CDNs are unreachable.');
+    setBgRemoveStatus('Failed');
+    setBgRemoveLoading(false);
   };
 
   const handleWatermarkExport = async () => {
