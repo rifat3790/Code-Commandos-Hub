@@ -21,6 +21,7 @@ interface CallContextType {
   toggleVideo: () => void;
   isScreenSharing: boolean;
   toggleScreenShare: () => Promise<void>;
+  screenSharerUid: string | null;
 }
 
 const CallContext = createContext<CallContextType | undefined>(undefined);
@@ -73,6 +74,27 @@ class RingtonePlayer {
 
 const ringtonePlayer = typeof window !== 'undefined' ? new RingtonePlayer() : null;
 
+const createDummyVideoTrack = () => {
+  if (typeof window === 'undefined') return null;
+  const canvas = document.createElement('canvas');
+  canvas.width = 640;
+  canvas.height = 480;
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    ctx.fillStyle = '#030712';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#10B981';
+    ctx.font = '16px monospace';
+    ctx.fillText('CAMERA OFF', 260, 240);
+  }
+  const stream = canvas.captureStream(5);
+  const track = stream.getVideoTracks()[0];
+  if (track) {
+    (track as any).isDummy = true;
+  }
+  return track;
+};
+
 export function CallProvider({ children }: { children: React.ReactNode }) {
   const { user, dbUser } = useAuth();
   const [activeCall, setActiveCall] = useState<any>(null);
@@ -87,6 +109,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   const [remoteHasVideo, setRemoteHasVideo] = useState(false);
   const [callDuration, setCallDuration] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [screenSharerUid, setScreenSharerUid] = useState<string | null>(null);
 
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
   const videoGridRef = useRef<HTMLDivElement>(null);
@@ -101,7 +124,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   const isAdminOrSuperAdmin = dbUser?.role === 'super_admin' || dbUser?.role === 'admin';
 
   // Computed layout state
-  const showVideoLayout = activeCall?.type === 'video' || isScreenSharing || remoteHasVideo;
+  const showVideoLayout = activeCall?.type === 'video' || !!screenSharerUid;
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -273,12 +296,22 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         audio: true, 
         video: type === 'video' 
       });
+      if (type === 'audio') {
+        const dummyTrack = createDummyVideoTrack();
+        if (dummyTrack) {
+          stream.addTrack(dummyTrack);
+        }
+      }
       setLocalStream(stream);
     } catch (err) {
       console.warn("Media access failed, trying fallback:", err);
       if (type === 'video') {
         try {
           stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+          const dummyTrack = createDummyVideoTrack();
+          if (dummyTrack) {
+            stream.addTrack(dummyTrack);
+          }
           setLocalStream(stream);
           type = 'audio';
           setIsVideoMuted(true);
@@ -344,6 +377,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       status: 'ringing',
       offer,
       type,
+      screenSharerUid: null,
       createdAt: new Date().getTime()
     };
 
@@ -362,6 +396,12 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         cleanupCall('declined');
       } else if (data.status === 'ended') {
         cleanupCall('ended');
+      }
+
+      setScreenSharerUid(data.screenSharerUid || null);
+
+      if (data.type === 'video') {
+        setActiveCall((prev: any) => prev ? { ...prev, type: 'video' } : data);
       }
     });
     unsubscribeCallRef.current = unsubscribeCall;
@@ -394,12 +434,22 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         audio: true, 
         video: callType === 'video' 
       });
+      if (callType === 'audio') {
+        const dummyTrack = createDummyVideoTrack();
+        if (dummyTrack) {
+          stream.addTrack(dummyTrack);
+        }
+      }
       setLocalStream(stream);
     } catch (err) {
       console.warn("Accept stream fetch failed, trying fallback:", err);
       if (callType === 'video') {
         try {
           stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+          const dummyTrack = createDummyVideoTrack();
+          if (dummyTrack) {
+            stream.addTrack(dummyTrack);
+          }
           setLocalStream(stream);
           callType = 'audio';
           setIsVideoMuted(true);
@@ -480,8 +530,16 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
 
     const unsubscribeCall = onSnapshot(doc(db, 'calls', incomingCall.id), (snapshot) => {
       const data = snapshot.data();
-      if (data && data.status === 'ended') {
-        cleanupCall('ended');
+      if (data) {
+        if (data.status === 'ended') {
+          cleanupCall('ended');
+        }
+        
+        setScreenSharerUid(data.screenSharerUid || null);
+
+        if (data.type === 'video') {
+          setActiveCall((prev: any) => prev ? { ...prev, type: 'video' } : data);
+        }
       }
     });
     unsubscribeCallRef.current = unsubscribeCall;
@@ -536,41 +594,66 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   };
 
   const toggleVideo = async () => {
-    if (!peerConnectionRef.current) return;
+    if (!peerConnectionRef.current || !localStream) return;
 
-    const videoTrack = localStream?.getVideoTracks()[0];
-    if (videoTrack) {
-      videoTrack.enabled = !videoTrack.enabled;
-      setIsVideoMuted(!videoTrack.enabled);
+    const videoTrack = localStream.getVideoTracks()[0];
+    const isDummy = videoTrack && (videoTrack as any).isDummy;
+
+    if (videoTrack && !isDummy) {
+      // Real camera is on, let's turn it off and switch back to dummy track
+      videoTrack.stop();
+      localStream.removeTrack(videoTrack);
+
+      const dummyTrack = createDummyVideoTrack();
+      if (dummyTrack) {
+        localStream.addTrack(dummyTrack);
+        const videoTransceiver = peerConnectionRef.current.getTransceivers().find(t => t.receiver.track.kind === 'video');
+        if (videoTransceiver?.sender) {
+          await videoTransceiver.sender.replaceTrack(dummyTrack);
+        }
+      }
+      setIsVideoMuted(true);
     } else {
+      // Camera is off (or dummy is running), let's turn on the real camera
       try {
         const cameraStream = await navigator.mediaDevices.getUserMedia({ video: true });
         const cameraTrack = cameraStream.getVideoTracks()[0];
-        
-        if (localStream) {
-          localStream.addTrack(cameraTrack);
+
+        if (videoTrack) {
+          videoTrack.stop();
+          localStream.removeTrack(videoTrack);
         }
 
+        localStream.addTrack(cameraTrack);
         const videoTransceiver = peerConnectionRef.current.getTransceivers().find(t => t.receiver.track.kind === 'video');
         if (videoTransceiver?.sender) {
           await videoTransceiver.sender.replaceTrack(cameraTrack);
         }
-
         setIsVideoMuted(false);
+
+        // Upgrade call to video call in Firestore
+        if (activeCall) {
+          await updateDoc(doc(db, 'calls', activeCall.id), { type: 'video' });
+        }
       } catch (err) {
         console.error("Camera access failed:", err);
+        alert("Failed to access camera device.");
       }
     }
   };
 
   const toggleScreenShare = async () => {
-    if (!peerConnectionRef.current) return;
+    if (!peerConnectionRef.current || !activeCall) return;
     if (dbUser && dbUser.callingAllowed === false) {
       alert("Your calling and screen sharing permissions have been disabled by an administrator.");
       return;
     }
 
     if (!isScreenSharing) {
+      if (screenSharerUid) {
+        alert("Someone else is already sharing their screen.");
+        return;
+      }
       try {
         const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
         screenStreamRef.current = screenStream;
@@ -586,6 +669,12 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         if (localVideoRef.current) {
           localVideoRef.current.srcObject = screenStream;
         }
+
+        // Update Firestore screenSharerUid
+        const myUid = isAdminOrSuperAdmin ? 'admin' : user?.uid;
+        await updateDoc(doc(db, 'calls', activeCall.id), {
+          screenSharerUid: myUid
+        });
 
         screenTrack.onended = () => {
           stopScreenShare();
@@ -620,6 +709,12 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       localVideoRef.current.srcObject = localStream;
     }
 
+    if (activeCall) {
+      await updateDoc(doc(db, 'calls', activeCall.id), {
+        screenSharerUid: null
+      });
+    }
+
     setIsScreenSharing(false);
   };
 
@@ -649,6 +744,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     setIsVideoMuted(false);
     setIsScreenSharing(false);
     setRemoteHasVideo(false);
+    setScreenSharerUid(null);
     
     if (finalState === 'ended' || finalState === 'declined') {
       setTimeout(() => {
@@ -664,7 +760,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <CallContext.Provider value={{ startCall, activeCall, callState, endCall, acceptCall, declineCall, incomingCall, isMuted, toggleMute, isVideoMuted, toggleVideo, isScreenSharing, toggleScreenShare }}>
+    <CallContext.Provider value={{ startCall, activeCall, callState, endCall, acceptCall, declineCall, incomingCall, isMuted, toggleMute, isVideoMuted, toggleVideo, isScreenSharing, toggleScreenShare, screenSharerUid }}>
       {children}
       <audio ref={remoteAudioRef} style={{ display: 'none' }} />
 
@@ -816,7 +912,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
                     autoPlay
                     playsInline
                     muted
-                    className="w-full h-full object-cover scale-x-[-1]"
+                    className={`w-full h-full object-cover ${isScreenSharing ? '' : 'scale-x-[-1]'}`}
                   />
                   {isVideoMuted && (
                     <div className="absolute inset-0 bg-gray-950/80 flex flex-col items-center justify-center gap-1.5">
