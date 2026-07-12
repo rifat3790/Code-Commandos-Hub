@@ -5,6 +5,7 @@ import Sidebar from './Sidebar';
 import { Menu, Terminal, ShieldAlert } from 'lucide-react';
 import Link from 'next/link';
 import { CallProvider } from '@/context/CallContext';
+import { playKeyboardClick } from '@/lib/audioSynth';
 
 // Intercept hydration warnings in development to prevent browser-extension-induced overlay crashes
 if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
@@ -185,6 +186,27 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
 
   const activeFont = storeSettings?.fontFamily || 'sans';
   const activeRadius = storeSettings?.borderRadius || 'xl';
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      // Don't play duplicate sound if user is actively typing in the Focus Studio notepad
+      if (window.location.pathname.startsWith('/focus')) return;
+
+      // Ignore modifiers like Ctrl, Cmd, Alt, Shift by themselves
+      if (['Control', 'Shift', 'Alt', 'Meta'].includes(e.key)) return;
+
+      const isGlobalClicks = localStorage.getItem('focus_global_clicks') === 'true';
+      if (!isGlobalClicks) return;
+
+      const switchType = (localStorage.getItem('focus_switch_type') || 'brown') as any;
+      playKeyboardClick(switchType, 0.35);
+    };
+
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, []);
 
   const getGoogleFontLink = (font: string) => {
     switch(font) {

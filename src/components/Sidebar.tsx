@@ -24,7 +24,8 @@ import {
   Database,
   Gauge,
   LogOut,
-  FolderKanban
+  FolderKanban,
+  Headphones
 } from 'lucide-react';
 import { useWorkspaceStore } from '@/store/workspaceStore';
 import { useAuth } from '@/context/AuthContext';
@@ -72,6 +73,7 @@ export default function Sidebar({ isMobileOpen = false, onCloseMobile }: Sidebar
     { name: 'Audit Suite', path: '/audit', icon: Gauge },
     { name: 'Projects', path: '/credentials', icon: Database },
     { name: 'Mockup Studio', path: '/mockup', icon: Trophy },
+    { name: 'Focus Studio', path: '/focus', icon: Headphones },
     { name: 'AI Assistant', path: '/chat', icon: MessageSquare },
     { name: 'Team Notes', path: '/notes', icon: StickyNote },
     { name: 'Downloads', path: '/downloads', icon: Download },
