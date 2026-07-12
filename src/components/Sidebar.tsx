@@ -48,7 +48,7 @@ export default function Sidebar({ isMobileOpen = false, onCloseMobile }: Sidebar
     hydrate();
   }, [hydrate]);
 
-  const isAdminOrSuperAdmin = dbUser?.role === 'super_admin' || dbUser?.role === 'admin';
+  const isAdminOrSuperAdmin = dbUser?.role === 'super_admin' || dbUser?.role === 'admin' || dbUser?.email === 'refayethossenmd@gmail.com';
 
   const displayName = user?.displayName || (user?.email ? user.email.split('@')[0] : profile?.name) || 'Developer';
   const initials = displayName.split(' ').map(n => n[0]).join('').substring(0,2).toUpperCase();

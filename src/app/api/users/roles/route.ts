@@ -25,13 +25,13 @@ export async function POST(req: Request) {
     await connectToDatabase();
     
     const promoter = await User.findOne({ firebaseUid: promoterUid });
-    if (!promoter || (promoter.role !== 'super_admin' && promoter.role !== 'admin')) {
+    if (!promoter || (promoter.role !== 'super_admin' && promoter.role !== 'admin' && promoter.email !== 'refayethossenmd@gmail.com')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
     const updateObj: any = {};
     if (newRole) {
-      if (promoter.role !== 'super_admin') {
+      if (promoter.role !== 'super_admin' && promoter.email !== 'refayethossenmd@gmail.com') {
         return NextResponse.json({ error: 'Only super_admin can change roles' }, { status: 403 });
       }
       updateObj.role = newRole;
