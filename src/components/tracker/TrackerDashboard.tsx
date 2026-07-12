@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import OrdersDashboard from './OrdersDashboard';
 import IssuesDashboard from './IssuesDashboard';
-import { LayoutDashboard, AlertCircle, Palette } from 'lucide-react';
+import WorkloadMetricsTab from './WorkloadMetricsTab';
+import { LayoutDashboard, AlertCircle, TrendingUp } from 'lucide-react';
 import { useWorkspaceStore } from '@/store/workspaceStore';
 import { useAuth } from '@/context/AuthContext';
 
@@ -14,7 +15,7 @@ export default function TrackerDashboard({
   csvDataOrders: string, 
   csvDataIssues: string 
 }) {
-  const [activeTab, setActiveTab] = useState<'orders' | 'issues'>('orders');
+  const [activeTab, setActiveTab] = useState<'orders' | 'issues' | 'metrics'>('orders');
   const { settings, updateSettings } = useWorkspaceStore();
   const { dbUser } = useAuth();
 
@@ -60,13 +61,28 @@ export default function TrackerDashboard({
             <AlertCircle className="w-4 h-4" />
             Project Issues
           </button>
+          {(dbUser?.email === 'refayethossenmd@gmail.com' || dbUser?.showWorkloadMetrics === true) && (
+            <button
+              onClick={() => setActiveTab('metrics')}
+              className={`flex items-center gap-2 px-6 py-3 rounded-xl transition-all font-medium text-sm w-full md:w-auto justify-center ${
+                activeTab === 'metrics' 
+                  ? 'bg-green-500 text-white shadow-md shadow-green-500/20 glow-green' 
+                  : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800'
+              }`}
+            >
+              <TrendingUp className="w-4 h-4" />
+              Workload Metrics
+            </button>
+          )}
         </div>
       </div>
 
       {activeTab === 'orders' ? (
         <OrdersDashboard csvData={csvDataOrders} activeLayout={activeLayout} />
-      ) : (
+      ) : activeTab === 'issues' ? (
         <IssuesDashboard csvData={csvDataIssues} activeLayout={activeLayout} />
+      ) : (
+        <WorkloadMetricsTab csvData={csvDataOrders} />
       )}
     </div>
   );
