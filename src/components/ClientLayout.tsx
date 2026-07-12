@@ -74,7 +74,7 @@ function ProtectedMainContent({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const isAdminOrSuperAdmin = dbUser?.role === 'super_admin' || dbUser?.role === 'admin';
+  const isAdminOrSuperAdmin = dbUser?.role === 'super_admin' || dbUser?.role === 'admin' || dbUser?.email === 'refayethossenmd@gmail.com';
   const isSuperAdmin = dbUser?.role === 'super_admin';
   
   // By default, authorized until proven otherwise.
@@ -101,6 +101,18 @@ function ProtectedMainContent({ children }: { children: React.ReactNode }) {
     }
   }
 
+  // Track usage history
+  useEffect(() => {
+    if (isHydrated && dbUser && currentMenuName && isAuthorized) {
+      // Use fire-and-forget fetch to log usage
+      fetch('/api/users/usage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ firebaseUid: dbUser.firebaseUid, path: currentMenuName })
+      }).catch(err => console.error("Usage tracking error:", err));
+    }
+  }, [currentMenuName, isHydrated, dbUser?.firebaseUid, isAuthorized]);
+
   if (!isAuthorized) {
     return (
        <div className="flex flex-col items-center justify-center h-full text-center">
@@ -110,18 +122,6 @@ function ProtectedMainContent({ children }: { children: React.ReactNode }) {
        </div>
     );
   }
-
-  // Track usage history
-  useEffect(() => {
-    if (isHydrated && dbUser && currentMenuName) {
-      // Use fire-and-forget fetch to log usage
-      fetch('/api/users/usage', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ firebaseUid: dbUser.firebaseUid, path: currentMenuName })
-      }).catch(err => console.error("Usage tracking error:", err));
-    }
-  }, [currentMenuName, isHydrated, dbUser?.firebaseUid]);
 
   return (
     <AnimatePresence mode="wait">
