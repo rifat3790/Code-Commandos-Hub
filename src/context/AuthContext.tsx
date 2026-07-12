@@ -16,8 +16,19 @@ const AuthContext = createContext<AuthContextType>({ user: null, dbUser: null, l
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [dbUser, setDbUser] = useState<any | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [dbUser, setDbUser] = useState<any | null>(() => {
+    if (typeof window !== 'undefined') {
+      const cached = localStorage.getItem('cached_db_user');
+      return cached ? JSON.parse(cached) : null;
+    }
+    return null;
+  });
+  const [loading, setLoading] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return !localStorage.getItem('cached_db_user');
+    }
+    return true;
+  });
   const router = useRouter();
   const pathname = usePathname();
 
@@ -26,6 +37,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(currentUser);
       
       if (currentUser) {
+        const cached = localStorage.getItem('cached_db_user');
+        if (!cached) {
+          setLoading(true);
+        }
+
         try {
           // 1. Sync User to MongoDB (creates or updates lastLoginAt)
           await fetch('/api/users', {
@@ -44,17 +60,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const data = await res.json();
           if (data.success) {
             if (data.user.role === 'banned') {
+              localStorage.removeItem('cached_db_user');
               await signOut(auth);
               setDbUser(null);
               router.push('/login?error=account_suspended');
             } else {
               setDbUser(data.user);
+              localStorage.setItem('cached_db_user', JSON.stringify(data.user));
             }
           }
         } catch (e) {
           console.error("Error syncing user data to DB:", e);
         }
       } else {
+        localStorage.removeItem('cached_db_user');
         setDbUser(null);
         if (pathname !== '/login') {
           router.push('/login');

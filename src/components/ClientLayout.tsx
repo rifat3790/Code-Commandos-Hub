@@ -125,13 +125,13 @@ function ProtectedMainContent({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AnimatePresence mode="wait">
+    <AnimatePresence>
       <motion.div
         key={pathname}
-        initial={{ opacity: 0, y: 5 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -5 }}
-        transition={{ duration: 0.2 }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.15, ease: 'easeOut' }}
         className="h-full"
       >
         {children}
@@ -186,6 +186,27 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
 
   const activeFont = storeSettings?.fontFamily || 'sans';
   const activeRadius = storeSettings?.borderRadius || 'xl';
+
+  const [navProgress, setNavProgress] = useState(0);
+  const [showProgress, setShowProgress] = useState(false);
+
+  useEffect(() => {
+    // Trigger progress bar sweep on navigation
+    setShowProgress(true);
+    setNavProgress(35);
+    
+    const timer1 = setTimeout(() => setNavProgress(75), 80);
+    const timer2 = setTimeout(() => {
+      setNavProgress(100);
+      const fadeTimer = setTimeout(() => setShowProgress(false), 150);
+      return () => clearTimeout(fadeTimer);
+    }, 250);
+
+    return () => {
+      clearTimeout(timer1);
+      clearTimeout(timer2);
+    };
+  }, [pathname]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -360,6 +381,16 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
           }
         `}} />
         <CallProvider>
+          {showProgress && (
+            <div className="fixed top-0 left-0 right-0 h-[2.5px] bg-transparent z-[9999] pointer-events-none">
+              <motion.div 
+                initial={{ width: '0%' }}
+                animate={{ width: `${navProgress}%` }}
+                transition={{ ease: 'easeOut', duration: 0.25 }}
+                className="h-full bg-gradient-to-r from-green-500 via-emerald-400 to-green-300 shadow-[0_0_8px_#10B981,0_0_12px_#34D399]"
+              />
+            </div>
+          )}
           <HeartbeatTrigger />
           <WorkspaceHydrator />
           <div className="flex flex-col md:flex-row h-screen w-screen overflow-hidden bg-[#030712]">
