@@ -144,19 +144,25 @@ const DEFAULT_FIVERR_SCREENSHOT = `data:image/svg+xml;utf8,${encodeURIComponent(
 </svg>
 `)}`;
 
+interface BgRemoveItem {
+  id: string;
+  file: File;
+  sourceUrl: string;
+  resultUrl: string;
+  status: 'idle' | 'loading' | 'success' | 'failed';
+  progress: number;
+  error: string;
+}
+
 export default function MockupPage() {
   const store = useWorkspaceStore();
   const cardRef = useRef<HTMLDivElement>(null);
   const [downloading, setDownloading] = useState(false);
 
   const [activeTab, setActiveTab] = useState<'studio' | 'bg-remove' | 'watermark'>('studio');
-  const [bgRemoveSource, setBgRemoveSource] = useState<string>('');
-  const [bgRemoveResult, setBgRemoveResult] = useState<string>('');
-  const [bgRemoveLoading, setBgRemoveLoading] = useState(false);
-  const [bgRemoveProgress, setBgRemoveProgress] = useState<number>(0);
-  const [bgRemoveStatus, setBgRemoveStatus] = useState<string>('');
-  const [bgRemoveError, setBgRemoveError] = useState<string>('');
-  const [bgRemoveFile, setBgRemoveFile] = useState<File | null>(null);
+  const [bgRemoveItems, setBgRemoveItems] = useState<BgRemoveItem[]>([]);
+  const [bgRemoveRatio, setBgRemoveRatio] = useState<'original' | '1:1' | '16:9' | '4:3' | '9:16'>('original');
+  const [bgRemoveProcessing, setBgRemoveProcessing] = useState(false);
 
   // Portfolio Watermarker States
   const watermarkRef = useRef<HTMLDivElement>(null);
@@ -258,12 +264,16 @@ export default function MockupPage() {
       else if (target === 'photo2') setMemberPhoto2(base64);
       else if (target === 'review') setReviewScreenshot(base64);
       else if (target === 'bg-remove') {
-        setBgRemoveSource(base64);
-        setBgRemoveFile(file);
-        setBgRemoveResult('');
-        setBgRemoveProgress(0);
-        setBgRemoveStatus('');
-        setBgRemoveError('');
+        const newItems: BgRemoveItem[] = [{
+          id: Math.random().toString(36).substring(7),
+          file: file,
+          sourceUrl: base64,
+          resultUrl: '',
+          status: 'idle',
+          progress: 0,
+          error: ''
+        }];
+        setBgRemoveItems(prev => [...prev, ...newItems]);
       }
       else if (target === 'watermark') {
         setWatermarkImage(base64);
@@ -272,59 +282,159 @@ export default function MockupPage() {
     reader.readAsDataURL(file);
   };
 
-  const processBgRemoval = async () => {
-    const inputSource = bgRemoveFile || bgRemoveSource;
-    if (!inputSource) return;
-    setBgRemoveLoading(true);
-    setBgRemoveProgress(0);
-    setBgRemoveStatus('Initializing AI engine...');
-    setBgRemoveError('');
-    
+  const handleBgRemoveMultipleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const newItems: BgRemoveItem[] = Array.from(files).map((file, idx) => ({
+      id: Math.random().toString(36).substring(7) + '-' + idx,
+      file: file,
+      sourceUrl: URL.createObjectURL(file),
+      resultUrl: '',
+      status: 'idle',
+      progress: 0,
+      error: ''
+    }));
+
+    setBgRemoveItems(prev => [...prev, ...newItems]);
+  };
+
+  const applyRatioToImage = (imageBlob: Blob, targetRatio: string): Promise<Blob> => {
+    return new Promise((resolve) => {
+      if (targetRatio === 'original') {
+        resolve(imageBlob);
+        return;
+      }
+
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(imageBlob);
+          return;
+        }
+
+        const originalWidth = img.width;
+        const originalHeight = img.height;
+        let targetWidth = originalWidth;
+        let targetHeight = originalHeight;
+
+        const ratioMap = {
+          '1:1': 1,
+          '16:9': 16 / 9,
+          '4:3': 4 / 3,
+          '9:16': 9 / 16
+        };
+
+        const ratio = ratioMap[targetRatio as keyof typeof ratioMap] || 1;
+
+        if (originalWidth / originalHeight > ratio) {
+          targetHeight = originalHeight;
+          targetWidth = originalHeight * ratio;
+        } else {
+          targetWidth = originalWidth;
+          targetHeight = originalWidth / ratio;
+        }
+
+        canvas.width = targetWidth;
+        canvas.height = targetHeight;
+        ctx.clearRect(0, 0, targetWidth, targetHeight);
+
+        const dx = (targetWidth - originalWidth) / 2;
+        const dy = (targetHeight - originalHeight) / 2;
+        ctx.drawImage(img, dx, dy);
+
+        canvas.toBlob((blob) => {
+          if (blob) resolve(blob);
+          else resolve(imageBlob);
+        }, 'image/png');
+      };
+      img.onerror = () => resolve(imageBlob);
+      img.src = URL.createObjectURL(imageBlob);
+    });
+  };
+
+  const processBatchBgRemoval = async () => {
+    const itemsToProcess = bgRemoveItems.filter(item => item.status === 'idle' || item.status === 'failed');
+    if (itemsToProcess.length === 0) return;
+
+    setBgRemoveProcessing(true);
     const version = "1.7.0"; // Matches installed package version
-    const paths = [
-      `https://staticimgly.com/@imgly/background-removal-data/${version}/dist/`,
-      undefined // fallback to library default
-    ];
-    
-    let lastError: any = null;
-    
-    for (let i = 0; i < paths.length; i++) {
-      const currentPath = paths[i];
+    const publicPath = `https://staticimgly.com/@imgly/background-removal-data/${version}/dist/`;
+
+    for (const item of itemsToProcess) {
+      setBgRemoveItems(prev => prev.map(i => i.id === item.id ? { ...i, status: 'loading', progress: 0 } : i));
+      
       try {
-        setBgRemoveStatus(`Initializing engine...`);
         const config = {
-          publicPath: currentPath,
+          publicPath,
           model: 'small', // Use small model for 8x faster loading and processing!
           proxyToWorker: true, // Run in a Web Worker for 3x faster speeds and zero UI freezing
           progress: (key: string, current: number, total: number) => {
             const percent = Math.round((current / total) * 100);
-            setBgRemoveProgress(percent);
-            const taskName = key.includes('wasm') ? 'computing engine' : 'AI weights';
-            setBgRemoveStatus(`Downloading ${taskName}: ${percent}%`);
+            setBgRemoveItems(prev => prev.map(i => i.id === item.id ? { ...i, progress: percent } : i));
           }
         };
+
+        const resultBlob = await imglyRemoveBackground(item.file, config as any);
         
-        setBgRemoveStatus('Removing background...');
-        const resultBlob = await imglyRemoveBackground(inputSource, config as any);
-        const url = URL.createObjectURL(resultBlob);
-        setBgRemoveResult(url);
-        setBgRemoveStatus('Success');
-        
-        // Confetti on success
-        confetti({ particleCount: 80, spread: 60, origin: { y: 0.8 } });
-        setBgRemoveLoading(false);
-        return; // Success, exit early!
+        // Resize according to ratio
+        const finalBlob = await applyRatioToImage(resultBlob, bgRemoveRatio);
+        const resultUrl = URL.createObjectURL(finalBlob);
+
+        setBgRemoveItems(prev => prev.map(i => i.id === item.id ? { ...i, status: 'success', resultUrl } : i));
       } catch (error: any) {
-        console.warn(`Failed with CDN path ${currentPath}:`, error);
-        lastError = error;
+        console.error('Batch processing failed:', error);
+        setBgRemoveItems(prev => prev.map(i => i.id === item.id ? { ...i, status: 'failed', error: error?.message || 'Failed' } : i));
       }
     }
+
+    setBgRemoveProcessing(false);
+    confetti({ particleCount: 80, spread: 60, origin: { y: 0.8 } });
+  };
+
+  const downloadAllProcessed = async () => {
+    const successItems = bgRemoveItems.filter(item => item.status === 'success' && item.resultUrl);
+    if (successItems.length === 0) return;
+
+    if (successItems.length === 1) {
+      const item = successItems[0];
+      const link = document.createElement('a');
+      link.download = `removed-bg-${item.file.name.split('.')[0]}.png`;
+      link.href = item.resultUrl;
+      link.click();
+      return;
+    }
+
+    const JSZip = (await import('jszip')).default;
+    const zip = new JSZip();
+
+    for (let idx = 0; idx < successItems.length; idx++) {
+      const item = successItems[idx];
+      const res = await fetch(item.resultUrl);
+      const blob = await res.blob();
+      const fileName = `removed-bg-${item.file.name.split('.')[0] || `image-${idx}`}.png`;
+      zip.file(fileName, blob);
+    }
+
+    const zipBlob = await zip.generateAsync({ type: 'blob' });
+    const zipUrl = URL.createObjectURL(zipBlob);
+    const link = document.createElement('a');
+    link.download = 'removed-backgrounds-batch.zip';
+    link.href = zipUrl;
+    link.click();
     
-    // If all fail
-    console.error('Background removal failed with all paths:', lastError);
-    setBgRemoveError(lastError?.message || 'Failed to remove background. CDN assets are unreachable.');
-    setBgRemoveStatus('Failed');
-    setBgRemoveLoading(false);
+    store.logActivity('Batch Background Removed', 'mockup', `Processed ${successItems.length} images.`);
+  };
+
+  const handleIndividualBgRemoveDownload = (item: BgRemoveItem) => {
+    if (!item.resultUrl) return;
+    const link = document.createElement('a');
+    link.download = `removed-bg-${item.file.name.split('.')[0]}.png`;
+    link.href = item.resultUrl;
+    link.click();
+    confetti({ particleCount: 30, spread: 40, origin: { y: 0.8 } });
   };
 
   const handleWatermarkExport = async () => {
@@ -348,18 +458,6 @@ export default function MockupPage() {
     } finally {
       setWatermarkExporting(false);
     }
-  };
-
-  const handleBgRemoveDownload = () => {
-    if (!bgRemoveResult) return;
-    const link = document.createElement('a');
-    link.download = 'removed-background.png';
-    link.href = bgRemoveResult;
-    link.click();
-    
-    // Confetti on success
-    confetti({ particleCount: 80, spread: 60, origin: { y: 0.8 } });
-    store.logActivity('Background Removed', 'mockup', 'Processed image background removal.');
   };
 
   // Export card as image
@@ -846,7 +944,7 @@ export default function MockupPage() {
       </div>
 
       {activeTab === 'bg-remove' && (
-        <div className="max-w-4xl mx-auto space-y-6">
+        <div className="max-w-5xl mx-auto space-y-6">
           {/* Custom style for the laser scanner */}
           <style dangerouslySetInnerHTML={{__html: `
             @keyframes scan-animation {
@@ -867,13 +965,79 @@ export default function MockupPage() {
             }
           `}} />
 
-          <div className="p-8 rounded-2xl glass-panel border border-glass-border text-center space-y-6">
-            {!bgRemoveSource ? (
-              <div className="border-2 border-dashed border-gray-700/50 hover:border-purple-500/50 bg-gray-950/30 rounded-xl p-12 transition-all group relative cursor-pointer overflow-hidden">
+          {/* Ratio Selector and Control Bar */}
+          <div className="p-6 rounded-2xl glass-panel border border-glass-border space-y-4">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block text-left">Target Aspect Ratio</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {(['original', '1:1', '16:9', '4:3', '9:16'] as const).map((ratio) => (
+                    <button
+                      key={ratio}
+                      onClick={() => setBgRemoveRatio(ratio)}
+                      className={`px-3 py-1.5 rounded-lg border text-xs font-black uppercase transition-all ${
+                        bgRemoveRatio === ratio
+                          ? 'border-purple-500/35 bg-purple-500/15 text-purple-400 drop-shadow-[0_0_8px_rgba(168,85,247,0.35)]'
+                          : 'border-glass-border text-gray-400 hover:bg-glass-hover hover:text-white'
+                      }`}
+                    >
+                      {ratio === 'original' ? 'Original Size' : ratio}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {bgRemoveItems.length > 0 && (
+                <div className="flex flex-wrap gap-2 self-end">
+                  <label className="px-4 py-2 rounded-lg bg-gray-900 border border-glass-border hover:bg-glass-hover text-white text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-colors">
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>Upload More</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={handleBgRemoveMultipleUpload}
+                      className="hidden"
+                    />
+                  </label>
+                  <button
+                    onClick={processBatchBgRemoval}
+                    disabled={bgRemoveProcessing || bgRemoveItems.filter(i => i.status === 'idle' || i.status === 'failed').length === 0}
+                    className="px-4 py-2 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 disabled:opacity-50 text-white font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-1.5"
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    <span>{bgRemoveProcessing ? 'Processing Queue...' : 'Process Queue'}</span>
+                  </button>
+                  <button
+                    onClick={downloadAllProcessed}
+                    disabled={bgRemoveItems.filter(i => i.status === 'success').length === 0}
+                    className="px-4 py-2 rounded-lg bg-green-500 hover:bg-green-400 disabled:opacity-50 text-black font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-1.5 glow-green"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>Download All (ZIP)</span>
+                  </button>
+                  <button
+                    onClick={() => setBgRemoveItems([])}
+                    disabled={bgRemoveProcessing}
+                    className="px-4 py-2 rounded-lg bg-red-950/20 border border-red-500/20 hover:bg-red-500/10 text-red-400 font-bold text-xs uppercase tracking-wider transition-colors flex items-center gap-1.5"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Clear All</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Batch Grid / Upload Center */}
+          {bgRemoveItems.length === 0 ? (
+            <div className="p-12 rounded-2xl glass-panel border border-glass-border text-center space-y-6">
+              <div className="border-2 border-dashed border-gray-700/50 hover:border-purple-500/50 bg-gray-950/30 rounded-xl p-16 transition-all group relative cursor-pointer overflow-hidden max-w-2xl mx-auto">
                 <input
                   type="file"
                   accept="image/*"
-                  onChange={(e) => handleImageUpload(e as any, 'bg-remove')}
+                  multiple
+                  onChange={handleBgRemoveMultipleUpload}
                   className="absolute inset-0 opacity-0 cursor-pointer z-10 w-full h-full"
                 />
                 <div className="flex flex-col items-center space-y-4">
@@ -881,129 +1045,139 @@ export default function MockupPage() {
                     <Upload className="w-8 h-8 text-purple-400" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-bold text-white">Upload Image</h3>
-                    <p className="text-sm text-gray-400 mt-1">Drag and drop or click to browse</p>
+                    <h3 className="text-lg font-bold text-white">Batch Upload Images</h3>
+                    <p className="text-sm text-gray-400 mt-1">Select multiple images to remove backgrounds at once</p>
                   </div>
                 </div>
               </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                {/* Original Image */}
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-gray-400">
-                    <span>Original</span>
-                    <button 
-                      onClick={() => { setBgRemoveSource(''); setBgRemoveResult(''); setBgRemoveError(''); setBgRemoveFile(null); }} 
-                      className="text-red-400 hover:text-red-300 flex items-center gap-1 transition-colors"
-                      disabled={bgRemoveLoading}
-                    >
-                      <Trash2 className="w-3.5 h-3.5" /> Clear
-                    </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {bgRemoveItems.map((item) => (
+                <div key={item.id} className="p-4 rounded-xl border border-glass-border bg-gray-950/20 space-y-3 flex flex-col justify-between relative overflow-hidden group">
+                  
+                  {/* Cancel/Remove individual item */}
+                  <button 
+                    onClick={() => setBgRemoveItems(prev => prev.filter(i => i.id !== item.id))}
+                    className="absolute top-2 right-2 p-1.5 rounded-full bg-black/60 text-gray-400 hover:text-red-400 hover:bg-black/90 z-20 opacity-0 group-hover:opacity-100 transition-opacity"
+                    title="Remove from list"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+
+                  <div className="space-y-2">
+                    {/* Item header */}
+                    <div className="flex items-center justify-between text-[10px] font-bold text-gray-400 truncate pr-6">
+                      <span className="truncate">{item.file.name}</span>
+                      <span className="shrink-0 text-gray-500 font-mono ml-2">{(item.file.size / 1024 / 1024).toFixed(2)} MB</span>
+                    </div>
+
+                    {/* Preview comparison card */}
+                    <div className="relative rounded-lg overflow-hidden border border-gray-800 bg-gray-950 aspect-square flex items-center justify-center">
+                      
+                      {/* Original / Loading / Success Preview rendering */}
+                      {item.status === 'success' && item.resultUrl ? (
+                        <div 
+                          className="w-full h-full flex items-center justify-center bg-gray-950"
+                          style={{
+                            backgroundImage: 'url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAMUlEQVQ4T2NkYNgfQEhQ+M9AzIAhMHg3yQxDDYwGkEQD0YAAw38GH0eDqMGjAcjAAAD7rR9c6xM1VwAAAABJRU5ErkJggg==")',
+                            backgroundRepeat: 'repeat',
+                            backgroundSize: '15px 15px'
+                          }}
+                        >
+                          <img src={item.resultUrl} className="max-w-full max-h-full object-contain" alt="Removed background" />
+                        </div>
+                      ) : (
+                        <div className="w-full h-full relative flex items-center justify-center">
+                          <img src={item.sourceUrl} className="max-w-full max-h-full object-contain" alt="Original source" />
+                          
+                          {/* Loading scan overlays */}
+                          {item.status === 'loading' && (
+                            <>
+                              <div className="laser-scanner" />
+                              <div className="absolute inset-0 bg-black/50 backdrop-blur-[1px] flex flex-col items-center justify-center p-3 gap-2">
+                                <div className="relative w-12 h-12 flex items-center justify-center">
+                                  <svg className="w-full h-full transform -rotate-90">
+                                    <circle cx="24" cy="24" r="20" className="stroke-gray-800" strokeWidth="2.5" fill="transparent" />
+                                    <circle
+                                      cx="24"
+                                      cy="24"
+                                      r="20"
+                                      className="stroke-purple-500 transition-all duration-300 ease-out"
+                                      strokeWidth="2.5"
+                                      fill="transparent"
+                                      strokeDasharray={`${2 * Math.PI * 20}`}
+                                      strokeDashoffset={`${2 * Math.PI * 20 * (1 - item.progress / 100)}`}
+                                      strokeLinecap="round"
+                                    />
+                                  </svg>
+                                  <span className="absolute text-[9px] font-black text-white">{item.progress}%</span>
+                                </div>
+                                <span className="text-[8px] font-black text-purple-400 uppercase tracking-widest animate-pulse">Extracting...</span>
+                              </div>
+                            </>
+                          )}
+
+                          {item.status === 'failed' && (
+                            <div className="absolute inset-0 bg-black/75 flex flex-col items-center justify-center p-4 text-center space-y-2">
+                              <Trash2 className="w-5 h-5 text-red-500" />
+                              <p className="text-[9px] text-red-400 font-bold leading-tight">{item.error || 'Failed'}</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <div className="relative rounded-xl overflow-hidden border border-gray-700 bg-gray-900 aspect-square flex items-center justify-center">
-                    <img src={bgRemoveSource} className="max-w-full max-h-full object-contain" alt="Original" />
-                    {bgRemoveLoading && (
+
+                  {/* Actions / Status pills footer */}
+                  <div className="pt-1.5 border-t border-glass-border flex items-center justify-between gap-2 h-9">
+                    {item.status === 'success' ? (
                       <>
-                        <div className="laser-scanner" />
-                        <div className="absolute inset-0 bg-black/40 backdrop-blur-[1px] pointer-events-none" />
+                        <span className="text-[9px] text-green-400 font-bold uppercase tracking-wider flex items-center gap-1">
+                          <Check className="w-3.5 h-3.5" />
+                          <span>Finished</span>
+                        </span>
+                        <button
+                          onClick={() => handleIndividualBgRemoveDownload(item)}
+                          className="px-2.5 py-1 rounded bg-green-500 hover:bg-green-400 text-black text-[10px] font-bold uppercase tracking-wider transition-colors flex items-center gap-1"
+                        >
+                          <Download className="w-3 h-3" />
+                          <span>Download</span>
+                        </button>
+                      </>
+                    ) : item.status === 'loading' ? (
+                      <span className="text-[9px] text-purple-400 font-bold uppercase tracking-wider animate-pulse flex items-center gap-1">
+                        <RefreshCw className="w-3 h-3 animate-spin" />
+                        <span>Processing...</span>
+                      </span>
+                    ) : item.status === 'failed' ? (
+                      <>
+                        <span className="text-[9px] text-red-400 font-bold uppercase tracking-wider">Failed</span>
+                        <button
+                          onClick={processBatchBgRemoval}
+                          className="px-2 py-1 rounded bg-gray-900 border border-gray-800 hover:bg-gray-800 text-white text-[10px] font-bold uppercase tracking-wider transition-colors"
+                        >
+                          Retry
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-[9px] text-gray-500 font-bold uppercase tracking-wider">Ready to process</span>
+                        <button
+                          onClick={processBatchBgRemoval}
+                          disabled={bgRemoveProcessing}
+                          className="px-2.5 py-1 rounded bg-purple-600 hover:bg-purple-500 text-white text-[10px] font-bold uppercase tracking-wider transition-colors flex items-center gap-1"
+                        >
+                          <Sparkles className="w-3 h-3" />
+                          <span>Extract</span>
+                        </button>
                       </>
                     )}
                   </div>
-                  {!bgRemoveResult && !bgRemoveError && (
-                    <button 
-                      onClick={processBgRemoval}
-                      disabled={bgRemoveLoading}
-                      className="w-full py-3 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 disabled:opacity-50 text-white font-black text-xs uppercase tracking-wider transition-all shadow-lg flex items-center justify-center gap-2"
-                    >
-                      {bgRemoveLoading ? (
-                        <>
-                          <RefreshCw className="w-4 h-4 animate-spin" /> Processing...
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles className="w-4 h-4" /> Remove Background
-                        </>
-                      )}
-                    </button>
-                  )}
                 </div>
-
-                {/* Result Image */}
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-gray-400 h-4">
-                    <span className="text-purple-400 flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5" /> Result</span>
-                  </div>
-                  <div 
-                    className="relative rounded-xl overflow-hidden border border-gray-700 aspect-square flex items-center justify-center bg-gray-950"
-                    style={{
-                      backgroundImage: !bgRemoveLoading && bgRemoveResult ? 'url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAMUlEQVQ4T2NkYNgfQEhQ+M9AzIAhMHg3yQxDDYwGkEQD0YAAw38GH0eDqMGjAcjAAAD7rR9c6xM1VwAAAABJRU5ErkJggg==")' : 'none',
-                      backgroundRepeat: 'repeat',
-                      backgroundSize: '20px 20px'
-                    }}
-                  >
-                    {bgRemoveLoading ? (
-                      <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-950/80 p-6 space-y-4">
-                        {/* Premium custom loading progress */}
-                        <div className="relative w-20 h-20 flex items-center justify-center">
-                          <svg className="w-full h-full transform -rotate-90">
-                            <circle
-                              cx="40"
-                              cy="40"
-                              r="36"
-                              className="stroke-gray-800"
-                              strokeWidth="4"
-                              fill="transparent"
-                            />
-                            <circle
-                              cx="40"
-                              cy="40"
-                              r="36"
-                              className="stroke-purple-500 transition-all duration-300 ease-out"
-                              strokeWidth="4"
-                              fill="transparent"
-                              strokeDasharray={`${2 * Math.PI * 36}`}
-                              strokeDashoffset={`${2 * Math.PI * 36 * (1 - bgRemoveProgress / 100)}`}
-                              strokeLinecap="round"
-                            />
-                          </svg>
-                          <span className="absolute text-sm font-black text-white">{bgRemoveProgress}%</span>
-                        </div>
-                        <div className="space-y-1 text-center">
-                          <p className="text-xs font-bold text-purple-400 tracking-wider uppercase animate-pulse">{bgRemoveStatus}</p>
-                          <p className="text-[10px] text-gray-500">First load downloads the client-side model weights.</p>
-                        </div>
-                      </div>
-                    ) : bgRemoveResult ? (
-                      <img src={bgRemoveResult} className="max-w-full max-h-full object-contain" alt="Removed Background" />
-                    ) : bgRemoveError ? (
-                      <div className="absolute inset-0 flex flex-col items-center justify-center p-6 space-y-3">
-                        <div className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center">
-                          <Trash2 className="w-6 h-6 text-red-500" />
-                        </div>
-                        <p className="text-xs text-red-400 font-bold">{bgRemoveError}</p>
-                        <button 
-                          onClick={processBgRemoval}
-                          className="px-4 py-1.5 rounded bg-gray-850 border border-gray-700 hover:bg-gray-800 text-white font-bold text-xs uppercase tracking-wider transition-colors flex items-center gap-1.5"
-                        >
-                          <RefreshCw className="w-3.5 h-3.5" /> Try Again
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="text-gray-600 text-xs font-bold uppercase tracking-widest">Waiting...</div>
-                    )}
-                  </div>
-                  {bgRemoveResult && !bgRemoveLoading && (
-                    <button 
-                      onClick={handleBgRemoveDownload}
-                      className="w-full py-3 rounded-lg bg-green-500 hover:bg-green-400 text-black font-black text-xs uppercase tracking-wider transition-all shadow-lg glow-green flex items-center justify-center gap-2"
-                    >
-                      <Download className="w-4 h-4" /> Download PNG
-                    </button>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
