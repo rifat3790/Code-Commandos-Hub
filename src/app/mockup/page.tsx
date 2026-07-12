@@ -282,9 +282,8 @@ export default function MockupPage() {
     
     const version = "1.7.0"; // Matches installed package version
     const paths = [
-      `https://cdn.jsdelivr.net/npm/@imgly/background-removal-data@${version}/dist/`,
-      `https://static.imgly.com/@imgly/background-removal-data/${version}/dist/`,
-      `https://unpkg.com/@imgly/background-removal-data@${version}/dist/`
+      `https://staticimgly.com/@imgly/background-removal-data/${version}/dist/`,
+      undefined // fallback to library default
     ];
     
     let lastError: any = null;
@@ -292,7 +291,7 @@ export default function MockupPage() {
     for (let i = 0; i < paths.length; i++) {
       const currentPath = paths[i];
       try {
-        setBgRemoveStatus(`Initializing engine (${i + 1}/${paths.length})...`);
+        setBgRemoveStatus(`Initializing engine...`);
         const config = {
           publicPath: currentPath,
           model: 'small', // Use small model for 8x faster loading and processing!
@@ -315,14 +314,14 @@ export default function MockupPage() {
         setBgRemoveLoading(false);
         return; // Success, exit early!
       } catch (error: any) {
-        console.warn(`Failed with CDN ${currentPath}:`, error);
+        console.warn(`Failed with CDN path ${currentPath}:`, error);
         lastError = error;
       }
     }
     
     // If all fail
-    console.error('Background removal failed with all CDNs:', lastError);
-    setBgRemoveError(lastError?.message || 'Failed to remove background. CDNs are unreachable.');
+    console.error('Background removal failed with all paths:', lastError);
+    setBgRemoveError(lastError?.message || 'Failed to remove background. CDN assets are unreachable.');
     setBgRemoveStatus('Failed');
     setBgRemoveLoading(false);
   };
