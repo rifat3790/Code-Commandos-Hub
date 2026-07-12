@@ -4,6 +4,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useRouter, usePathname } from 'next/navigation';
+import PageLoader from '@/components/PageLoader';
 
 interface AuthContextType {
   user: User | null;
@@ -67,11 +68,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider value={{ user, dbUser, loading }}>
-      {!loading ? children : (
-        <div className="flex h-screen w-screen items-center justify-center bg-[#030712]">
-          <div className="w-10 h-10 border-4 border-green-500 border-t-transparent rounded-full animate-spin glow-green"></div>
-        </div>
-      )}
+      {!loading ? children : <PageLoader />}
     </AuthContext.Provider>
   );
 }
