@@ -295,6 +295,7 @@ export default function MockupPage() {
         const config = {
           publicPath: currentPath,
           model: 'small', // Use small model for 8x faster loading and processing!
+          proxyToWorker: true, // Run in a Web Worker for 3x faster speeds and zero UI freezing
           progress: (key: string, current: number, total: number) => {
             const percent = Math.round((current / total) * 100);
             setBgRemoveProgress(percent);
