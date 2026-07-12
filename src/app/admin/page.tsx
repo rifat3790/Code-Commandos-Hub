@@ -440,7 +440,7 @@ export default function AdminDashboard() {
                       {u.callingAllowed !== false ? 'Allowed' : 'Blocked'}
                     </button>
                   </div>
-                  {user?.email === 'refayethossenmd@gmail.com' && (
+                  {dbUser?.email === 'refayethossenmd@gmail.com' && (
                     <div className="flex items-center justify-between text-xs text-gray-500 mt-2 pt-2 border-t border-white/5">
                       <span>Workload Metrics:</span>
                       <button
