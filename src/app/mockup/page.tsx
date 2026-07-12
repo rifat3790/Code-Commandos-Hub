@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import confetti from 'canvas-confetti';
+import imglyRemoveBackground from '@imgly/background-removal';
 import { useWorkspaceStore } from '@/store/workspaceStore';
 import { MockupStyle } from '@/types';
 
@@ -148,6 +149,11 @@ export default function MockupPage() {
   const cardRef = useRef<HTMLDivElement>(null);
   const [downloading, setDownloading] = useState(false);
 
+  const [activeTab, setActiveTab] = useState<'studio' | 'bg-remove'>('studio');
+  const [bgRemoveSource, setBgRemoveSource] = useState<string>('');
+  const [bgRemoveResult, setBgRemoveResult] = useState<string>('');
+  const [bgRemoveLoading, setBgRemoveLoading] = useState(false);
+
   // Layout Themes & Structures
   const [style, setStyle] = useState<MockupStyle>('green-award');
   const [structure, setStructure] = useState<LayoutStructure>('fiverr_split');
@@ -226,7 +232,7 @@ export default function MockupPage() {
   }, [style]);
 
   // Image Upload handler
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, target: 'photo' | 'photo2' | 'review') => {
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, target: 'photo' | 'photo2' | 'review' | 'bg-remove') => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -236,8 +242,45 @@ export default function MockupPage() {
       if (target === 'photo') setMemberPhoto(base64);
       else if (target === 'photo2') setMemberPhoto2(base64);
       else if (target === 'review') setReviewScreenshot(base64);
+      else if (target === 'bg-remove') {
+        setBgRemoveSource(base64);
+        setBgRemoveResult('');
+      }
     };
     reader.readAsDataURL(file);
+  };
+
+  const processBgRemoval = async () => {
+    if (!bgRemoveSource) return;
+    setBgRemoveLoading(true);
+    try {
+      // Create a Blob from the base64 string
+      const response = await fetch(bgRemoveSource);
+      const blob = await response.blob();
+      
+      const config = {
+        publicPath: "https://static.imgly.com/@imgly/background-removal-data/1.4.3/dist/" 
+      };
+      const resultBlob = await imglyRemoveBackground(blob, config);
+      const url = URL.createObjectURL(resultBlob);
+      setBgRemoveResult(url);
+    } catch (error) {
+      console.error('Background removal failed:', error);
+    } finally {
+      setBgRemoveLoading(false);
+    }
+  };
+
+  const handleBgRemoveDownload = () => {
+    if (!bgRemoveResult) return;
+    const link = document.createElement('a');
+    link.download = 'removed-background.png';
+    link.href = bgRemoveResult;
+    link.click();
+    
+    // Confetti on success
+    confetti({ particleCount: 80, spread: 60, origin: { y: 0.8 } });
+    store.logActivity('Background Removed', 'tool', 'Processed image background removal.');
   };
 
   // Export card as image
@@ -698,8 +741,120 @@ export default function MockupPage() {
           </button>
         </div>
       </div>
+      </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+      {/* Tabs */}
+      <div className="flex gap-4 border-b border-glass-border mb-6">
+        <button 
+          onClick={() => setActiveTab('studio')} 
+          className={`pb-3 px-2 text-xs font-black uppercase tracking-wider transition-colors border-b-2 ${activeTab === 'studio' ? 'border-green-400 text-green-400 glow-green-text' : 'border-transparent text-gray-500 hover:text-gray-300'}`}
+        >
+          Mockup Studio
+        </button>
+        <button 
+          onClick={() => setActiveTab('bg-remove')} 
+          className={`pb-3 px-2 text-xs font-black uppercase tracking-wider transition-colors border-b-2 flex items-center gap-1.5 ${activeTab === 'bg-remove' ? 'border-purple-400 text-purple-400 drop-shadow-[0_0_8px_rgba(192,132,252,0.5)]' : 'border-transparent text-gray-500 hover:text-gray-300'}`}
+        >
+          <Sparkles className="w-3.5 h-3.5" />
+          <span>Image Background Remover</span>
+        </button>
+      </div>
+
+      {activeTab === 'bg-remove' && (
+        <div className="max-w-4xl mx-auto space-y-6">
+          <div className="p-8 rounded-2xl glass-panel border border-glass-border text-center space-y-6">
+            {!bgRemoveSource ? (
+              <div className="border-2 border-dashed border-gray-700/50 hover:border-purple-500/50 bg-gray-950/30 rounded-xl p-12 transition-all group relative cursor-pointer overflow-hidden">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => handleImageUpload(e as any, 'bg-remove')}
+                  className="absolute inset-0 opacity-0 cursor-pointer z-10 w-full h-full"
+                />
+                <div className="flex flex-col items-center space-y-4">
+                  <div className="w-16 h-16 rounded-full bg-purple-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <Upload className="w-8 h-8 text-purple-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-white">Upload Image</h3>
+                    <p className="text-sm text-gray-400 mt-1">Drag and drop or click to browse</p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {/* Original Image */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-gray-400">
+                    <span>Original</span>
+                    <button onClick={() => { setBgRemoveSource(''); setBgRemoveResult(''); }} className="text-red-400 hover:text-red-300 flex items-center gap-1 transition-colors">
+                      <Trash2 className="w-3.5 h-3.5" /> Clear
+                    </button>
+                  </div>
+                  <div className="relative rounded-xl overflow-hidden border border-gray-700 bg-gray-900 aspect-square flex items-center justify-center">
+                    <img src={bgRemoveSource} className="max-w-full max-h-full object-contain" alt="Original" />
+                    {bgRemoveLoading && (
+                      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center z-10">
+                        <RefreshCw className="w-8 h-8 text-purple-400 animate-spin mb-3" />
+                        <span className="text-xs font-bold text-purple-400 uppercase tracking-widest animate-pulse">AI Processing...</span>
+                      </div>
+                    )}
+                  </div>
+                  {!bgRemoveResult && (
+                    <button 
+                      onClick={processBgRemoval}
+                      disabled={bgRemoveLoading}
+                      className="w-full py-3 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 disabled:opacity-50 text-white font-black text-xs uppercase tracking-wider transition-all shadow-lg flex items-center justify-center gap-2"
+                    >
+                      {bgRemoveLoading ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 animate-spin" /> Processing...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-4 h-4" /> Remove Background
+                        </>
+                      )}
+                    </button>
+                  )}
+                </div>
+
+                {/* Result Image */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-gray-400 h-4">
+                    <span className="text-purple-400 flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5" /> Result</span>
+                  </div>
+                  <div 
+                    className="relative rounded-xl overflow-hidden border border-gray-700 aspect-square flex items-center justify-center"
+                    style={{
+                      backgroundImage: 'url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAMUlEQVQ4T2NkYNgfQEhQ+M9AzIAhMHg3yQxDDYwGkEQD0YAAw38GH0eDqMGjAcjAAAD7rR9c6xM1VwAAAABJRU5ErkJggg==")',
+                      backgroundRepeat: 'repeat',
+                      backgroundSize: '20px 20px'
+                    }}
+                  >
+                    {bgRemoveResult ? (
+                      <img src={bgRemoveResult} className="max-w-full max-h-full object-contain" alt="Removed Background" />
+                    ) : (
+                      <div className="text-gray-600 text-xs font-bold uppercase tracking-widest">Waiting...</div>
+                    )}
+                  </div>
+                  {bgRemoveResult && (
+                    <button 
+                      onClick={handleBgRemoveDownload}
+                      className="w-full py-3 rounded-lg bg-green-500 hover:bg-green-400 text-black font-black text-xs uppercase tracking-wider transition-all shadow-lg glow-green flex items-center justify-center gap-2"
+                    >
+                      <Download className="w-4 h-4" /> Download PNG
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'studio' && (
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
         
         {/* LEFT COLUMN: Input Control Panel (xl:col-span-5) */}
         <div className="xl:col-span-5 space-y-6 max-h-[85vh] overflow-y-auto pr-1">
@@ -2006,7 +2161,7 @@ export default function MockupPage() {
           </div>
         </div>
 
-      </div>
+      )}
     </div>
   );
 }
