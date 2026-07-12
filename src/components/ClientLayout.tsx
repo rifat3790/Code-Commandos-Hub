@@ -288,157 +288,124 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
         return { xs: '4px', sm: '8px', md: '12px', lg: '16px', xl: '20px', '2xl': '24px', '3xl': '32px' };
     }
   };
-
   const fontUrl = getGoogleFontLink(activeFont);
   const fontFamilyCss = getFontFamilyCss(activeFont);
   const radiusVals = getRadiusCssValues(activeRadius);
 
-  // Don't render the sidebar or standard layout structure for the login page
-  if (pathname === '/login' || pathname === '/login/') {
-    return (
-      <AuthProvider>
-        {fontUrl && <link href={fontUrl} rel="stylesheet" />}
-        <style dangerouslySetInnerHTML={{ __html: `
-          :root {
-            --radius-xs: ${radiusVals.xs} !important;
-            --radius-sm: ${radiusVals.sm} !important;
-            --radius-md: ${radiusVals.md} !important;
-            --radius-lg: ${radiusVals.lg} !important;
-            --radius-xl: ${radiusVals.xl} !important;
-            --radius-2xl: ${radiusVals['2xl']} !important;
-            --radius-3xl: ${radiusVals['3xl']} !important;
-            --font-sans: ${fontFamilyCss} !important;
-            --font-geist-sans: ${fontFamilyCss} !important;
-          }
-          body, html, button, input, select, textarea, [class*="font-sans"] {
-            font-family: ${fontFamilyCss} !important;
-          }
-          *:not(pre):not(code):not(.font-mono):not(kbd):not([class*="font-mono"]) {
-            font-family: ${fontFamilyCss} !important;
-          }
-          .rounded:not(.rounded-full), [class*="rounded-md"]:not(.rounded-full) {
-            border-radius: ${radiusVals.md} !important;
-          }
-          .rounded-sm:not(.rounded-full) {
-            border-radius: ${radiusVals.sm} !important;
-          }
-          .rounded-lg:not(.rounded-full) {
-            border-radius: ${radiusVals.lg} !important;
-          }
-          .rounded-xl:not(.rounded-full) {
-            border-radius: ${radiusVals.xl} !important;
-          }
-          .rounded-2xl:not(.rounded-full) {
-            border-radius: ${radiusVals['2xl']} !important;
-          }
-          .rounded-3xl:not(.rounded-full) {
-            border-radius: ${radiusVals['3xl']} !important;
-          }
-        `}} />
-        {children}
-      </AuthProvider>
-    );
-  }
+  const isLoginPage = pathname === '/login' || pathname === '/login/';
+
+  const styleCss = `
+    :root {
+      --radius-xs: ${radiusVals.xs} !important;
+      --radius-sm: ${radiusVals.sm} !important;
+      --radius-md: ${radiusVals.md} !important;
+      --radius-lg: ${radiusVals.lg} !important;
+      --radius-xl: ${radiusVals.xl} !important;
+      --radius-2xl: ${radiusVals['2xl']} !important;
+      --radius-3xl: ${radiusVals['3xl']} !important;
+      --font-sans: ${fontFamilyCss} !important;
+      --font-geist-sans: ${fontFamilyCss} !important;
+    }
+    body, html, button, input, select, textarea, [class*="font-sans"] {
+      font-family: ${fontFamilyCss} !important;
+    }
+    *:not(pre):not(code):not(.font-mono):not(kbd):not([class*="font-mono"]) {
+      font-family: ${fontFamilyCss} !important;
+    }
+    .rounded:not(.rounded-full), [class*="rounded-md"]:not(.rounded-full) {
+      border-radius: ${radiusVals.md} !important;
+    }
+    .rounded-sm:not(.rounded-full) {
+      border-radius: ${radiusVals.sm} !important;
+    }
+    .rounded-lg:not(.rounded-full) {
+      border-radius: ${radiusVals.lg} !important;
+    }
+    .rounded-xl:not(.rounded-full) {
+      border-radius: ${radiusVals.xl} !important;
+    }
+    .rounded-2xl:not(.rounded-full) {
+      border-radius: ${radiusVals['2xl']} !important;
+    }
+    .rounded-3xl:not(.rounded-full) {
+      border-radius: ${radiusVals['3xl']} !important;
+    }
+  `;
 
   return (
     <AuthProvider>
       <ThemeProvider>
         {fontUrl && <link href={fontUrl} rel="stylesheet" />}
-        <style dangerouslySetInnerHTML={{ __html: `
-          :root {
-            --radius-xs: ${radiusVals.xs} !important;
-            --radius-sm: ${radiusVals.sm} !important;
-            --radius-md: ${radiusVals.md} !important;
-            --radius-lg: ${radiusVals.lg} !important;
-            --radius-xl: ${radiusVals.xl} !important;
-            --radius-2xl: ${radiusVals['2xl']} !important;
-            --radius-3xl: ${radiusVals['3xl']} !important;
-            --font-sans: ${fontFamilyCss} !important;
-            --font-geist-sans: ${fontFamilyCss} !important;
-          }
-          body, html, button, input, select, textarea, [class*="font-sans"] {
-            font-family: ${fontFamilyCss} !important;
-          }
-          *:not(pre):not(code):not(.font-mono):not(kbd):not([class*="font-mono"]) {
-            font-family: ${fontFamilyCss} !important;
-          }
-          .rounded:not(.rounded-full), [class*="rounded-md"]:not(.rounded-full) {
-            border-radius: ${radiusVals.md} !important;
-          }
-          .rounded-sm:not(.rounded-full) {
-            border-radius: ${radiusVals.sm} !important;
-          }
-          .rounded-lg:not(.rounded-full) {
-            border-radius: ${radiusVals.lg} !important;
-          }
-          .rounded-xl:not(.rounded-full) {
-            border-radius: ${radiusVals.xl} !important;
-          }
-          .rounded-2xl:not(.rounded-full) {
-            border-radius: ${radiusVals['2xl']} !important;
-          }
-          .rounded-3xl:not(.rounded-full) {
-            border-radius: ${radiusVals['3xl']} !important;
-          }
-        `}} />
-        <CallProvider>
-          {showProgress && (
-            <div className="fixed top-0 left-0 right-0 h-[2.5px] bg-transparent z-[9999] pointer-events-none">
-              <motion.div 
-                initial={{ width: '0%' }}
-                animate={{ width: `${navProgress}%` }}
-                transition={{ ease: 'easeOut', duration: 0.25 }}
-                className="h-full bg-gradient-to-r from-green-500 via-emerald-400 to-green-300 shadow-[0_0_8px_#10B981,0_0_12px_#34D399]"
-              />
-            </div>
-          )}
-          <HeartbeatTrigger />
-          <WorkspaceHydrator />
-          <div className="flex flex-col md:flex-row h-screen w-screen overflow-hidden bg-[#030712]">
-        {/* Sidebar - responsive built-in mobile/desktop */}
-        <Sidebar isMobileOpen={isMobileOpen} onCloseMobile={() => setIsMobileOpen(false)} />
+        <style dangerouslySetInnerHTML={{ __html: styleCss }} />
         
-        {/* Main Content container */}
-        <div className="flex-1 flex flex-col h-full overflow-hidden relative">
-          {/* Mobile Header Bar */}
-          <header className="md:hidden flex items-center justify-between px-4 py-3 bg-gray-950/80 border-b border-glass-border select-none shrink-0 z-30 backdrop-blur-md">
-            <div className="flex items-center gap-2.5">
-              <button 
-                onClick={() => setIsMobileOpen(true)}
-                className="p-2 rounded-lg bg-gray-900 border border-glass-border text-gray-400 hover:text-white transition-colors"
-                aria-label="Toggle navigation menu"
-              >
-                <Menu className="w-5 h-5" />
-              </button>
-              <Link href="/" className="flex items-center gap-2">
-                <div className="w-7.5 h-7.5 rounded-lg bg-brand-green flex items-center justify-center glow-green shrink-0" style={{ backgroundColor: 'var(--color-brand-green)' }}>
-                  <Terminal className="w-4.5 h-4.5 text-black stroke-[2.5]" />
-                </div>
-                <span className="font-bold text-sm tracking-wider text-white hidden sm:inline-block">CODE COMMANDOS HUB</span>
-              </Link>
-            </div>
-            <div className="flex items-center gap-2">
-              <NotificationBell />
-              <FocusTimer />
-            </div>
-          </header>
+        {isLoginPage ? (
+          <div className="h-screen w-screen bg-[#030712] overflow-hidden relative">
+            {children}
+          </div>
+        ) : (
+          <CallProvider>
+            {showProgress && (
+              <div className="fixed top-0 left-0 right-0 h-[2.5px] bg-transparent z-[9999] pointer-events-none">
+                <motion.div 
+                  initial={{ width: '0%' }}
+                  animate={{ width: `${navProgress}%` }}
+                  transition={{ ease: 'easeOut', duration: 0.25 }}
+                  className="h-full bg-gradient-to-r from-green-500 via-emerald-400 to-green-300 shadow-[0_0_8px_#10B981,0_0_12px_#34D399]"
+                />
+              </div>
+            )}
+            <HeartbeatTrigger />
+            <WorkspaceHydrator />
+            <div className="flex flex-col md:flex-row h-screen w-screen overflow-hidden bg-[#030712]">
+              {/* Sidebar - responsive built-in mobile/desktop */}
+              <Sidebar isMobileOpen={isMobileOpen} onCloseMobile={() => setIsMobileOpen(false)} />
+              
+              {/* Main Content container */}
+              <div className="flex-1 flex flex-col h-full overflow-hidden relative">
+                {/* Mobile Header Bar */}
+                <header className="md:hidden flex items-center justify-between px-4 py-3 bg-gray-950/80 border-b border-glass-border select-none shrink-0 z-30 backdrop-blur-md">
+                  <div className="flex items-center gap-2.5">
+                    <button 
+                      onClick={() => setIsMobileOpen(true)}
+                      className="p-2 rounded-lg bg-gray-900 border border-glass-border text-gray-400 hover:text-white transition-colors"
+                      aria-label="Toggle navigation menu"
+                    >
+                      <Menu className="w-5 h-5" />
+                    </button>
+                    <Link href="/" className="flex items-center gap-2">
+                      <div className="w-7.5 h-7.5 rounded-lg bg-brand-green flex items-center justify-center glow-green shrink-0" style={{ backgroundColor: 'var(--color-brand-green)' }}>
+                        <Terminal className="w-4.5 h-4.5 text-black stroke-[2.5]" />
+                      </div>
+                      <span className="font-bold text-sm tracking-wider text-white hidden sm:inline-block">CODE COMMANDOS HUB</span>
+                    </Link>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <NotificationBell />
+                    <FocusTimer />
+                  </div>
+                </header>
 
-          {/* Main page content scroll viewport */}
-          <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 relative bg-radial-[circle_at_top_right,rgba(16,185,129,0.03),transparent_40%]">
-            <div className="hidden md:flex absolute top-6 right-8 z-50 items-center gap-4">
-              <NotificationBell />
-              <FocusTimer />
+                {/* Main page content scroll viewport */}
+                <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 relative bg-radial-[circle_at_top_right,rgba(16,185,129,0.03),transparent_40%]">
+                  <div className="hidden md:flex absolute top-6 right-8 z-50 items-center gap-4">
+                    <NotificationBell />
+                    <FocusTimer />
+                  </div>
+                  <ProtectedMainContent>{children}</ProtectedMainContent>
+                </main>
+              </div>
             </div>
-            <ProtectedMainContent>{children}</ProtectedMainContent>
-          </main>
-        </div>
-      </div>
-      
+          </CallProvider>
+        )}
+        
         {/* Global Modals */}
-        <CommandMenu />
-        <GlobalPendingModal />
-        <ChatbotWidget />
-        </CallProvider>
+        {!isLoginPage && (
+          <>
+            <CommandMenu />
+            <GlobalPendingModal />
+            <ChatbotWidget />
+          </>
+        )}
       </ThemeProvider>
     </AuthProvider>
   );
