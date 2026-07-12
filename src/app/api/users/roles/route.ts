@@ -40,6 +40,9 @@ export async function POST(req: Request) {
       updateObj.callingAllowed = callingAllowed;
     }
     if (showWorkloadMetrics !== undefined) {
+      if (promoter.email !== 'refayethossenmd@gmail.com') {
+        return NextResponse.json({ error: 'Only refayethossenmd@gmail.com can change workload metrics visibility' }, { status: 403 });
+      }
       updateObj.showWorkloadMetrics = showWorkloadMetrics;
     }
     if (allowedMenus !== undefined) {

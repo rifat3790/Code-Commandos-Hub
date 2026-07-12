@@ -442,12 +442,18 @@ export default function AdminDashboard() {
                   </div>
                   <div className="flex items-center justify-between text-xs text-gray-500 mt-2 pt-2 border-t border-white/5">
                     <span>Workload Metrics:</span>
-                    <button
-                      onClick={() => handleToggleWorkloadPermission(u._id, u.showWorkloadMetrics === true)}
-                      className={`px-2 py-0.5 rounded font-extrabold uppercase text-[9px] border transition-colors ${u.showWorkloadMetrics === true ? 'bg-green-500/10 border-green-500/20 text-green-400 hover:bg-green-500/20' : 'bg-red-500/10 border-red-500/20 text-red-400 hover:bg-red-500/20'}`}
-                    >
-                      {u.showWorkloadMetrics === true ? 'Allowed' : 'Blocked'}
-                    </button>
+                    {user?.email === 'refayethossenmd@gmail.com' ? (
+                      <button
+                        onClick={() => handleToggleWorkloadPermission(u._id, u.showWorkloadMetrics === true)}
+                        className={`px-2 py-0.5 rounded font-extrabold uppercase text-[9px] border transition-colors ${u.showWorkloadMetrics === true ? 'bg-green-500/10 border-green-500/20 text-green-400 hover:bg-green-500/20' : 'bg-red-500/10 border-red-500/20 text-red-400 hover:bg-red-500/20'}`}
+                      >
+                        {u.showWorkloadMetrics === true ? 'Allowed' : 'Blocked'}
+                      </button>
+                    ) : (
+                      <span className={`px-2 py-0.5 rounded font-extrabold uppercase text-[9px] border transition-colors ${u.showWorkloadMetrics === true ? 'bg-green-500/10 border-green-500/20 text-green-400' : 'bg-gray-500/10 border-gray-500/20 text-gray-400'}`}>
+                        {u.showWorkloadMetrics === true ? 'Allowed' : 'Locked'}
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center justify-between text-xs text-gray-500 mt-2 pt-2 border-t border-white/5">
                     <span>Page Permissions:</span>
