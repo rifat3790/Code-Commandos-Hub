@@ -16,21 +16,25 @@ const AuthContext = createContext<AuthContextType>({ user: null, dbUser: null, l
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [dbUser, setDbUser] = useState<any | null>(() => {
-    if (typeof window !== 'undefined') {
-      const cached = localStorage.getItem('cached_db_user');
-      return cached ? JSON.parse(cached) : null;
-    }
-    return null;
-  });
-  const [loading, setLoading] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return !localStorage.getItem('cached_db_user');
-    }
-    return true;
-  });
+  const [dbUser, setDbUser] = useState<any | null>(null);
+  const [loading, setLoading] = useState(true);
   const router = useRouter();
   const pathname = usePathname();
+
+  // Hydration-safe cache retrieval
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const cached = localStorage.getItem('cached_db_user');
+      if (cached) {
+        try {
+          setDbUser(JSON.parse(cached));
+          setLoading(false);
+        } catch (e) {
+          console.error("Error parsing cached user state:", e);
+        }
+      }
+    }
+  }, []);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
