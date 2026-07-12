@@ -2,19 +2,37 @@
 
 import React, { useState } from 'react';
 import { auth } from '@/lib/firebase';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, sendPasswordResetEmail } from 'firebase/auth';
 import { Terminal, Lock, Mail, LogIn, CheckCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
   const [isRegistering, setIsRegistering] = useState(false);
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [teamName, setTeamName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   const [showSuccess, setShowSuccess] = useState(false);
   const router = useRouter();
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setSuccessMessage('');
+    if (!email.trim()) {
+      setError('Please enter your email address first.');
+      return;
+    }
+    try {
+      await sendPasswordResetEmail(auth, email.trim());
+      setSuccessMessage('A password reset link has been sent to your email. Please check your inbox and spam folder.');
+    } catch (err: any) {
+      setError(err.message || 'Failed to send password reset email.');
+    }
+  };
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -72,19 +90,79 @@ export default function LoginPage() {
       <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-emerald-500/5 rounded-full blur-[120px] pointer-events-none"></div>
 
       <div className="w-full max-w-md bg-gray-900/50 backdrop-blur-xl border border-glass-border rounded-2xl p-8 relative z-10 shadow-2xl">
-        <div className="flex flex-col items-center mb-8">
-          <div className="w-16 h-16 rounded-2xl bg-green-500/10 border border-green-500/30 flex items-center justify-center mb-4 glow-green">
-            <Terminal className="w-8 h-8 text-green-500" />
-          </div>
-          <h1 className="text-2xl font-bold text-white tracking-wide">CODE COMMANDOS</h1>
-          <p className="text-gray-400 text-sm mt-2">Sign in to access your workspace</p>
-        </div>
+        {isForgotPassword ? (
+          <div>
+            <div className="flex flex-col items-center mb-8">
+              <div className="w-16 h-16 rounded-2xl bg-green-500/10 border border-green-500/30 flex items-center justify-center mb-4 glow-green">
+                <Terminal className="w-8 h-8 text-green-500" />
+              </div>
+              <h1 className="text-2xl font-bold text-white tracking-wide">RESET PASSWORD</h1>
+              <p className="text-gray-400 text-sm mt-2 text-center">Receive a password recovery email</p>
+            </div>
 
-        {error && (
-          <div className="mb-6 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-sm rounded-lg text-center">
-            {error}
+            {error && (
+              <div className="mb-6 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-sm rounded-lg text-center">
+                {error}
+              </div>
+            )}
+
+            {successMessage && (
+              <div className="mb-6 p-3 bg-green-500/10 border border-green-500/20 text-green-400 text-sm rounded-lg text-center font-medium">
+                {successMessage}
+              </div>
+            )}
+
+            <form onSubmit={handleResetPassword} className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-400 mb-1.5 ml-1">Email Address</label>
+                <div className="relative">
+                  <Mail className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+                  <input 
+                    type="email" 
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full bg-gray-950/50 border border-glass-border rounded-xl py-2.5 pl-10 pr-4 text-white focus:outline-none focus:border-green-500/50 focus:ring-1 focus:ring-green-500/50 transition-all placeholder:text-gray-600"
+                    placeholder="developer@example.com"
+                    required
+                  />
+                </div>
+              </div>
+
+              <button 
+                type="submit"
+                className="w-full bg-green-500 hover:bg-green-600 text-black font-semibold rounded-xl py-2.5 mt-2 transition-all flex items-center justify-center gap-2"
+              >
+                Send Recovery Email
+              </button>
+
+              <button 
+                type="button"
+                onClick={() => {
+                  setIsForgotPassword(false);
+                  setError('');
+                  setSuccessMessage('');
+                }}
+                className="w-full bg-transparent text-gray-400 hover:text-white text-xs font-semibold py-2 transition-all block text-center"
+              >
+                Back to Sign In
+              </button>
+            </form>
           </div>
-        )}
+        ) : (
+          <>
+            <div className="flex flex-col items-center mb-8">
+              <div className="w-16 h-16 rounded-2xl bg-green-500/10 border border-green-500/30 flex items-center justify-center mb-4 glow-green">
+                <Terminal className="w-8 h-8 text-green-500" />
+              </div>
+              <h1 className="text-2xl font-bold text-white tracking-wide">CODE COMMANDOS</h1>
+              <p className="text-gray-400 text-sm mt-2">Sign in to access your workspace</p>
+            </div>
+
+            {error && (
+              <div className="mb-6 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-sm rounded-lg text-center">
+                {error}
+              </div>
+            )}
 
         <form onSubmit={handleAuth} className="space-y-4">
           {isRegistering && (
@@ -137,7 +215,22 @@ export default function LoginPage() {
           </div>
           
           <div>
-            <label className="block text-xs font-medium text-gray-400 mb-1.5 ml-1">Password</label>
+            <div className="flex justify-between items-center mb-1.5 ml-1">
+              <label className="block text-xs font-medium text-gray-400">Password</label>
+              {!isRegistering && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsForgotPassword(true);
+                    setError('');
+                    setSuccessMessage('');
+                  }}
+                  className="text-xs text-green-500 hover:text-green-400 hover:underline font-medium bg-transparent border-none p-0 cursor-pointer"
+                >
+                  Forgot Password?
+                </button>
+              )}
+            </div>
             <div className="relative">
               <Lock className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
               <input 
@@ -191,6 +284,8 @@ export default function LoginPage() {
             {isRegistering ? 'Sign In' : 'Create one'}
           </button>
         </p>
+          </>
+        )}
       </div>
 
       {/* Success Modal */}
