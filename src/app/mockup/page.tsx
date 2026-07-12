@@ -149,13 +149,25 @@ export default function MockupPage() {
   const cardRef = useRef<HTMLDivElement>(null);
   const [downloading, setDownloading] = useState(false);
 
-  const [activeTab, setActiveTab] = useState<'studio' | 'bg-remove'>('studio');
+  const [activeTab, setActiveTab] = useState<'studio' | 'bg-remove' | 'watermark'>('studio');
   const [bgRemoveSource, setBgRemoveSource] = useState<string>('');
   const [bgRemoveResult, setBgRemoveResult] = useState<string>('');
   const [bgRemoveLoading, setBgRemoveLoading] = useState(false);
   const [bgRemoveProgress, setBgRemoveProgress] = useState<number>(0);
   const [bgRemoveStatus, setBgRemoveStatus] = useState<string>('');
   const [bgRemoveError, setBgRemoveError] = useState<string>('');
+  const [bgRemoveFile, setBgRemoveFile] = useState<File | null>(null);
+
+  // Portfolio Watermarker States
+  const watermarkRef = useRef<HTMLDivElement>(null);
+  const [watermarkImage, setWatermarkImage] = useState<string>('');
+  const [watermarkBadgeText, setWatermarkBadgeText] = useState<string>('COMPLETED BY CODE COMMANDOS');
+  const [watermarkBadgeStyle, setWatermarkBadgeStyle] = useState<'glass' | 'neon' | 'gold' | 'shopify'>('glass');
+  const [watermarkPosition, setWatermarkPosition] = useState<'bottom-right' | 'bottom-left' | 'top-right' | 'top-left'>('bottom-right');
+  const [watermarkOpacity, setWatermarkOpacity] = useState<number>(0.85);
+  const [watermarkTextOverlay, setWatermarkTextOverlay] = useState<boolean>(false);
+  const [watermarkTextOverlayVal, setWatermarkTextOverlayVal] = useState<string>('CODE COMMANDOS');
+  const [watermarkExporting, setWatermarkExporting] = useState<boolean>(false);
 
   // Layout Themes & Structures
   const [style, setStyle] = useState<MockupStyle>('green-award');
@@ -235,7 +247,7 @@ export default function MockupPage() {
   }, [style]);
 
   // Image Upload handler
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, target: 'photo' | 'photo2' | 'review' | 'bg-remove') => {
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, target: 'photo' | 'photo2' | 'review' | 'bg-remove' | 'watermark') => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -247,25 +259,27 @@ export default function MockupPage() {
       else if (target === 'review') setReviewScreenshot(base64);
       else if (target === 'bg-remove') {
         setBgRemoveSource(base64);
+        setBgRemoveFile(file);
         setBgRemoveResult('');
         setBgRemoveProgress(0);
         setBgRemoveStatus('');
         setBgRemoveError('');
+      }
+      else if (target === 'watermark') {
+        setWatermarkImage(base64);
       }
     };
     reader.readAsDataURL(file);
   };
 
   const processBgRemoval = async () => {
-    if (!bgRemoveSource) return;
+    const inputSource = bgRemoveFile || bgRemoveSource;
+    if (!inputSource) return;
     setBgRemoveLoading(true);
     setBgRemoveProgress(0);
     setBgRemoveStatus('Initializing AI engine...');
     setBgRemoveError('');
     try {
-      const response = await fetch(bgRemoveSource);
-      const blob = await response.blob();
-      
       const config = {
         publicPath: "https://static.imgly.com/@imgly/background-removal-data/1.4.3/dist/",
         model: 'small', // Use small model for 8x faster loading and processing!
@@ -278,7 +292,7 @@ export default function MockupPage() {
       };
       
       setBgRemoveStatus('Removing background...');
-      const resultBlob = await imglyRemoveBackground(blob, config as any);
+      const resultBlob = await imglyRemoveBackground(inputSource, config as any);
       const url = URL.createObjectURL(resultBlob);
       setBgRemoveResult(url);
       setBgRemoveStatus('Success');
@@ -291,6 +305,29 @@ export default function MockupPage() {
       setBgRemoveStatus('Failed');
     } finally {
       setBgRemoveLoading(false);
+    }
+  };
+
+  const handleWatermarkExport = async () => {
+    if (!watermarkRef.current) return;
+    setWatermarkExporting(true);
+    try {
+      const dataUrl = await toPng(watermarkRef.current, {
+        cacheBust: true,
+        quality: 1.0,
+        pixelRatio: 2
+      });
+      const link = document.createElement('a');
+      link.download = 'watermarked-portfolio.png';
+      link.href = dataUrl;
+      link.click();
+      
+      confetti({ particleCount: 80, spread: 60, origin: { y: 0.8 } });
+      store.logActivity('Portfolio Watermarked', 'mockup', 'Generated watermarked portfolio image.');
+    } catch (err) {
+      console.error('Failed to export watermarked image:', err);
+    } finally {
+      setWatermarkExporting(false);
     }
   };
 
@@ -780,6 +817,13 @@ export default function MockupPage() {
           <Sparkles className="w-3.5 h-3.5" />
           <span>Image Background Remover</span>
         </button>
+        <button 
+          onClick={() => setActiveTab('watermark')} 
+          className={`pb-3 px-2 text-xs font-black uppercase tracking-wider transition-colors border-b-2 flex items-center gap-1.5 ${activeTab === 'watermark' ? 'border-yellow-400 text-yellow-400 drop-shadow-[0_0_8px_rgba(234,179,8,0.5)]' : 'border-transparent text-gray-500 hover:text-gray-300'}`}
+        >
+          <Award className="w-3.5 h-3.5" />
+          <span>Portfolio Watermarker</span>
+        </button>
       </div>
 
       {activeTab === 'bg-remove' && (
@@ -830,7 +874,7 @@ export default function MockupPage() {
                   <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-gray-400">
                     <span>Original</span>
                     <button 
-                      onClick={() => { setBgRemoveSource(''); setBgRemoveResult(''); setBgRemoveError(''); }} 
+                      onClick={() => { setBgRemoveSource(''); setBgRemoveResult(''); setBgRemoveError(''); setBgRemoveFile(null); }} 
                       className="text-red-400 hover:text-red-300 flex items-center gap-1 transition-colors"
                       disabled={bgRemoveLoading}
                     >
@@ -940,6 +984,200 @@ export default function MockupPage() {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'watermark' && (
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start text-left">
+          {/* LEFT COLUMN: Watermark Controls */}
+          <div className="xl:col-span-5 space-y-6 max-h-[85vh] overflow-y-auto pr-1">
+            <div className="p-4 rounded-xl border border-glass-border bg-gray-950/20 space-y-4">
+              <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block border-b border-glass-border pb-1">Upload Work</span>
+              
+              <div className="space-y-1">
+                <label className="text-[9px] font-bold text-gray-400 uppercase">Portfolio Screenshot</label>
+                <div className="flex items-center gap-3">
+                  <div className="relative overflow-hidden flex-1">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => handleImageUpload(e as any, 'watermark')}
+                      className="absolute inset-0 opacity-0 cursor-pointer"
+                    />
+                    <button type="button" className="w-full py-1.5 rounded-lg bg-gray-900 border border-glass-border hover:bg-glass-hover text-white text-xs font-bold flex items-center justify-center gap-1">
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>{watermarkImage ? 'Change Image' : 'Upload Portfolio Image'}</span>
+                    </button>
+                  </div>
+                  {watermarkImage && (
+                    <button onClick={() => setWatermarkImage('')} className="p-2 rounded bg-red-950/20 text-red-400 hover:bg-red-500/10">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {watermarkImage && (
+              <>
+                <div className="p-4 rounded-xl border border-glass-border bg-gray-950/20 space-y-4">
+                  <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block border-b border-glass-border pb-1">Badge Configuration</span>
+                  
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-bold text-gray-400 uppercase">Badge Text</label>
+                    <input
+                      type="text"
+                      value={watermarkBadgeText}
+                      onChange={(e) => setWatermarkBadgeText(e.target.value.toUpperCase())}
+                      className="w-full px-3 py-1.5 rounded-lg glass-input text-xs"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-bold text-gray-400 uppercase">Badge Style</label>
+                      <select
+                        value={watermarkBadgeStyle}
+                        onChange={(e) => setWatermarkBadgeStyle(e.target.value as any)}
+                        className="w-full px-3 py-1.5 rounded-lg glass-input text-xs font-medium cursor-pointer"
+                      >
+                        <option value="glass">Glassmorphic Glow</option>
+                        <option value="neon">Neon Cyberpunk</option>
+                        <option value="gold">Premium Gold</option>
+                        <option value="shopify">Shopify Partner</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-bold text-gray-400 uppercase">Position</label>
+                      <select
+                        value={watermarkPosition}
+                        onChange={(e) => setWatermarkPosition(e.target.value as any)}
+                        className="w-full px-3 py-1.5 rounded-lg glass-input text-xs font-medium cursor-pointer"
+                      >
+                        <option value="bottom-right">Bottom Right</option>
+                        <option value="bottom-left">Bottom Left</option>
+                        <option value="top-right">Top Right</option>
+                        <option value="top-left">Top Left</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="flex justify-between items-center">
+                      <label className="text-[9px] font-bold text-gray-400 uppercase">Badge Opacity ({Math.round(watermarkOpacity * 100)}%)</label>
+                    </div>
+                    <input
+                      type="range"
+                      min="0.3"
+                      max="1.0"
+                      step="0.05"
+                      value={watermarkOpacity}
+                      onChange={(e) => setWatermarkOpacity(Number(e.target.value))}
+                      className="w-full accent-yellow-400"
+                    />
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-xl border border-glass-border bg-gray-950/20 space-y-4">
+                  <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block border-b border-glass-border pb-1">Diagonal Watermark</span>
+                  
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-white font-semibold">Enable Security Watermark</span>
+                    <button
+                      onClick={() => setWatermarkTextOverlay(!watermarkTextOverlay)}
+                      className={`px-3 py-1 rounded text-xs font-bold uppercase tracking-wider border ${
+                        watermarkTextOverlay 
+                          ? 'bg-yellow-500/10 border-yellow-500/25 text-yellow-400' 
+                          : 'bg-gray-900 border-glass-border text-gray-500'
+                      }`}
+                    >
+                      {watermarkTextOverlay ? 'Enabled' : 'Disabled'}
+                    </button>
+                  </div>
+
+                  {watermarkTextOverlay && (
+                    <div className="space-y-1.5">
+                      <label className="text-[9px] font-bold text-gray-400 uppercase">Watermark Text</label>
+                      <input
+                        type="text"
+                        value={watermarkTextOverlayVal}
+                        onChange={(e) => setWatermarkTextOverlayVal(e.target.value.toUpperCase())}
+                        className="w-full px-3 py-1.5 rounded-lg glass-input text-xs"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <button 
+                  onClick={handleWatermarkExport}
+                  disabled={watermarkExporting}
+                  className="w-full py-3 rounded-lg bg-yellow-500 hover:bg-yellow-400 disabled:opacity-50 text-black font-black text-xs uppercase tracking-wider transition-all shadow-lg flex items-center justify-center gap-2"
+                >
+                  {watermarkExporting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                  <span>{watermarkExporting ? 'Exporting...' : 'Download Portfolio PNG'}</span>
+                </button>
+              </>
+            )}
+          </div>
+
+          {/* RIGHT COLUMN: Watermark Visual Sandbox */}
+          <div className="xl:col-span-7 space-y-4">
+            <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block text-left">Portfolio Sandbox</span>
+            <div className="overflow-x-auto p-4 border border-glass-border rounded-2xl bg-gray-900/50 flex justify-center">
+              {watermarkImage ? (
+                <div 
+                  ref={watermarkRef}
+                  className="relative overflow-hidden shadow-2xl shrink-0 select-none bg-black flex items-center justify-center"
+                  style={{
+                    width: '600px',
+                    height: '400px'
+                  }}
+                >
+                  <img src={watermarkImage} className="w-full h-full object-cover pointer-events-none" alt="Portfolio background" />
+
+                  {/* Diagonal Watermark */}
+                  {watermarkTextOverlay && (
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden select-none z-10">
+                      <div className="text-[36px] font-black text-white/10 tracking-widest uppercase transform -rotate-30 select-none whitespace-nowrap">
+                        {watermarkTextOverlayVal} &nbsp; {watermarkTextOverlayVal} &nbsp; {watermarkTextOverlayVal}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Badge Overlay */}
+                  <div 
+                    className={`absolute p-2.5 px-4 rounded-xl border flex items-center gap-2 select-none z-20 ${
+                      watermarkPosition === 'bottom-right' ? 'bottom-4 right-4' :
+                      watermarkPosition === 'bottom-left' ? 'bottom-4 left-4' :
+                      watermarkPosition === 'top-right' ? 'top-4 right-4' : 'top-4 left-4'
+                    } ${
+                      watermarkBadgeStyle === 'glass' ? 'bg-black/60 border-white/20 backdrop-blur-md text-white shadow-xl shadow-black/40' :
+                      watermarkBadgeStyle === 'neon' ? 'bg-purple-950/60 border-purple-500/50 backdrop-blur-md text-purple-400 shadow-lg shadow-purple-500/20' :
+                      watermarkBadgeStyle === 'gold' ? 'bg-gradient-to-r from-yellow-600 via-amber-500 to-yellow-600 border-yellow-300 text-black font-extrabold shadow-lg shadow-yellow-500/20' :
+                      'bg-emerald-950/85 border-emerald-500/50 text-emerald-400 backdrop-blur-sm shadow-md'
+                    }`}
+                    style={{ opacity: watermarkOpacity }}
+                  >
+                    {watermarkBadgeStyle === 'gold' ? (
+                      <Trophy className="w-4 h-4 text-black" />
+                    ) : watermarkBadgeStyle === 'neon' ? (
+                      <Sparkles className="w-4 h-4 text-purple-400" />
+                    ) : watermarkBadgeStyle === 'shopify' ? (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                    ) : (
+                      <Award className="w-4 h-4 text-white" />
+                    )}
+                    <span className="text-[10px] font-black uppercase tracking-wider">{watermarkBadgeText}</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="w-[600px] h-[400px] flex items-center justify-center border border-dashed border-gray-800 rounded-xl bg-gray-950/30 text-gray-500 text-xs font-bold uppercase tracking-widest">
+                  Upload a portfolio screenshot to get started
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
