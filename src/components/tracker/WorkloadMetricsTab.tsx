@@ -17,7 +17,14 @@ import {
   Download,
   Activity,
   LineChart,
-  BadgeAlert
+  BadgeAlert,
+  Sliders,
+  Play,
+  RotateCcw,
+  Clock,
+  CheckCircle2,
+  Calendar,
+  AlertCircle
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 
@@ -32,7 +39,12 @@ export default function WorkloadMetricsTab({
   
   // NRA Filters State
   const [nraServiceLineFilter, setNraServiceLineFilter] = useState<string>('All');
+  const [nraUrgencyFilter, setNraUrgencyFilter] = useState<string>('All');
   const [nraSearchQuery, setNraSearchQuery] = useState<string>('');
+
+  // Simulation Sandbox State
+  const [isSimulationMode, setIsSimulationMode] = useState<boolean>(false);
+  const [simulatedAdjustments, setSimulatedAdjustments] = useState<Record<string, number>>({});
 
   useEffect(() => {
     Papa.parse(csvData, {
@@ -97,6 +109,21 @@ export default function WorkloadMetricsTab({
     })).sort((a, b) => b.count - a.count);
   }, [data]);
 
+  // Calculate simulated workload values
+  const simulatedWorkload = useMemo(() => {
+    return teamWorkload.map(tw => {
+      const adjustment = simulatedAdjustments[tw.team] || 0;
+      const count = Math.max(0, tw.count + adjustment);
+      return {
+        ...tw,
+        count
+      };
+    }).sort((a, b) => b.count - a.count);
+  }, [teamWorkload, simulatedAdjustments]);
+
+  // Active workload context (simulated or real)
+  const activeWorkloadData = isSimulationMode ? simulatedWorkload : teamWorkload;
+
   // Filter NRA Projects
   const nraProjects = useMemo(() => {
     return data.filter(d => {
@@ -104,6 +131,44 @@ export default function WorkloadMetricsTab({
       return status === 'NRA';
     });
   }, [data]);
+
+  // SLA Urgency calculation for NRA
+  const nraUrgencyData = useMemo(() => {
+    let critical = 0;
+    let warning = 0;
+    let safe = 0;
+    let undated = 0;
+
+    nraProjects.forEach(d => {
+      let daysLeft: number | null = null;
+      const deadlineStr = d['Deadline'] || '';
+      const parsedNum = parseInt(deadlineStr.replace(/[^0-9]/g, ''));
+      
+      if (!isNaN(parsedNum)) {
+        daysLeft = parsedNum;
+      } else {
+        const deliDateStr = d['Deli_Date'] || '';
+        if (deliDateStr) {
+          const diff = new Date(deliDateStr).getTime() - Date.now();
+          if (!isNaN(diff)) {
+            daysLeft = Math.ceil(diff / (1000 * 60 * 60 * 24));
+          }
+        }
+      }
+
+      if (daysLeft === null) {
+        undated++;
+      } else if (daysLeft < 5) {
+        critical++;
+      } else if (daysLeft <= 10) {
+        warning++;
+      } else {
+        safe++;
+      }
+    });
+
+    return { critical, warning, safe, undated };
+  }, [nraProjects]);
 
   // Extract unique Service Lines in NRA rows
   const nraServiceLines = useMemo(() => {
@@ -115,11 +180,38 @@ export default function WorkloadMetricsTab({
     return ['All', ...Array.from(sls)];
   }, [nraProjects]);
 
-  // Filter NRA by Service Line and Search query
+  // Filter NRA by Service Line, Search query, and SLA Urgency
   const filteredNraProjects = useMemo(() => {
     return nraProjects.filter(d => {
       const sl = d['Service Line']?.trim() || 'Unassigned';
       const matchesServiceLine = nraServiceLineFilter === 'All' || sl === nraServiceLineFilter;
+
+      // Urgency filter logic
+      let daysLeft: number | null = null;
+      const deadlineStr = d['Deadline'] || '';
+      const parsedNum = parseInt(deadlineStr.replace(/[^0-9]/g, ''));
+      if (!isNaN(parsedNum)) {
+        daysLeft = parsedNum;
+      } else {
+        const deliDateStr = d['Deli_Date'] || '';
+        if (deliDateStr) {
+          const diff = new Date(deliDateStr).getTime() - Date.now();
+          if (!isNaN(diff)) {
+            daysLeft = Math.ceil(diff / (1000 * 60 * 60 * 24));
+          }
+        }
+      }
+
+      let matchesUrgency = true;
+      if (nraUrgencyFilter === 'Critical') {
+        matchesUrgency = daysLeft !== null && daysLeft < 5;
+      } else if (nraUrgencyFilter === 'Warning') {
+        matchesUrgency = daysLeft !== null && daysLeft >= 5 && daysLeft <= 10;
+      } else if (nraUrgencyFilter === 'Safe') {
+        matchesUrgency = daysLeft !== null && daysLeft > 10;
+      } else if (nraUrgencyFilter === 'Undated') {
+        matchesUrgency = daysLeft === null;
+      }
 
       const empName = (d['Employee Name'] || '').toLowerCase();
       const clientName = (d['Client name'] || '').toLowerCase();
@@ -127,9 +219,9 @@ export default function WorkloadMetricsTab({
       const query = nraSearchQuery.toLowerCase();
       const matchesSearch = empName.includes(query) || clientName.includes(query) || orderId.includes(query);
 
-      return matchesServiceLine && matchesSearch;
+      return matchesServiceLine && matchesUrgency && matchesSearch;
     });
-  }, [nraProjects, nraServiceLineFilter, nraSearchQuery]);
+  }, [nraProjects, nraServiceLineFilter, nraUrgencyFilter, nraSearchQuery]);
 
   const totalNraValue = useMemo(() => {
     return filteredNraProjects.reduce((sum, d) => {
@@ -158,6 +250,25 @@ export default function WorkloadMetricsTab({
     document.body.removeChild(link);
   };
 
+  // NRA Exporter
+  const handleExportNraCSV = () => {
+    const csvRows = [
+      ['Order ID', 'Date', 'Employee Name', 'Sales Team', 'Client Name', 'Service Line', 'Value', 'Deadline', 'Remarks', 'Order Link'],
+      ...filteredNraProjects.map(p => [
+        p['Order ID'], p['Date'], p['Employee Name'], p['Sales Team'], p['Client name'], p['Service Line'], p['Value'] || p['Amount'], p['Deadline'], p['Remarks'] || p['Order Sheet'], p['Order Link']
+      ])
+    ];
+    const csvContent = "data:text/csv;charset=utf-8," 
+      + csvRows.map(e => e.map(val => `"${String(val || '').replace(/"/g, '""')}"`).join(",")).join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `NRA_Projects_Report_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   // Optimization insights calculations
   const workloadInsights = useMemo(() => {
     let overloaded = 0;
@@ -167,7 +278,7 @@ export default function WorkloadMetricsTab({
     let highestLoadTeam = { team: 'None', count: 0 };
     let lowestLoadTeam = { team: 'None', count: 999 };
 
-    teamWorkload.forEach(tw => {
+    activeWorkloadData.forEach(tw => {
       if (tw.count >= 8) overloaded++;
       else if (tw.count >= 4) balanced++;
       else underloaded++;
@@ -188,7 +299,7 @@ export default function WorkloadMetricsTab({
       : "Workload distribution is balanced and stable. No critical transfers recommended.";
 
     return { overloaded, balanced, underloaded, highestValueTeam, highestLoadTeam, lowestLoadTeam, recommendation };
-  }, [teamWorkload]);
+  }, [activeWorkloadData]);
 
   // NRA Analytics Calculations
   const nraInsights = useMemo(() => {
@@ -205,6 +316,21 @@ export default function WorkloadMetricsTab({
 
     return { salesDistribution, missingRemarks };
   }, [nraProjects]);
+
+  // Adjust simulation values
+  const adjustSimCount = (team: string, amount: number) => {
+    setSimulatedAdjustments(prev => ({
+      ...prev,
+      [team]: (prev[team] || 0) + amount
+    }));
+  };
+
+  const resetSimulation = () => {
+    setSimulatedAdjustments({});
+  };
+
+  // Custom premium SVG Bar Chart Data
+  const chartHeight = 160;
 
   return (
     <div className="space-y-6 mt-6">
@@ -276,26 +402,49 @@ export default function WorkloadMetricsTab({
         <div className="glass-panel p-5 space-y-4">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-glass-border pb-3 gap-3">
             <div>
-              <h2 className="text-sm font-extrabold text-purple-400 uppercase tracking-widest flex items-center gap-2">
-                <TrendingUp className="w-4 h-4" />
-                <span>Team Workload & Active Assignment Metrics</span>
-              </h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm font-extrabold text-purple-400 uppercase tracking-widest flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4" />
+                  <span>Team Workload & Active Assignment Metrics</span>
+                </h2>
+                {isSimulationMode && (
+                  <span className="px-2 py-0.5 rounded bg-indigo-500/20 border border-indigo-500/30 text-indigo-400 text-[9px] font-black uppercase tracking-widest animate-pulse">
+                    Sandbox Active
+                  </span>
+                )}
+              </div>
               <p className="text-xs text-gray-500 mt-0.5">Real-time status of active WIP orders, workload load factor, and pipeline value distribution per team.</p>
             </div>
             
-            {/* CSV Exporter */}
-            <button
-              onClick={handleExportWorkloadCSV}
-              className="px-3.5 py-1.5 rounded-xl border border-purple-500/30 bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 text-xs font-bold uppercase transition-all flex items-center gap-2 shrink-0"
-            >
-              <Download className="w-3.5 h-3.5" />
-              Export Report
-            </button>
+            {/* Action Bar */}
+            <div className="flex items-center gap-2.5 w-full sm:w-auto">
+              {isOwner && (
+                <button
+                  onClick={() => setIsSimulationMode(!isSimulationMode)}
+                  className={`px-3.5 py-1.5 rounded-xl border text-xs font-bold uppercase transition-all flex items-center gap-2 shrink-0 ${
+                    isSimulationMode 
+                      ? 'bg-indigo-500/25 border-indigo-500/40 text-indigo-300 shadow-[0_0_15px_rgba(99,102,241,0.2)]'
+                      : 'bg-white/5 border-glass-border text-gray-400 hover:bg-white/10'
+                  }`}
+                >
+                  <Sliders className="w-3.5 h-3.5" />
+                  {isSimulationMode ? 'Exit Simulator' : 'Simulation Sandbox'}
+                </button>
+              )}
+              
+              <button
+                onClick={handleExportWorkloadCSV}
+                className="px-3.5 py-1.5 rounded-xl border border-purple-500/30 bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 text-xs font-bold uppercase transition-all flex items-center gap-2 shrink-0 ml-auto sm:ml-0"
+              >
+                <Download className="w-3.5 h-3.5" />
+                Export Report
+              </button>
+            </div>
           </div>
 
           <div className="space-y-6 pt-2">
             {/* Overload Warning Banner */}
-            {teamWorkload.some(tw => tw.count >= 8) && (
+            {activeWorkloadData.some(tw => tw.count >= 8) && (
               <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-red-500/5 border border-red-500/20 rounded-xl gap-4">
                 <div className="flex items-start sm:items-center gap-2.5">
                   <span className="p-1.5 rounded-lg bg-red-500/10 text-red-400 shrink-0">
@@ -315,6 +464,93 @@ export default function WorkloadMetricsTab({
                 </div>
               </div>
             )}
+
+            {/* Simulation Sandbox Control Panel */}
+            {isSimulationMode && isOwner && (
+              <div className="p-4 bg-indigo-950/20 border border-indigo-500/25 rounded-3xl space-y-4 shadow-[0_0_20px_rgba(99,102,241,0.05)] animate-fade-in">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-2 text-xs font-black text-indigo-400 uppercase tracking-widest">
+                    <Sliders className="w-4 h-4" />
+                    <span>Resource Allocation Simulator</span>
+                  </div>
+                  <button 
+                    onClick={resetSimulation}
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-white/5 hover:bg-white/10 text-[10px] text-gray-400 font-bold uppercase transition-all"
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    Reset Sandbox
+                  </button>
+                </div>
+                <p className="text-[11px] text-gray-400">
+                  Simulate team workload adjustments (e.g. assigning new projects or moving tasks) to view potential bottlenecks and optimizations in real-time.
+                </p>
+                <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3">
+                  {teamWorkload.map(tw => {
+                    const adj = simulatedAdjustments[tw.team] || 0;
+                    return (
+                      <div key={tw.team} className="p-3 bg-black/40 border border-glass-border rounded-2xl flex flex-col justify-between items-center text-center">
+                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Team {tw.team}</span>
+                        <div className="my-2 flex items-center gap-1.5">
+                          <button 
+                            onClick={() => adjustSimCount(tw.team, -1)}
+                            className="w-5 h-5 rounded-full bg-white/5 hover:bg-red-500/20 hover:text-red-400 flex items-center justify-center font-bold text-xs transition-all border border-white/5"
+                          >
+                            -
+                          </button>
+                          <span className={`text-base font-black font-mono ${adj > 0 ? 'text-green-400' : adj < 0 ? 'text-red-400' : 'text-white'}`}>
+                            {tw.count + adj}
+                          </span>
+                          <button 
+                            onClick={() => adjustSimCount(tw.team, 1)}
+                            className="w-5 h-5 rounded-full bg-white/5 hover:bg-green-500/20 hover:text-green-400 flex items-center justify-center font-bold text-xs transition-all border border-white/5"
+                          >
+                            +
+                          </button>
+                        </div>
+                        <span className="text-[9px] text-gray-500 font-bold uppercase">Adj: {adj > 0 ? `+${adj}` : adj}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Unique Premium Custom SVG Workload Chart */}
+            <div className="p-4 bg-black/40 border border-glass-border rounded-3xl space-y-4">
+              <div className="flex items-center gap-2 text-xs font-black text-gray-400 uppercase tracking-wider">
+                <LineChart className="w-4 h-4 text-purple-400" />
+                <span>Visual Team Workload Spread</span>
+              </div>
+              <div className="w-full flex items-end justify-between h-[180px] pt-4 px-2 select-none">
+                {activeWorkloadData.map((tw) => {
+                  const maxTarget = 8;
+                  const ratio = Math.min(1.2, tw.count / maxTarget);
+                  const barHeight = Math.max(12, ratio * (chartHeight - 40));
+                  
+                  // Color gradient
+                  const fillClass = tw.count >= 8 
+                    ? 'bg-gradient-to-t from-red-600/30 to-red-500/80 shadow-[0_0_15px_rgba(239,68,68,0.3)]' 
+                    : tw.count >= 5 
+                      ? 'bg-gradient-to-t from-yellow-600/30 to-yellow-500/80 shadow-[0_0_10px_rgba(234,179,8,0.2)]'
+                      : 'bg-gradient-to-t from-green-600/30 to-green-500/80 shadow-[0_0_10px_rgba(34,197,94,0.2)]';
+
+                  return (
+                    <div key={tw.team} className="flex flex-col items-center flex-1 mx-1.5 sm:mx-3 group">
+                      <div className="text-[10px] font-black text-white mb-2 font-mono group-hover:text-purple-400 transition-colors">
+                        {tw.count}
+                      </div>
+                      <div className="w-full relative rounded-t-lg overflow-hidden transition-all duration-500" style={{ height: `${barHeight}px` }}>
+                        <div className={`w-full h-full rounded-t-lg ${fillClass}`} />
+                      </div>
+                      <div className="h-px w-full bg-glass-border mt-1" />
+                      <div className="text-[9px] font-black text-gray-500 mt-2 uppercase tracking-wider group-hover:text-white transition-colors">
+                        T-{tw.team}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
 
             {/* Insights & Optimization Adviser for Refayet */}
             {isOwner && (
@@ -353,19 +589,19 @@ export default function WorkloadMetricsTab({
               <div>
                 <span className="text-[10px] text-gray-500 block uppercase font-bold">Total WIP Tasks</span>
                 <span className="text-lg font-extrabold text-white font-mono">
-                  {teamWorkload.reduce((sum, tw) => sum + tw.count, 0)}
+                  {activeWorkloadData.reduce((sum, tw) => sum + tw.count, 0)}
                 </span>
               </div>
               <div>
                 <span className="text-[10px] text-gray-500 block uppercase font-bold">Total Active Value</span>
                 <span className="text-lg font-extrabold text-green-400 font-mono">
-                  ${teamWorkload.reduce((sum, tw) => sum + tw.value, 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                  ${activeWorkloadData.reduce((sum, tw) => sum + tw.value, 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}
                 </span>
               </div>
               <div>
                 <span className="text-[10px] text-gray-500 block uppercase font-bold">Peak Team Load</span>
                 <span className="text-sm font-extrabold text-purple-400 uppercase block truncate">
-                  Team {teamWorkload.reduce((max, tw) => tw.count > max.count ? tw : max, { team: 'None', count: 0 }).team} ({teamWorkload.reduce((max, tw) => tw.count > max.count ? tw : max, { team: 'None', count: 0 }).count} WIP)
+                  Team {activeWorkloadData.reduce((max, tw) => tw.count > max.count ? tw : max, { team: 'None', count: 0 }).team} ({activeWorkloadData.reduce((max, tw) => tw.count > max.count ? tw : max, { team: 'None', count: 0 }).count} WIP)
                 </span>
               </div>
               <div>
@@ -374,8 +610,9 @@ export default function WorkloadMetricsTab({
               </div>
             </div>
 
+            {/* Team Cards Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {teamWorkload.map((tw) => {
+              {activeWorkloadData.map((tw) => {
                 const maxWip = 8;
                 const percentage = Math.min(100, (tw.count / maxWip) * 100);
                 const isOverloaded = tw.count >= maxWip;
@@ -435,6 +672,14 @@ export default function WorkloadMetricsTab({
             </div>
             
             <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+              <button
+                onClick={handleExportNraCSV}
+                className="px-3.5 py-2 bg-green-500/10 border border-green-500/20 text-green-400 hover:bg-green-500/20 rounded-xl text-xs font-bold uppercase transition-all flex items-center gap-2 justify-center"
+              >
+                <Download className="w-3.5 h-3.5" />
+                Export NRA List
+              </button>
+              
               {/* Search input */}
               <div className="relative w-full sm:w-60">
                 <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -448,6 +693,86 @@ export default function WorkloadMetricsTab({
               </div>
             </div>
           </div>
+
+          {/* Interactive SLA Urgency Heatmap Timeline */}
+          {isOwner && (
+            <div className="space-y-2">
+              <span className="text-[10px] text-gray-500 block uppercase font-bold tracking-wider">Interactive SLA Delivery Heatmap (Click to Filter):</span>
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                <button
+                  onClick={() => setNraUrgencyFilter('All')}
+                  className={`p-3.5 rounded-2xl border transition-all text-left flex flex-col justify-between ${
+                    nraUrgencyFilter === 'All'
+                      ? 'bg-purple-500/10 border-purple-500/30 text-purple-300 shadow-[0_0_15px_rgba(168,85,247,0.1)]'
+                      : 'bg-white/5 border-glass-border text-gray-400 hover:bg-white/10'
+                  }`}
+                >
+                  <span className="text-[9px] uppercase font-bold tracking-wider">All Projects</span>
+                  <span className="text-lg font-black mt-1.5 font-mono text-white">{nraProjects.length}</span>
+                </button>
+                
+                <button
+                  onClick={() => setNraUrgencyFilter('Critical')}
+                  className={`p-3.5 rounded-2xl border transition-all text-left flex flex-col justify-between ${
+                    nraUrgencyFilter === 'Critical'
+                      ? 'bg-red-500/15 border-red-500/40 text-red-300 shadow-[0_0_15px_rgba(239,68,68,0.15)] animate-pulse'
+                      : 'bg-white/5 border-glass-border text-gray-400 hover:bg-white/10'
+                  }`}
+                >
+                  <span className="text-[9px] uppercase font-bold tracking-wider flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-red-400 animate-spin" />
+                    Critical (&lt; 5d)
+                  </span>
+                  <span className="text-lg font-black mt-1.5 font-mono text-red-400">{nraUrgencyData.critical}</span>
+                </button>
+                
+                <button
+                  onClick={() => setNraUrgencyFilter('Warning')}
+                  className={`p-3.5 rounded-2xl border transition-all text-left flex flex-col justify-between ${
+                    nraUrgencyFilter === 'Warning'
+                      ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-300 shadow-[0_0_15px_rgba(234,179,8,0.1)]'
+                      : 'bg-white/5 border-glass-border text-gray-400 hover:bg-white/10'
+                  }`}
+                >
+                  <span className="text-[9px] uppercase font-bold tracking-wider flex items-center gap-1.5">
+                    <AlertCircle className="w-3.5 h-3.5 text-yellow-400" />
+                    Warning (5-10d)
+                  </span>
+                  <span className="text-lg font-black mt-1.5 font-mono text-yellow-400">{nraUrgencyData.warning}</span>
+                </button>
+                
+                <button
+                  onClick={() => setNraUrgencyFilter('Safe')}
+                  className={`p-3.5 rounded-2xl border transition-all text-left flex flex-col justify-between ${
+                    nraUrgencyFilter === 'Safe'
+                      ? 'bg-green-500/10 border-green-500/30 text-green-300 shadow-[0_0_15px_rgba(34,197,94,0.1)]'
+                      : 'bg-white/5 border-glass-border text-gray-400 hover:bg-white/10'
+                  }`}
+                >
+                  <span className="text-[9px] uppercase font-bold tracking-wider flex items-center gap-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-green-400" />
+                    Safe (11d+)
+                  </span>
+                  <span className="text-lg font-black mt-1.5 font-mono text-green-400">{nraUrgencyData.safe}</span>
+                </button>
+                
+                <button
+                  onClick={() => setNraUrgencyFilter('Undated')}
+                  className={`p-3.5 rounded-2xl border transition-all text-left flex flex-col justify-between ${
+                    nraUrgencyFilter === 'Undated'
+                      ? 'bg-blue-500/10 border-blue-500/30 text-blue-300 shadow-[0_0_15px_rgba(59,130,246,0.1)]'
+                      : 'bg-white/5 border-glass-border text-gray-400 hover:bg-white/10'
+                  }`}
+                >
+                  <span className="text-[9px] uppercase font-bold tracking-wider flex items-center gap-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-blue-400" />
+                    Backlog / Undated
+                  </span>
+                  <span className="text-lg font-black mt-1.5 font-mono text-blue-400">{nraUrgencyData.undated}</span>
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* NRA Advanced Analytics */}
           {isOwner && (
