@@ -13,7 +13,11 @@ import {
   BarChart3,
   Layers,
   Sparkles,
-  ClipboardList
+  ClipboardList,
+  Download,
+  Activity,
+  LineChart,
+  BadgeAlert
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 
@@ -137,6 +141,71 @@ export default function WorkloadMetricsTab({
 
   const isOwner = dbUser?.email === 'refayethossenmd@gmail.com';
 
+  // Exporter to CSV
+  const handleExportWorkloadCSV = () => {
+    const csvRows = [
+      ['Team', 'Active WIP', 'Active Pipeline Value', 'Members'],
+      ...teamWorkload.map(tw => [tw.team, tw.count, `$${tw.value}`, tw.members])
+    ];
+    const csvContent = "data:text/csv;charset=utf-8," 
+      + csvRows.map(e => e.map(val => `"${String(val).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `Team_Workload_Report_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Optimization insights calculations
+  const workloadInsights = useMemo(() => {
+    let overloaded = 0;
+    let balanced = 0;
+    let underloaded = 0;
+    let highestValueTeam = { team: 'None', value: 0 };
+    let highestLoadTeam = { team: 'None', count: 0 };
+    let lowestLoadTeam = { team: 'None', count: 999 };
+
+    teamWorkload.forEach(tw => {
+      if (tw.count >= 8) overloaded++;
+      else if (tw.count >= 4) balanced++;
+      else underloaded++;
+
+      if (tw.value > highestValueTeam.value) {
+        highestValueTeam = { team: tw.team, value: tw.value };
+      }
+      if (tw.count > highestLoadTeam.count) {
+        highestLoadTeam = { team: tw.team, count: tw.count };
+      }
+      if (tw.count < lowestLoadTeam.count) {
+        lowestLoadTeam = { team: tw.team, count: tw.count };
+      }
+    });
+
+    const recommendation = overloaded > 0 && lowestLoadTeam.team !== 'None'
+      ? `Redistribute tasks from Team ${highestLoadTeam.team} (${highestLoadTeam.count} WIP) to Team ${lowestLoadTeam.team} (${lowestLoadTeam.count} WIP) to optimize throughput.`
+      : "Workload distribution is balanced and stable. No critical transfers recommended.";
+
+    return { overloaded, balanced, underloaded, highestValueTeam, highestLoadTeam, lowestLoadTeam, recommendation };
+  }, [teamWorkload]);
+
+  // NRA Analytics Calculations
+  const nraInsights = useMemo(() => {
+    const salesDistribution: Record<string, number> = {};
+    let missingRemarks = 0;
+
+    nraProjects.forEach(d => {
+      const salesTeam = d['Sales Team'] || 'Direct/Unknown';
+      salesDistribution[salesTeam] = (salesDistribution[salesTeam] || 0) + 1;
+      if (!d['Remarks'] || d['Remarks'].trim() === '') {
+        missingRemarks++;
+      }
+    });
+
+    return { salesDistribution, missingRemarks };
+  }, [nraProjects]);
+
   return (
     <div className="space-y-6 mt-6">
       {/* Unique Professional Header for Owner */}
@@ -205,7 +274,7 @@ export default function WorkloadMetricsTab({
       {activeSubTab === 'workload' ? (
         /* Team Workload view */
         <div className="glass-panel p-5 space-y-4">
-          <div className="flex justify-between items-center border-b border-glass-border pb-3">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-glass-border pb-3 gap-3">
             <div>
               <h2 className="text-sm font-extrabold text-purple-400 uppercase tracking-widest flex items-center gap-2">
                 <TrendingUp className="w-4 h-4" />
@@ -213,6 +282,15 @@ export default function WorkloadMetricsTab({
               </h2>
               <p className="text-xs text-gray-500 mt-0.5">Real-time status of active WIP orders, workload load factor, and pipeline value distribution per team.</p>
             </div>
+            
+            {/* CSV Exporter */}
+            <button
+              onClick={handleExportWorkloadCSV}
+              className="px-3.5 py-1.5 rounded-xl border border-purple-500/30 bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 text-xs font-bold uppercase transition-all flex items-center gap-2 shrink-0"
+            >
+              <Download className="w-3.5 h-3.5" />
+              Export Report
+            </button>
           </div>
 
           <div className="space-y-6 pt-2">
@@ -234,6 +312,38 @@ export default function WorkloadMetricsTab({
                   <span className="px-2.5 py-1 bg-red-500/10 text-red-400 border border-red-500/20 rounded-lg font-bold text-[10px] uppercase font-mono tracking-wider flex items-center justify-center">
                     Action Required
                   </span>
+                </div>
+              </div>
+            )}
+
+            {/* Insights & Optimization Adviser for Refayet */}
+            {isOwner && (
+              <div className="p-4 bg-purple-950/20 border border-purple-500/10 rounded-2xl space-y-3">
+                <div className="flex items-center gap-2 text-xs font-black text-purple-400 uppercase tracking-widest">
+                  <LineChart className="w-4 h-4 text-purple-400" />
+                  <span>Workload Optimization Advisor</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                  <div className="p-3 bg-black/40 rounded-xl border border-glass-border">
+                    <span className="text-gray-500 block uppercase font-bold text-[9px] tracking-wider">Resource Allocation</span>
+                    <p className="text-gray-300 mt-1 font-semibold">
+                      <span className="text-red-400 font-extrabold">{workloadInsights.overloaded} Overloaded</span> /{' '}
+                      <span className="text-yellow-400 font-extrabold">{workloadInsights.balanced} Balanced</span> /{' '}
+                      <span className="text-green-400 font-extrabold">{workloadInsights.underloaded} Underloaded</span>
+                    </p>
+                  </div>
+                  <div className="p-3 bg-black/40 rounded-xl border border-glass-border">
+                    <span className="text-gray-500 block uppercase font-bold text-[9px] tracking-wider">High Value Pipeline</span>
+                    <p className="text-gray-300 mt-1 font-semibold">
+                      Team <span className="text-green-400 font-black">{workloadInsights.highestValueTeam.team}</span> (${workloadInsights.highestValueTeam.value.toLocaleString()})
+                    </p>
+                  </div>
+                  <div className="p-3 bg-black/40 rounded-xl border border-glass-border">
+                    <span className="text-gray-500 block uppercase font-bold text-[9px] tracking-wider">Optimization Suggestion</span>
+                    <p className="text-gray-400 mt-1 text-[11px] leading-relaxed">
+                      {workloadInsights.recommendation}
+                    </p>
+                  </div>
                 </div>
               </div>
             )}
@@ -338,6 +448,35 @@ export default function WorkloadMetricsTab({
               </div>
             </div>
           </div>
+
+          {/* NRA Advanced Analytics */}
+          {isOwner && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="p-4 bg-black/40 border border-glass-border rounded-2xl">
+                <span className="text-[10px] text-gray-500 block uppercase font-bold tracking-wider mb-2">Sales Channel Distribution</span>
+                <div className="flex flex-wrap gap-3">
+                  {Object.entries(nraInsights.salesDistribution).map(([team, count]) => (
+                    <div key={team} className="px-3 py-1.5 bg-white/5 border border-glass-border rounded-xl flex items-center gap-2 text-xs">
+                      <span className="font-bold text-gray-300">{team}</span>
+                      <span className="px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400 text-[10px] font-bold">{count}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="p-4 bg-black/40 border border-glass-border rounded-2xl flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] text-gray-500 block uppercase font-bold tracking-wider">Unassigned Remarks Alert</span>
+                  <p className="text-xs text-gray-400 mt-1">NRA projects currently missing specific project execution notes or remarks.</p>
+                </div>
+                <div className="text-right">
+                  <span className={`text-xl font-black ${nraInsights.missingRemarks > 0 ? 'text-yellow-500' : 'text-green-400'} font-mono`}>
+                    {nraInsights.missingRemarks}
+                  </span>
+                  <span className="text-[9px] text-gray-500 block uppercase font-bold mt-0.5">Missing Notes</span>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Service Line Pill Filter */}
           <div className="space-y-2">
