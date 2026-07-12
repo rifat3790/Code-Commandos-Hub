@@ -4,10 +4,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   Headphones, 
   Volume2, 
-  VolumeX, 
   Play, 
   Pause, 
-  SkipForward, 
   Plus, 
   Trash2, 
   Check, 
@@ -17,17 +15,22 @@ import {
   Music, 
   ClipboardList, 
   Sparkles,
-  RefreshCw
+  Zap,
+  BarChart2
 } from 'lucide-react';
+
+const YoutubeIcon = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
+    <path d="M23.498 6.163a3.003 3.003 0 0 0-2.11-2.11C19.517 3.545 12 3.545 12 3.545s-7.517 0-9.388.508a3.003 3.003 0 0 0-2.11 2.11C0 8.033 0 12 0 12s0 3.967.502 5.837a3.003 3.003 0 0 0 2.11 2.11c1.871.508 9.388.508 9.388.508s7.517 0 9.388-.508a3.003 3.003 0 0 0 2.11-2.11C24 15.967 24 12 24 12s0-3.967-.502-5.837zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+  </svg>
+);
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   playKeyboardClick, 
   startSynthesizedRain, 
   stopSynthesizedRain, 
-  updateRainVolume, 
   startSynthesizedHum, 
   stopSynthesizedHum, 
-  updateHumVolume,
   KeyboardSwitchType
 } from '@/lib/audioSynth';
 
@@ -61,8 +64,21 @@ export default function FocusPage() {
   const [volumeMusic, setVolumeMusic] = useState(30);
   const [streamError, setStreamError] = useState<string | null>(null);
 
-  // Notepad states
+  // YouTube Custom input states
+  const [youtubeInput, setYoutubeInput] = useState('');
+  const [ytVideoId, setYtVideoId] = useState<string | null>(null);
+
+  // Notepad sandbox states
   const [notepadText, setNotepadText] = useState('');
+  const [typingStats, setTypingStats] = useState({
+    wpm: 0,
+    peakWpm: 0,
+    chars: 0,
+    words: 0
+  });
+
+  const typingTimerRef = useRef<number | null>(null);
+  const startTimeRef = useRef<number | null>(null);
   
   // Task state
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -87,6 +103,12 @@ export default function FocusPage() {
 
       const savedTasks = localStorage.getItem('focus_tasks');
       if (savedTasks) setTasks(JSON.parse(savedTasks));
+
+      const savedYt = localStorage.getItem('focus_yt_video_id');
+      if (savedYt) {
+        setYtVideoId(savedYt);
+        setYoutubeInput(`https://www.youtube.com/watch?v=${savedYt}`);
+      }
     }
   }, []);
 
@@ -163,9 +185,94 @@ export default function FocusPage() {
     }
   }, [volumeMusic]);
 
+  // Preset configuration applicator
+  const applyPreset = (preset: 'cyberpunk' | 'cafe' | 'focus') => {
+    if (preset === 'cyberpunk') {
+      setSwitchType('red');
+      setVolumeClicks(65);
+      setVolumeRain(30);
+      setVolumeHum(75);
+      setActiveStreamIndex(1); // Synthwave
+      setIsMusicPlaying(true);
+      setStreamError(null);
+    } else if (preset === 'cafe') {
+      setSwitchType('brown');
+      setVolumeClicks(70);
+      setVolumeRain(90);
+      setVolumeHum(0);
+      setActiveStreamIndex(0); // Lofi
+      setIsMusicPlaying(true);
+      setStreamError(null);
+    } else if (preset === 'focus') {
+      setSwitchType('red');
+      setVolumeClicks(40);
+      setVolumeRain(0);
+      setVolumeHum(45);
+      setActiveStreamIndex(0); // Lofi
+      setIsMusicPlaying(true);
+      setStreamError(null);
+    }
+  };
+
+  // Helper to extract YouTube video ID from URL
+  const extractYtId = (url: string) => {
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+    const match = url.match(regExp);
+    return (match && match[2].length === 11) ? match[2] : null;
+  };
+
+  // Handle YouTube URL submit
+  const handleYtSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!youtubeInput.trim()) {
+      setYtVideoId(null);
+      localStorage.removeItem('focus_yt_video_id');
+      return;
+    }
+    const id = extractYtId(youtubeInput);
+    if (id) {
+      setYtVideoId(id);
+      localStorage.setItem('focus_yt_video_id', id);
+      setIsMusicPlaying(false); // Pause default audio stream if YouTube is loaded
+    } else {
+      alert("Invalid YouTube URL. Please copy-paste a valid video link.");
+    }
+  };
+
+  // WPM and Typing Tracker onChange
+  const handleNotepadChange = (val: string) => {
+    setNotepadText(val);
+
+    if (!startTimeRef.current) {
+      startTimeRef.current = Date.now();
+    }
+
+    const elapsedMinutes = (Date.now() - startTimeRef.current) / 60000;
+    const wordCount = val.trim().split(/\s+/).filter(Boolean).length;
+    
+    // Only calculate WPM after some characters to avoid spike anomalies
+    const currentWpm = elapsedMinutes > 0.008 ? Math.round(wordCount / elapsedMinutes) : 0;
+
+    setTypingStats(prev => {
+      const peak = currentWpm > prev.peakWpm ? currentWpm : prev.peakWpm;
+      return {
+        wpm: currentWpm,
+        peakWpm: peak,
+        chars: val.length,
+        words: wordCount
+      };
+    });
+
+    // Auto-pause calculation timer
+    if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+    typingTimerRef.current = window.setTimeout(() => {
+      startTimeRef.current = null; // resets calculation delta when they resume
+    }, 4500);
+  };
+
   // Handle local keystrokes inside Notepad
   const handleNotepadKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    // Avoid double clicking on trigger keys
+    if (['Control', 'Shift', 'Alt', 'Meta'].includes(e.key)) return;
     playKeyboardClick(switchType, volumeClicks / 100);
   };
 
@@ -196,14 +303,14 @@ export default function FocusPage() {
 
   return (
     <main className="min-h-screen p-4 md:p-8 bg-[#030712] text-[#f3f4f6] relative select-none pb-24 overflow-y-auto">
-      {/* Hidden audio element for streams */}
-      <audio ref={audioRef} crossOrigin="anonymous" loop />
+      {/* HTML5 audio element - REMOVED crossOrigin="anonymous" to bypass radio CORS locks */}
+      <audio ref={audioRef} loop />
 
       {/* 1. Ambient Background Orbs */}
       <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-green-500/5 blur-[120px] rounded-full pointer-events-none" />
       <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/5 blur-[120px] rounded-full pointer-events-none" />
 
-      {/* Header with Digital Clock */}
+      {/* Header */}
       <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-8 border-b border-glass-border pb-6">
         <div>
           <div className="flex items-center gap-3">
@@ -232,6 +339,34 @@ export default function FocusPage() {
         {/* LEFT COLUMN: Mechanical Synthesizers & Sound Mixer */}
         <div className="lg:col-span-2 space-y-6">
           
+          {/* Preset Buttons Panel (Master controller) */}
+          <div className="glass-panel rounded-2xl p-4 flex flex-col md:flex-row items-center justify-between gap-4 relative overflow-hidden shadow-xl border border-green-500/10">
+            <div className="flex items-center gap-2">
+              <Zap className="w-4 h-4 text-green-400 animate-pulse" />
+              <span className="text-xs font-bold font-mono text-white uppercase tracking-wider">Quick Sound Presets</span>
+            </div>
+            <div className="flex flex-wrap gap-2.5 w-full md:w-auto">
+              <button 
+                onClick={() => applyPreset('cyberpunk')}
+                className="flex-1 md:flex-initial px-4 py-2 rounded-xl bg-[#0a0f1d] border border-purple-500/20 text-[10px] font-bold font-mono text-purple-400 hover:bg-purple-950/20 transition-all uppercase tracking-wider flex items-center justify-center gap-1.5"
+              >
+                🌌 Cyberpunk Hack
+              </button>
+              <button 
+                onClick={() => applyPreset('cafe')}
+                className="flex-1 md:flex-initial px-4 py-2 rounded-xl bg-[#0a0f1d] border border-blue-500/20 text-[10px] font-bold font-mono text-blue-400 hover:bg-blue-950/20 transition-all uppercase tracking-wider flex items-center justify-center gap-1.5"
+              >
+                🌧️ Rainy Cafe
+              </button>
+              <button 
+                onClick={() => applyPreset('focus')}
+                className="flex-1 md:flex-initial px-4 py-2 rounded-xl bg-[#0a0f1d] border border-green-500/20 text-[10px] font-bold font-mono text-green-400 hover:bg-green-950/20 transition-all uppercase tracking-wider flex items-center justify-center gap-1.5"
+              >
+                🚀 Deep Focus
+              </button>
+            </div>
+          </div>
+
           {/* Section 1: Keyboard Switch Select */}
           <div className="glass-panel rounded-2xl p-6 relative overflow-hidden shadow-2xl">
             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-green-500 to-emerald-600" />
@@ -267,11 +402,11 @@ export default function FocusPage() {
                 onClick={() => setSwitchType('brown')}
                 className={`p-4 rounded-xl border text-left transition-all relative overflow-hidden ${
                   switchType === 'brown' 
-                    ? 'border-yellow-600/50 bg-amber-950/20 shadow-lg shadow-yellow-500/10' 
+                    ? 'border-yellow-655/50 bg-amber-955/20 shadow-lg shadow-yellow-500/10' 
                     : 'border-glass-border bg-[#0a0f1d]/30 hover:border-white/10 hover:bg-glass-hover'
                 }`}
               >
-                <div className="w-6 h-6 rounded bg-amber-700 mb-3 flex items-center justify-center text-xs font-bold text-black font-mono shadow-md">Br</div>
+                <div className="w-6 h-6 rounded bg-amber-750 mb-3 flex items-center justify-center text-xs font-bold text-black font-mono shadow-md">Br</div>
                 <h4 className="font-bold text-xs text-white">MX Brown (Tactile)</h4>
                 <p className="text-[10px] text-gray-400 mt-1 leading-relaxed">Quiet plastic thud with moderate tactile feel. Balanced option.</p>
               </button>
@@ -395,7 +530,7 @@ export default function FocusPage() {
                   {isMusicPlaying && <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />}
                 </div>
                 <div>
-                  <span className="text-[10px] text-gray-500 block mb-1">LOFI Girl Web Radio</span>
+                  <span className="text-[10px] text-gray-500 block mb-1">Lofi Chill Streams</span>
                   <div className="flex items-center gap-2.5">
                     <input 
                       type="range" 
@@ -417,7 +552,7 @@ export default function FocusPage() {
               <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest font-mono mb-3">Lofi Radio Stations</h4>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 {LOFI_STREAMS.map((stream, idx) => {
-                  const isActive = activeStreamIndex === idx;
+                  const isActive = activeStreamIndex === idx && !ytVideoId;
                   return (
                     <div 
                       key={idx}
@@ -443,6 +578,7 @@ export default function FocusPage() {
                         ) : (
                           <button 
                             onClick={() => {
+                              setYtVideoId(null); // disable custom youtube stream
                               setActiveStreamIndex(idx);
                               setIsMusicPlaying(true);
                             }}
@@ -465,7 +601,7 @@ export default function FocusPage() {
                 })}
               </div>
               
-              {streamError && (
+              {streamError && !ytVideoId && (
                 <div className="mt-3 text-[10px] text-red-400 font-mono flex items-center gap-1">
                   <span className="w-1 h-1 bg-red-400 rounded-full animate-ping" />
                   {streamError}
@@ -473,33 +609,91 @@ export default function FocusPage() {
               )}
             </div>
 
+            {/* YouTube Custom Stream Input */}
+            <div className="mt-6 border-t border-glass-border pt-5">
+              <div className="flex items-center gap-2 mb-3">
+                <YoutubeIcon className="w-4 h-4 text-red-500" />
+                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest font-mono">Custom YouTube Stream</h4>
+              </div>
+              <form onSubmit={handleYtSubmit} className="flex gap-2">
+                <input 
+                  type="text" 
+                  value={youtubeInput}
+                  onChange={(e) => setYoutubeInput(e.target.value)}
+                  placeholder="Paste YouTube Stream Link (e.g. Lofi Girl Live)..."
+                  className="flex-1 px-3 py-2 text-xs rounded-xl bg-black/35 border border-glass-border text-white focus:outline-none focus:border-red-500/50 transition-colors"
+                />
+                <button 
+                  type="submit"
+                  className="px-4 py-2 text-xs bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl shadow-md transition-colors"
+                >
+                  {ytVideoId ? 'Update' : 'Load Player'}
+                </button>
+              </form>
+
+              {ytVideoId && (
+                <div className="mt-4 rounded-xl overflow-hidden border border-glass-border w-full aspect-video shadow-2xl relative bg-black">
+                  <iframe
+                    src={`https://www.youtube.com/embed/${ytVideoId}?autoplay=1&enablejsapi=1`}
+                    title="YouTube Focus Video Player"
+                    allow="autoplay; encrypted-media; picture-in-picture"
+                    allowFullScreen
+                    className="w-full h-full border-none"
+                  />
+                  <div className="absolute top-2 right-2 bg-black/60 text-red-500 text-[9px] font-mono font-bold px-2 py-0.5 rounded border border-red-500/20 backdrop-blur-sm">
+                    ACTIVE STREAM
+                  </div>
+                </div>
+              )}
+            </div>
+
           </div>
 
-          {/* Section 3: Keyboard Click Sandbox / Typing Notepad */}
+          {/* Section 3: Keyboard Click Sandbox & Typing Tracker */}
           <div className="glass-panel rounded-2xl p-6 relative overflow-hidden shadow-2xl">
             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-500 to-green-500" />
-            <div className="flex items-center gap-2 mb-3">
-              <Sparkles className="w-4 h-4 text-green-400" />
-              <h3 className="font-bold text-sm tracking-wider uppercase text-white font-mono">Notepad Sandbox</h3>
+            
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-4">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-green-400" />
+                <h3 className="font-bold text-sm tracking-wider uppercase text-white font-mono">Notepad Sandbox</h3>
+              </div>
+              
+              {/* Live typing stats */}
+              <div className="flex gap-4 bg-black/30 border border-glass-border rounded-xl p-2 px-3.5 text-[10px] font-mono text-gray-400">
+                <div className="flex items-center gap-1.5">
+                  <BarChart2 className="w-3.5 h-3.5 text-green-400" />
+                  Speed: <span className="text-white font-bold">{typingStats.wpm} WPM</span>
+                </div>
+                <div className="border-r border-white/5 h-3.5" />
+                <div>
+                  Peak: <span className="text-green-400 font-bold">{typingStats.peakWpm}</span>
+                </div>
+                <div className="border-r border-white/5 h-3.5" />
+                <div>
+                  Chars: <span className="text-gray-300 font-bold">{typingStats.chars}</span>
+                </div>
+              </div>
             </div>
-            <p className="text-xs text-gray-500 mb-4 leading-normal">
-              Type or paste code snippets here to hear and feel the mechanical keyboard keystroke clicks. 
-            </p>
             
             <textarea 
               value={notepadText}
-              onChange={(e) => setNotepadText(e.target.value)}
+              onChange={(e) => handleNotepadChange(e.target.value)}
               onKeyDown={handleNotepadKeyDown}
               placeholder="Start coding here... (e.g. {% schema %} or function main() { ... })"
-              className="w-full h-40 bg-black/35 border border-glass-border rounded-xl p-4 font-mono text-xs text-gray-300 focus:outline-none focus:border-green-500/50 shadow-inner resize-none transition-colors"
+              className="w-full h-44 bg-black/35 border border-glass-border rounded-xl p-4 font-mono text-xs text-gray-300 focus:outline-none focus:border-green-500/50 shadow-inner resize-none transition-colors"
             />
             <div className="flex justify-between items-center mt-2.5">
-              <span className="text-[10px] text-gray-500 font-mono">Characters: {notepadText.length} | Lines: {notepadText.split('\n').length}</span>
+              <span className="text-[10px] text-gray-500 font-mono">Words: {typingStats.words} | Time elapsed resets on pause.</span>
               <button 
-                onClick={() => setNotepadText('')}
+                onClick={() => {
+                  setNotepadText('');
+                  setTypingStats({ wpm: 0, peakWpm: 0, chars: 0, words: 0 });
+                  startTimeRef.current = null;
+                }}
                 className="text-[10px] text-gray-500 hover:text-red-400 flex items-center gap-1 transition-colors"
               >
-                Clear Sandbox
+                Reset Stats & Clear
               </button>
             </div>
           </div>
@@ -539,7 +733,7 @@ export default function FocusPage() {
                 return (
                   <motion.div 
                     key={idx}
-                    animate={isMusicPlaying ? { height: heights[idx] } : { height: 6 }}
+                    animate={(isMusicPlaying || !!ytVideoId) ? { height: heights[idx] } : { height: 6 }}
                     transition={{
                       repeat: Infinity,
                       duration: animDuration[idx],
@@ -558,7 +752,7 @@ export default function FocusPage() {
             </div>
             
             <p className="text-[9px] text-gray-500 font-mono text-center tracking-wider">
-              {isMusicPlaying ? 'SYNCHRONIZING DIGITAL CARRIER WAVE...' : 'STANDBY - WAITING FOR CARRIER...'}
+              {(isMusicPlaying || !!ytVideoId) ? 'SYNCHRONIZING DIGITAL CARRIER WAVE...' : 'STANDBY - WAITING FOR CARRIER...'}
             </p>
           </div>
 
@@ -582,7 +776,7 @@ export default function FocusPage() {
               />
               <button 
                 type="submit"
-                className="w-9 h-9 rounded-xl bg-blue-600 hover:bg-blue-500 text-white flex items-center justify-center transition-colors shadow-md"
+                className="w-9 h-9 rounded-xl bg-blue-600 hover:bg-blue-500 text-white flex items-center justify-center transition-colors shadow-md animate-pulse"
               >
                 <Plus className="w-4 h-4" />
               </button>
@@ -594,7 +788,7 @@ export default function FocusPage() {
                 {tasks.length === 0 ? (
                   <div className="h-full flex flex-col items-center justify-center text-center p-4">
                     <p className="text-xs text-gray-500 font-mono select-none">No active tasks in this queue.</p>
-                    <p className="text-[10px] text-gray-650 mt-1">Add items above to start tracking!</p>
+                    <p className="text-[10px] text-gray-655 mt-1">Add items above to start tracking!</p>
                   </div>
                 ) : (
                   tasks.map((task) => (

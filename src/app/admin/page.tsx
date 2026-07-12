@@ -10,7 +10,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 const allAvailableMenus = [
   'Home', 'Workspace', 'Order Tracker', 'Personal Projects', 'Message Helper', 'Templates', 'Schema Builder',
-  'Audit Suite', 'Projects', 'Mockup Studio', 'AI Assistant', 
+  'Audit Suite', 'Projects', 'Mockup Studio', 'Focus Studio', 'AI Assistant', 
   'Team Notes', 'Downloads', 'Member Profile', 'Shopify Codes', 'Settings'
 ];
 

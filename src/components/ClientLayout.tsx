@@ -55,6 +55,7 @@ function ProtectedMainContent({ children }: { children: React.ReactNode }) {
     '/audit': 'Audit Suite',
     '/credentials': 'Projects',
     '/mockup': 'Mockup Studio',
+    '/focus': 'Focus Studio',
     '/chat': 'AI Assistant',
     '/notes': 'Team Notes',
     '/downloads': 'Downloads',
