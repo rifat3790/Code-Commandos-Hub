@@ -26,7 +26,7 @@ import {
 } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import confetti from 'canvas-confetti';
-import imglyRemoveBackground from '@imgly/background-removal';
+import { removeBackground as imglyRemoveBackground } from '@imgly/background-removal';
 import { useWorkspaceStore } from '@/store/workspaceStore';
 import { MockupStyle } from '@/types';
 
@@ -280,7 +280,7 @@ export default function MockupPage() {
     
     // Confetti on success
     confetti({ particleCount: 80, spread: 60, origin: { y: 0.8 } });
-    store.logActivity('Background Removed', 'tool', 'Processed image background removal.');
+    store.logActivity('Background Removed', 'mockup', 'Processed image background removal.');
   };
 
   // Export card as image
@@ -740,7 +740,6 @@ export default function MockupPage() {
             <span>{downloading ? 'Compiling...' : 'Export PNG'}</span>
           </button>
         </div>
-      </div>
       </div>
 
       {/* Tabs */}
@@ -2160,7 +2159,7 @@ export default function MockupPage() {
             </div>
           </div>
         </div>
-
+      </div>
       )}
     </div>
   );
