@@ -75,15 +75,23 @@ export default function AdminDashboard() {
   }, [loading, dbUser, router]);
 
   const fetchPending = async () => {
-    const res = await fetch('/api/pending');
-    const data = await res.json();
-    if (data.success) setPendingChanges(data.changes);
+    try {
+      const res = await fetch('/api/pending');
+      const data = await res.json();
+      if (data.success) setPendingChanges(data.changes);
+    } catch (e) {
+      console.error("Error fetching pending:", e);
+    }
   };
 
   const fetchPendingShopify = async () => {
-    const res = await fetch('/api/admin/shopify-snippets');
-    const data = await res.json();
-    if (data.success) setPendingShopify(data.snippets);
+    try {
+      const res = await fetch('/api/admin/shopify-snippets');
+      const data = await res.json();
+      if (data.success) setPendingShopify(data.snippets);
+    } catch (e) {
+      console.error("Error fetching shopify snippets:", e);
+    }
   };
 
   const fetchStorageStats = async () => {
@@ -136,9 +144,13 @@ export default function AdminDashboard() {
   }, [activeTab, user]);
 
   const fetchUsers = async () => {
-    const res = await fetch('/api/users/roles');
-    const data = await res.json();
-    if (data.success) setAllUsers(data.users);
+    try {
+      const res = await fetch('/api/users/roles');
+      const data = await res.json();
+      if (data.success) setAllUsers(data.users);
+    } catch (e) {
+      console.error("Error fetching users:", e);
+    }
   };
 
   const handleApproveReject = async (id: string, decision: 'approve' | 'reject') => {
