@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { useAuth } from './AuthContext';
 import { db } from '@/lib/firebase';
-import { collection, doc, addDoc, setDoc, updateDoc, onSnapshot, query, where, limit, getDoc } from 'firebase/firestore';
+import { collection, doc, addDoc, setDoc, updateDoc, onSnapshot, query, where, limit, getDoc, deleteDoc } from 'firebase/firestore';
 import { Phone, PhoneOff, Mic, MicOff, Video, VideoOff, ScreenShare, Volume2, Maximize, Minimize2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -169,6 +169,152 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   const unsubscribeCallRef = useRef<(() => void) | null>(null);
   const unsubscribeIceRef = useRef<(() => void) | null>(null);
   const timerIntervalRef = useRef<any>(null);
+
+  const [meshRemoteStreams, setMeshRemoteStreams] = useState<Record<string, MediaStream>>({});
+  const meshConnectionsRef = useRef<Record<string, RTCPeerConnection>>({});
+
+  useEffect(() => {
+    if (!user || !activeCall?.isGroupCall) {
+      // Clean up all mesh connections
+      Object.keys(meshConnectionsRef.current).forEach(peerUid => {
+        try {
+          meshConnectionsRef.current[peerUid].close();
+        } catch (e) {}
+      });
+      meshConnectionsRef.current = {};
+      setMeshRemoteStreams({});
+      return;
+    }
+
+    const groupId = activeCall.id;
+    const myPresenceRef = doc(db, 'groupCalls', groupId, 'participants', user.uid);
+    
+    setDoc(myPresenceRef, {
+      uid: user.uid,
+      name: dbUser?.name || user.email || 'Developer',
+      joinedAt: new Date().getTime()
+    }).catch(err => console.error("Error setting presence:", err));
+
+    const participantsRef = collection(db, 'groupCalls', groupId, 'participants');
+    const unsubscribeParticipants = onSnapshot(participantsRef, async (snapshot) => {
+      const participantsList = snapshot.docs.map(doc => doc.data().uid).filter(uid => uid !== user.uid);
+      
+      // Clean up connections for left participants
+      Object.keys(meshConnectionsRef.current).forEach(peerUid => {
+        if (!participantsList.includes(peerUid)) {
+          try {
+            meshConnectionsRef.current[peerUid].close();
+          } catch (e) {}
+          delete meshConnectionsRef.current[peerUid];
+          setMeshRemoteStreams(prev => {
+            const copy = { ...prev };
+            delete copy[peerUid];
+            return copy;
+          });
+        }
+      });
+
+      // Connect with new participants
+      for (const peerUid of participantsList) {
+        if (meshConnectionsRef.current[peerUid]) continue;
+
+        const pc = new RTCPeerConnection({
+          iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+        });
+        meshConnectionsRef.current[peerUid] = pc;
+
+        if (localStream) {
+          localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+        }
+
+        pc.ontrack = (event) => {
+          if (event.streams && event.streams[0]) {
+            setMeshRemoteStreams(prev => ({
+              ...prev,
+              [peerUid]: event.streams[0]
+            }));
+          }
+        };
+
+        const connId = user.uid > peerUid 
+          ? `${user.uid}_to_${peerUid}` 
+          : `${peerUid}_to_${user.uid}`;
+        
+        const connectionDocRef = doc(db, 'groupCalls', groupId, 'connections', connId);
+
+        pc.onicecandidate = (event) => {
+          if (event.candidate) {
+            const candRef = doc(collection(db, 'groupCalls', groupId, 'connections', connId, 'candidates'));
+            setDoc(candRef, {
+              ...event.candidate.toJSON(),
+              senderUid: user.uid
+            }).catch(console.error);
+          }
+        };
+
+        // Listen for remote ICE candidates
+        const unsubscribeIce = onSnapshot(collection(db, 'groupCalls', groupId, 'connections', connId, 'candidates'), (iceSnap) => {
+          iceSnap.docChanges().forEach(async (change) => {
+            if (change.type === 'added') {
+              const data = change.doc.data();
+              if (data.senderUid !== user.uid) {
+                try {
+                  await pc.addIceCandidate(new RTCIceCandidate(data));
+                } catch (err) {}
+              }
+            }
+          });
+        });
+
+        if (user.uid > peerUid) {
+          const offerDescription = await pc.createOffer();
+          await pc.setLocalDescription(offerDescription);
+
+          await setDoc(connectionDocRef, {
+            offer: {
+              sdp: offerDescription.sdp,
+              type: offerDescription.type
+            },
+            callerUid: user.uid,
+            receiverUid: peerUid
+          });
+
+          // Listen for answer
+          const unsubscribeConn = onSnapshot(connectionDocRef, async (connSnap) => {
+            if (connSnap.exists()) {
+              const data = connSnap.data();
+              if (data.answer && !pc.currentRemoteDescription) {
+                await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
+              }
+            }
+          });
+        } else {
+          // Listen for offer
+          const unsubscribeConn = onSnapshot(connectionDocRef, async (connSnap) => {
+            if (connSnap.exists()) {
+              const data = connSnap.data();
+              if (data.offer && !pc.currentRemoteDescription) {
+                await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
+                const answerDescription = await pc.createAnswer();
+                await pc.setLocalDescription(answerDescription);
+                await updateDoc(connectionDocRef, {
+                  answer: {
+                    sdp: answerDescription.sdp,
+                    type: answerDescription.type
+                  }
+                });
+              }
+            }
+          });
+        }
+      }
+    });
+
+    return () => {
+      unsubscribeParticipants();
+      deleteDoc(myPresenceRef).catch(console.error);
+    };
+  }, [activeCall, user, localStream]);
 
   const isAdminOrSuperAdmin = dbUser?.role === 'super_admin' || dbUser?.role === 'admin';
 
@@ -1102,16 +1248,28 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
                     {groupCallParticipants.filter(uid => uid !== user?.uid).map(uid => {
                       const participantUser = allUsers.find(u => u.firebaseUid === uid || u.uid === uid);
                       const name = participantUser?.name || participantUser?.email || 'Developer';
+                      const stream = meshRemoteStreams[uid];
                       return (
                         <div key={uid} className="relative bg-gray-900 border border-glass-border rounded-2xl overflow-hidden shadow-xl aspect-video flex items-center justify-center">
-                          <div className="flex flex-col items-center justify-center gap-3">
-                            <div className="w-16 h-16 rounded-full bg-purple-500/10 border-2 border-purple-500/50 flex items-center justify-center text-purple-400 font-bold text-xl animate-pulse shadow-[0_0_15px_rgba(168,85,247,0.3)]">
-                              {name.charAt(0).toUpperCase()}
+                          {stream ? (
+                            <video
+                              ref={el => {
+                                if (el) el.srcObject = stream;
+                              }}
+                              autoPlay
+                              playsInline
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="flex flex-col items-center justify-center gap-3">
+                              <div className="w-16 h-16 rounded-full bg-purple-500/10 border-2 border-purple-500/50 flex items-center justify-center text-purple-400 font-bold text-xl animate-pulse shadow-[0_0_15px_rgba(168,85,247,0.3)]">
+                                {name.charAt(0).toUpperCase()}
+                              </div>
+                              <span className="text-xs font-bold text-gray-300">{name}</span>
                             </div>
-                            <span className="text-xs font-bold text-gray-300">{name}</span>
-                          </div>
+                          )}
                           
-                          <div className="absolute bottom-3 left-3 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-lg border border-glass-border">
+                          <div className="absolute bottom-3 left-3 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-lg border border-glass-border z-20">
                             <span className="text-[10px] font-bold text-green-400">Connected</span>
                           </div>
                         </div>

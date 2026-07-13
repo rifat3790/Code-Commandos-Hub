@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useCall } from '@/context/CallContext';
 import { db } from '@/lib/firebase';
-import { collection, query, onSnapshot, doc, setDoc, orderBy, updateDoc } from 'firebase/firestore';
+import { collection, query, onSnapshot, doc, setDoc, orderBy, updateDoc, deleteDoc } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Video, 
@@ -19,7 +19,8 @@ import {
   XCircle, 
   AlertCircle,
   FileText,
-  Bell
+  Bell,
+  Trash2
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { soundSynth } from '@/lib/sounds';
@@ -245,6 +246,21 @@ export default function MeetingsPage() {
     }
   };
 
+  const handleDeleteMeeting = async (meetingId: string) => {
+    if (!confirm("Are you sure you want to delete this meeting? This action cannot be undone.")) return;
+    try {
+      await deleteDoc(doc(db, 'meetings', meetingId));
+      soundSynth.playSuccess();
+      toast.success("Meeting removed successfully");
+      if (selectedMeeting?.id === meetingId) {
+        setSelectedMeeting(null);
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to delete meeting");
+    }
+  };
+
   return (
     <div className="space-y-6 w-full select-none">
       {/* Upper header section */}
@@ -438,6 +454,18 @@ export default function MeetingsPage() {
                               >
                                 <ExternalLink className="w-4 h-4" />
                               </a>
+                              {(m.createdById === user?.uid || dbUser?.role === 'super_admin' || dbUser?.role === 'admin') && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteMeeting(m.id);
+                                  }}
+                                  className="p-2.5 rounded-xl border border-red-500/30 bg-gray-950 text-red-400 hover:text-white hover:bg-red-950/30 transition-all flex items-center justify-center shrink-0 cursor-pointer"
+                                  title="Delete Meeting"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              )}
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();

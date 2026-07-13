@@ -53,6 +53,7 @@ export default function ChatbotWidget() {
   const [isScheduleMeetingOpen, setIsScheduleMeetingOpen] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');
   const [selectedGroupMembers, setSelectedGroupMembers] = useState<string[]>([]);
+  const [groupMemberSearchQuery, setGroupMemberSearchQuery] = useState('');
   const [newMeetingTitle, setNewMeetingTitle] = useState('');
   const [newMeetingDesc, setNewMeetingDesc] = useState('');
   const [newMeetingDateTime, setNewMeetingDateTime] = useState('');
@@ -930,28 +931,58 @@ export default function ChatbotWidget() {
                     />
                   </div>
                   <div className="space-y-2 text-left">
-                    <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wider">Select Members</label>
-                    <div className="space-y-2 max-h-[220px] overflow-y-auto border border-gray-900 p-2.5 rounded-xl">
-                      {allUsers.filter(u => u.firebaseUid !== user.uid).map(u => {
-                        const isSelected = selectedGroupMembers.includes(u.firebaseUid);
-                        return (
-                          <label key={u.firebaseUid} className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-gray-800 transition-colors cursor-pointer text-xs text-gray-300">
-                            <input
-                              type="checkbox"
-                              checked={isSelected}
-                              onChange={() => {
-                                if (isSelected) {
-                                  setSelectedGroupMembers(prev => prev.filter(uid => uid !== u.firebaseUid));
-                                } else {
-                                  setSelectedGroupMembers(prev => [...prev, u.firebaseUid]);
-                                }
-                              }}
-                              className="rounded border-gray-800 text-brand-green focus:ring-brand-green bg-gray-900"
-                            />
-                            <span>{u.name || u.email}</span>
-                          </label>
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wider">Select Members</label>
+                      <span className="text-[9px] text-purple-400 font-bold">{selectedGroupMembers.length} selected</span>
+                    </div>
+                    <input
+                      type="text"
+                      value={groupMemberSearchQuery}
+                      onChange={e => { setGroupMemberSearchQuery(e.target.value); soundSynth.playClick(); }}
+                      placeholder="Search member by name or email..."
+                      className="w-full bg-gray-900 border border-gray-800 rounded-xl px-3 py-1.5 text-xs text-white placeholder-gray-650 focus:outline-none focus:border-brand-green mb-2"
+                    />
+                    <div className="space-y-2 max-h-[160px] overflow-y-auto border border-gray-900 p-2.5 rounded-xl bg-black/20">
+                      {allUsers.filter(u => u.firebaseUid && u.firebaseUid !== user.uid).length === 0 ? (
+                        <div className="text-center text-xs text-gray-500 italic py-4">No other members found.</div>
+                      ) : (() => {
+                        const filtered = allUsers.filter(u => 
+                          u.firebaseUid && 
+                          u.firebaseUid !== user.uid && 
+                          (
+                            (u.name || '').toLowerCase().includes(groupMemberSearchQuery.toLowerCase()) || 
+                            (u.email || '').toLowerCase().includes(groupMemberSearchQuery.toLowerCase())
+                          )
                         );
-                      })}
+                        if (filtered.length === 0) {
+                          return (
+                            <div className="text-center text-xs text-gray-550 italic py-4">
+                              No members matching "{groupMemberSearchQuery}"
+                            </div>
+                          );
+                        }
+                        return filtered.map(u => {
+                          const isSelected = selectedGroupMembers.includes(u.firebaseUid);
+                          return (
+                            <label key={u.firebaseUid} className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-gray-800 transition-colors cursor-pointer text-xs text-gray-300 font-medium">
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => {
+                                  soundSynth.playClick();
+                                  if (isSelected) {
+                                    setSelectedGroupMembers(prev => prev.filter(uid => uid !== u.firebaseUid));
+                                  } else {
+                                    setSelectedGroupMembers(prev => [...prev, u.firebaseUid]);
+                                  }
+                                }}
+                                className="rounded border-gray-800 text-brand-green focus:ring-brand-green bg-gray-900"
+                              />
+                              <span className="truncate">{u.name || u.email}</span>
+                            </label>
+                          );
+                        });
+                      })()}
                     </div>
                   </div>
                 </div>
