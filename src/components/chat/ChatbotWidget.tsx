@@ -361,27 +361,27 @@ export default function ChatbotWidget() {
     );
   };
 
-  if (!user) return null;
-
   // Format AI messages to look like chat messages
-  const aiDisplayMessages = aiMessages.map((m: any, i) => ({
-    id: `ai-${m.id || i}`,
-    senderUid: m.role === 'user' ? user.uid : 'ai_assistant',
-    senderName: m.role === 'user' ? 'You' : 'AI Assistant',
-    receiverUid: m.role === 'user' ? 'ai_assistant' : user.uid,
-    text: m.content || m.parts?.filter((p: any) => p.type === 'text').map((p: any) => p.text).join('') || '',
-    timestamp: { seconds: Date.now() / 1000 },
-    readStatus: true
-  }));
+  const aiDisplayMessages = useMemo(() => {
+    return aiMessages.map((m: any, i) => ({
+      id: `ai-${m.id || i}`,
+      senderUid: m.role === 'user' ? (user?.uid || '') : 'ai_assistant',
+      senderName: m.role === 'user' ? 'You' : 'AI Assistant',
+      receiverUid: m.role === 'user' ? 'ai_assistant' : (user?.uid || ''),
+      text: m.content || m.parts?.filter((p: any) => p.type === 'text').map((p: any) => p.text).join('') || '',
+      timestamp: { seconds: Date.now() / 1000 },
+      readStatus: true
+    }));
+  }, [aiMessages, user?.uid]);
 
   const displayMessages = useMemo(() => {
     const threadMsgs = activeChatUser === 'ai_assistant'
       ? aiDisplayMessages
       : activeChatUser
         ? messages.filter(m => {
-            const myId = isAdminOrSuperAdmin ? 'admin' : user.uid;
-            const amISender = m.senderUid === myId || m.senderUid === user.uid;
-            const amIReceiver = m.receiverUid === myId || m.receiverUid === user.uid;
+            const myId = isAdminOrSuperAdmin ? 'admin' : (user?.uid || '');
+            const amISender = m.senderUid === myId || m.senderUid === user?.uid;
+            const amIReceiver = m.receiverUid === myId || m.receiverUid === user?.uid;
             const isOtherSender = m.senderUid === activeChatUser;
             const isOtherReceiver = m.receiverUid === activeChatUser;
             return (amISender && isOtherReceiver) || (amIReceiver && isOtherSender);
@@ -394,6 +394,8 @@ export default function ChatbotWidget() {
   }, [activeChatUser, aiDisplayMessages, messages, user, isAdminOrSuperAdmin, threadSearchQuery]);
 
   const totalUnread = chatList.reduce((acc, c) => acc + c.unread, 0);
+
+  if (!user) return null;
 
   return (
     <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end">
