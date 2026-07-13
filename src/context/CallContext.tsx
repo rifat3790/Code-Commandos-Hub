@@ -195,6 +195,8 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    if (!localStream) return;
+
     const groupId = activeCall.id;
     const myPresenceRef = doc(db, 'groupCalls', groupId, 'participants', user.uid);
     
@@ -613,11 +615,11 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (callState === 'connected') {
       if (showVideoLayout) {
-        if (localVideoRef.current) {
-          localVideoRef.current.srcObject = screenStreamRef.current || localStream;
+        if (localVideoEl) {
+          localVideoEl.srcObject = screenStreamRef.current || localStream;
         }
-        if (remoteVideoRef.current && remoteStream) {
-          remoteVideoRef.current.srcObject = remoteStream;
+        if (remoteVideoEl && remoteStream) {
+          remoteVideoEl.srcObject = remoteStream;
         }
       } else {
         if (remoteAudioRef.current && remoteStream) {
@@ -1068,8 +1070,9 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     for (const peerUid of Object.keys(meshConnectionsRef.current)) {
       const pc = meshConnectionsRef.current[peerUid];
       try {
-        const senders = pc.getSenders();
-        const sender = senders.find(s => s.track && s.track.kind === kind);
+        const transceivers = pc.getTransceivers();
+        const transceiver = transceivers.find(t => t.receiver.track.kind === kind);
+        const sender = transceiver?.sender;
         if (sender && newTrack) {
           await sender.replaceTrack(newTrack);
         }
@@ -1173,8 +1176,8 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
           }
         }
 
-        if (localVideoRef.current) {
-          localVideoRef.current.srcObject = screenStream;
+        if (localVideoEl) {
+          localVideoEl.srcObject = screenStream;
         }
 
         // Update Firestore screenSharerUid
@@ -1230,8 +1233,8 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       });
     }
 
-    if (localVideoRef.current && localStream) {
-      localVideoRef.current.srcObject = localStream;
+    if (localVideoEl && localStream) {
+      localVideoEl.srcObject = localStream;
     }
 
     setIsScreenSharing(false);
@@ -1460,8 +1463,8 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
 
                       {/* Other group participants */}
                       {groupCallParticipants.filter(uid => uid !== user?.uid).map(uid => {
-                        const participantUser = allUsers.find(u => u.firebaseUid === uid || u.uid === uid);
-                        const name = participantUser?.name || participantUser?.email || 'Developer';
+                        const participantDoc = activeMeetingParticipants.find(p => p.uid === uid);
+                        const name = participantDoc?.name || 'Developer';
                         const stream = meshRemoteStreams[uid];
                         return (
                           <div key={uid} className="relative bg-gray-900 border border-glass-border rounded-2xl overflow-hidden shadow-xl aspect-video flex items-center justify-center">
@@ -1511,8 +1514,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
                           {activeMeetingParticipants.map(p => {
                             const isHost = meetingHostUid === p.uid;
                             const isMe = p.uid === user?.uid;
-                            const pUser = allUsers.find(u => u.firebaseUid === p.uid || u.uid === p.uid);
-                            const name = pUser?.name || pUser?.email || 'Developer';
+                            const name = p.name || 'Developer';
                             
                             return (
                               <div key={p.uid} className="flex items-center justify-between bg-gray-900/60 p-2.5 rounded-xl border border-white/5 hover:border-purple-500/30 transition-all">
