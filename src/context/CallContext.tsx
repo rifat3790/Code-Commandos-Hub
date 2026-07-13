@@ -4,7 +4,7 @@ import React, { createContext, useContext, useState, useEffect, useRef } from 'r
 import { useAuth } from './AuthContext';
 import { db } from '@/lib/firebase';
 import { collection, doc, addDoc, setDoc, updateDoc, onSnapshot, query, where, limit, getDoc, deleteDoc } from 'firebase/firestore';
-import { Phone, PhoneOff, Mic, MicOff, Video, VideoOff, ScreenShare, Volume2, Maximize, Minimize2 } from 'lucide-react';
+import { Phone, PhoneOff, Mic, MicOff, Video, VideoOff, ScreenShare, Volume2, Maximize, Minimize2, Crown, UserMinus, Laptop, Users } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface CallContextType {
@@ -172,6 +172,13 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
 
   const [meshRemoteStreams, setMeshRemoteStreams] = useState<Record<string, MediaStream>>({});
   const meshConnectionsRef = useRef<Record<string, RTCPeerConnection>>({});
+
+  const [localVideoEl, setLocalVideoEl] = useState<HTMLVideoElement | null>(null);
+  const [remoteVideoEl, setRemoteVideoEl] = useState<HTMLVideoElement | null>(null);
+  const [activeMeetingParticipants, setActiveMeetingParticipants] = useState<any[]>([]);
+  const [meetingHostUid, setMeetingHostUid] = useState<string | null>(null);
+  const [showParticipantsPanel, setShowParticipantsPanel] = useState(false);
+  const [allowScreenShare, setAllowScreenShare] = useState(true);
 
   useEffect(() => {
     if (!user || !activeCall?.isGroupCall) {
@@ -360,6 +367,99 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       document.querySelectorAll('[id^="audio_play_"]').forEach(el => el.remove());
     };
   }, [activeCall, user, localStream]);
+
+  // 1. Bind localVideoEl and remoteVideoEl
+  useEffect(() => {
+    if (localVideoEl) {
+      localVideoEl.srcObject = screenStreamRef.current || localStream;
+    }
+  }, [localVideoEl, localStream, isScreenSharing]);
+
+  useEffect(() => {
+    if (remoteVideoEl && remoteStream) {
+      remoteVideoEl.srcObject = remoteStream;
+    }
+  }, [remoteVideoEl, remoteStream]);
+
+  // 2. Sync mic/video mute states to presence
+  useEffect(() => {
+    if (activeCall?.isGroupCall && user) {
+      updateDoc(doc(db, 'groupCalls', activeCall.id, 'participants', user.uid), {
+        isMuted: isMuted,
+        isVideoMuted: isVideoMuted
+      }).catch(console.error);
+    }
+  }, [isMuted, isVideoMuted, activeCall, user]);
+
+  // 3. Listen to group call details (hostUid, active participants list)
+  useEffect(() => {
+    if (!activeCall?.isGroupCall) {
+      setActiveMeetingParticipants([]);
+      setMeetingHostUid(null);
+      setShowParticipantsPanel(false);
+      return;
+    }
+    const callDocRef = doc(db, 'groupCalls', activeCall.id);
+    const unsubscribeCallDoc = onSnapshot(callDocRef, (snapshot) => {
+      if (snapshot.exists()) {
+        setMeetingHostUid(snapshot.data().hostUid || null);
+      }
+    });
+
+    const participantsCollRef = collection(db, 'groupCalls', activeCall.id, 'participants');
+    const unsubscribeParticipantsColl = onSnapshot(participantsCollRef, (snapshot) => {
+      const list = snapshot.docs.map(d => d.data());
+      setActiveMeetingParticipants(list);
+    });
+
+    return () => {
+      unsubscribeCallDoc();
+      unsubscribeParticipantsColl();
+    };
+  }, [activeCall]);
+
+  // 4. Listen to host commands
+  useEffect(() => {
+    if (!activeCall?.isGroupCall || !user) return;
+
+    const cmdRef = doc(db, 'groupCalls', activeCall.id, 'commands', user.uid);
+    const unsubscribeCmd = onSnapshot(cmdRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+        if (data.command === 'mute' && !isMuted) {
+          if (localStream) {
+            localStream.getAudioTracks().forEach(track => {
+              track.enabled = false;
+            });
+          }
+          setIsMuted(true);
+          import('react-hot-toast').then(m => m.default.success("You have been muted by the host"));
+          deleteDoc(cmdRef).catch(console.error);
+        } else if (data.command === 'kick') {
+          import('react-hot-toast').then(m => m.default.error("You have been kicked from the meeting by the host"));
+          endCall();
+          deleteDoc(cmdRef).catch(console.error);
+        } else if (data.command === 'request_control') {
+          import('react-hot-toast').then(m => m.default.success(`Host ${data.hostName} is collaborating on your screen`));
+          deleteDoc(cmdRef).catch(console.error);
+        }
+      }
+    });
+
+    return () => unsubscribeCmd();
+  }, [activeCall, user, localStream, isMuted]);
+
+  // 5. Listen to personal screen share permission status
+  useEffect(() => {
+    if (!activeCall?.isGroupCall || !user) return;
+    const unsubscribePresence = onSnapshot(doc(db, 'groupCalls', activeCall.id, 'participants', user.uid), (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+        setAllowScreenShare(data.allowScreenShare !== false);
+      }
+    });
+    return () => unsubscribePresence();
+  }, [activeCall, user]);
 
   const isAdminOrSuperAdmin = dbUser?.role === 'super_admin' || dbUser?.role === 'admin';
 
@@ -1048,6 +1148,11 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    if (!allowScreenShare) {
+      alert("The host has disabled screen sharing permissions for you.");
+      return;
+    }
+
     if (!isScreenSharing) {
       if (screenSharerUid) {
         alert("Someone else is already sharing their screen.");
@@ -1331,68 +1436,167 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
               {/* Video Grid Viewport */}
               <div ref={videoGridRef} className="flex-1 bg-black relative flex items-center justify-center overflow-hidden">
                 {activeCall?.isGroupCall ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full h-full p-4 bg-gray-950 overflow-y-auto pointer-events-auto">
-                    {/* Local Video Stream */}
-                    <div className="relative bg-gray-900 border border-purple-500/20 rounded-2xl overflow-hidden shadow-xl aspect-video flex items-center justify-center">
-                      <video
-                        ref={el => {
-                          localVideoRef.current = el;
-                          if (el && localStream) el.srcObject = screenStreamRef.current || localStream;
-                        }}
-                        autoPlay
-                        playsInline
-                        muted
-                        className={`w-full h-full object-cover ${isScreenSharing ? '' : 'scale-x-[-1]'}`}
-                      />
-                      {isVideoMuted && (
-                        <div className="absolute inset-0 bg-gray-950 flex flex-col items-center justify-center gap-1.5 z-10">
-                          <VideoOff className="w-8 h-8 text-gray-600 animate-pulse" />
-                          <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Camera Disabled</span>
+                  <div className="flex w-full h-full">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1 h-full p-4 bg-gray-950 overflow-y-auto pointer-events-auto">
+                      {/* Local Video Stream */}
+                      <div className="relative bg-gray-900 border border-purple-500/20 rounded-2xl overflow-hidden shadow-xl aspect-video flex items-center justify-center">
+                        <video
+                          ref={setLocalVideoEl}
+                          autoPlay
+                          playsInline
+                          muted
+                          className={`w-full h-full object-cover ${isScreenSharing ? '' : 'scale-x-[-1]'}`}
+                        />
+                        {isVideoMuted && (
+                          <div className="absolute inset-0 bg-gray-950 flex flex-col items-center justify-center gap-1.5 z-10">
+                            <VideoOff className="w-8 h-8 text-gray-600 animate-pulse" />
+                            <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Camera Disabled</span>
+                          </div>
+                        )}
+                        <div className="absolute bottom-3 left-3 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-lg border border-glass-border">
+                          <span className="text-[10px] font-bold text-white">You (Local)</span>
                         </div>
-                      )}
-                      <div className="absolute bottom-3 left-3 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-lg border border-glass-border">
-                        <span className="text-[10px] font-bold text-white">You (Local)</span>
                       </div>
-                    </div>
 
-                    {/* Other group participants */}
-                    {groupCallParticipants.filter(uid => uid !== user?.uid).map(uid => {
-                      const participantUser = allUsers.find(u => u.firebaseUid === uid || u.uid === uid);
-                      const name = participantUser?.name || participantUser?.email || 'Developer';
-                      const stream = meshRemoteStreams[uid];
-                      return (
-                        <div key={uid} className="relative bg-gray-900 border border-glass-border rounded-2xl overflow-hidden shadow-xl aspect-video flex items-center justify-center">
-                          {stream ? (
-                            <video
-                              ref={el => {
-                                if (el) el.srcObject = stream;
-                              }}
-                              autoPlay
-                              playsInline
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <div className="flex flex-col items-center justify-center gap-3">
-                              <div className="w-16 h-16 rounded-full bg-purple-500/10 border-2 border-purple-500/50 flex items-center justify-center text-purple-400 font-bold text-xl animate-pulse shadow-[0_0_15px_rgba(168,85,247,0.3)]">
-                                {name.charAt(0).toUpperCase()}
+                      {/* Other group participants */}
+                      {groupCallParticipants.filter(uid => uid !== user?.uid).map(uid => {
+                        const participantUser = allUsers.find(u => u.firebaseUid === uid || u.uid === uid);
+                        const name = participantUser?.name || participantUser?.email || 'Developer';
+                        const stream = meshRemoteStreams[uid];
+                        return (
+                          <div key={uid} className="relative bg-gray-900 border border-glass-border rounded-2xl overflow-hidden shadow-xl aspect-video flex items-center justify-center">
+                            {stream ? (
+                              <video
+                                ref={el => {
+                                  if (el) el.srcObject = stream;
+                                }}
+                                autoPlay
+                                playsInline
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="flex flex-col items-center justify-center gap-3">
+                                <div className="w-16 h-16 rounded-full bg-purple-500/10 border-2 border-purple-500/50 flex items-center justify-center text-purple-400 font-bold text-xl animate-pulse shadow-[0_0_15px_rgba(168,85,247,0.3)]">
+                                  {name.charAt(0).toUpperCase()}
+                                </div>
+                                <span className="text-xs font-bold text-gray-300">{name}</span>
                               </div>
-                              <span className="text-xs font-bold text-gray-300">{name}</span>
+                            )}
+                            
+                            <div className="absolute bottom-3 left-3 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-lg border border-glass-border z-20">
+                              <span className="text-[10px] font-bold text-green-400">Connected</span>
                             </div>
-                          )}
-                          
-                          <div className="absolute bottom-3 left-3 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-lg border border-glass-border z-20">
-                            <span className="text-[10px] font-bold text-green-400">Connected</span>
+                          </div>
+                        );
+                      })}
+                      
+                      {/* If alone in the call, show waiting placeholder */}
+                      {groupCallParticipants.length <= 1 && (
+                        <div className="relative bg-gray-900 border border-glass-border rounded-2xl overflow-hidden shadow-xl aspect-video flex items-center justify-center border-dashed">
+                          <div className="flex flex-col items-center justify-center gap-2">
+                            <span className="text-xs text-gray-500 italic">Waiting for others to join...</span>
+                            <span className="text-[10px] text-purple-400 font-mono">Room ID: {activeCall.id}</span>
                           </div>
                         </div>
-                      );
-                    })}
-                    
-                    {/* If alone in the call, show waiting placeholder */}
-                    {groupCallParticipants.length <= 1 && (
-                      <div className="relative bg-gray-900 border border-glass-border rounded-2xl overflow-hidden shadow-xl aspect-video flex items-center justify-center border-dashed">
-                        <div className="flex flex-col items-center justify-center gap-2">
-                          <span className="text-xs text-gray-500 italic">Waiting for others to join...</span>
-                          <span className="text-[10px] text-purple-400 font-mono">Room ID: {activeCall.id}</span>
+                      )}
+                    </div>
+
+                    {/* Right-Side Participants Management Panel */}
+                    {showParticipantsPanel && (
+                      <div className="w-[320px] bg-gray-950 border-l border-glass-border flex flex-col h-full z-30 pointer-events-auto">
+                        <div className="p-4 border-b border-glass-border flex justify-between items-center bg-gray-900 shrink-0">
+                          <h4 className="text-xs font-bold text-white uppercase tracking-wider">Room Participants ({activeMeetingParticipants.length})</h4>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-3 space-y-2.5">
+                          {activeMeetingParticipants.map(p => {
+                            const isHost = meetingHostUid === p.uid;
+                            const isMe = p.uid === user?.uid;
+                            const pUser = allUsers.find(u => u.firebaseUid === p.uid || u.uid === p.uid);
+                            const name = pUser?.name || pUser?.email || 'Developer';
+                            
+                            return (
+                              <div key={p.uid} className="flex items-center justify-between bg-gray-900/60 p-2.5 rounded-xl border border-white/5 hover:border-purple-500/30 transition-all">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <div className="relative shrink-0">
+                                    <div className="w-8 h-8 rounded-full bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-[10px] font-bold text-purple-400">
+                                      {name.charAt(0).toUpperCase()}
+                                    </div>
+                                    {isHost && (
+                                      <div className="absolute -top-1 -right-1 bg-yellow-500 text-black p-0.5 rounded-full" title="Host">
+                                        <Crown className="w-2.5 h-2.5" />
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className="min-w-0">
+                                    <p className="text-xs font-bold text-white truncate max-w-[100px]">{name}</p>
+                                    <p className="text-[9px] text-gray-500 truncate max-w-[100px]">
+                                      {isMe ? 'You' : p.isMuted ? 'Muted' : 'Speaking'}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center gap-1 shrink-0">
+                                  {meetingHostUid === user?.uid && !isMe && (
+                                    <>
+                                      {/* Mute Button */}
+                                      <button
+                                        onClick={() => {
+                                          setDoc(doc(db, 'groupCalls', activeCall.id, 'commands', p.uid), { command: 'mute' });
+                                          import('react-hot-toast').then(m => m.default.success(`Mute request sent to ${name}`));
+                                        }}
+                                        className="p-1.5 rounded-lg bg-gray-950 text-gray-400 hover:text-red-400 border border-white/5 hover:border-red-500/20 cursor-pointer"
+                                        title="Mute participant"
+                                      >
+                                        <MicOff className="w-3.5 h-3.5" />
+                                      </button>
+
+                                      {/* Kick Button */}
+                                      <button
+                                        onClick={() => {
+                                          if(confirm(`Kick ${name} from the meeting?`)) {
+                                            setDoc(doc(db, 'groupCalls', activeCall.id, 'commands', p.uid), { command: 'kick' });
+                                          }
+                                        }}
+                                        className="p-1.5 rounded-lg bg-gray-950 text-gray-400 hover:text-red-500 border border-white/5 hover:border-red-500/20 cursor-pointer"
+                                        title="Kick participant"
+                                      >
+                                        <UserMinus className="w-3.5 h-3.5" />
+                                      </button>
+
+                                      {/* Toggle Screen Share Permission */}
+                                      <button
+                                        onClick={() => {
+                                          updateDoc(doc(db, 'groupCalls', activeCall.id, 'participants', p.uid), {
+                                            allowScreenShare: p.allowScreenShare === false
+                                          });
+                                          import('react-hot-toast').then(m => m.default.success(`Screen share permission toggled for ${name}`));
+                                        }}
+                                        className={`p-1.5 rounded-lg border border-white/5 cursor-pointer ${p.allowScreenShare === false ? 'bg-red-500/10 text-red-400 border-red-500/20' : 'bg-gray-950 text-gray-400 hover:text-purple-400'}`}
+                                        title={p.allowScreenShare === false ? "Enable screen share permission" : "Disable screen share permission"}
+                                      >
+                                        <ScreenShare className="w-3.5 h-3.5" />
+                                      </button>
+
+                                      {/* Collaboration Control Control */}
+                                      <button
+                                        onClick={() => {
+                                          setDoc(doc(db, 'groupCalls', activeCall.id, 'commands', p.uid), {
+                                            command: 'request_control',
+                                            hostName: dbUser?.name || 'Host'
+                                          });
+                                          import('react-hot-toast').then(m => m.default.success(`Control collaboration request sent to ${name}`));
+                                        }}
+                                        className="p-1.5 rounded-lg bg-gray-950 text-gray-400 hover:text-yellow-400 border border-white/5 hover:border-yellow-500/20 cursor-pointer"
+                                        title="Request workspace collaboration"
+                                      >
+                                        <Laptop className="w-3.5 h-3.5" />
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
                     )}
@@ -1401,10 +1605,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
                   <>
                     {/* Remote Video Stream (Main Feed) */}
                     <video
-                      ref={el => {
-                        remoteVideoRef.current = el;
-                        if (el && remoteStream) el.srcObject = remoteStream;
-                      }}
+                      ref={setRemoteVideoEl}
                       autoPlay
                       playsInline
                       className="w-full h-full object-contain"
@@ -1414,10 +1615,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
                     {!isCallMinimized && (
                       <div className="absolute bottom-4 right-4 w-40 h-28 md:w-52 md:h-36 bg-gray-900 border border-purple-500/30 rounded-2xl overflow-hidden shadow-2xl z-10">
                         <video
-                          ref={el => {
-                            localVideoRef.current = el;
-                            if (el && localStream) el.srcObject = screenStreamRef.current || localStream;
-                          }}
+                          ref={setLocalVideoEl}
                           autoPlay
                           playsInline
                           muted
@@ -1475,6 +1673,17 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
                     title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
                   >
                     <Maximize className="w-5 h-5" />
+                  </button>
+                )}
+
+                {activeCall?.isGroupCall && (
+                  <button
+                    onClick={() => setShowParticipantsPanel(!showParticipantsPanel)}
+                    className={`${isCallMinimized ? 'p-2 rounded-xl' : 'p-3 rounded-2xl'} border transition-all flex items-center justify-center gap-1.5 relative ${showParticipantsPanel ? 'bg-purple-600 border-purple-500 text-white shadow-[0_0_15px_rgba(168,85,247,0.4)]' : 'bg-gray-900 border-gray-800 text-gray-400 hover:text-white hover:bg-gray-800'}`}
+                    title="Participants List"
+                  >
+                    <Users className={isCallMinimized ? "w-4 h-4" : "w-5 h-5"} />
+                    {!isCallMinimized && <span className="text-xs font-bold">{activeMeetingParticipants.length}</span>}
                   </button>
                 )}
 
