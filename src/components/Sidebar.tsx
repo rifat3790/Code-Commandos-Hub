@@ -105,7 +105,7 @@ export default function Sidebar({ isMobileOpen = false, onCloseMobile }: Sidebar
   // Helper to render navigation list items
   const renderNavLinks = (isMobileLayout = false) => {
     return (
-      <nav className="p-3 space-y-1.5 flex-1">
+      <nav className="p-3 space-y-1.5 flex-1 overflow-y-auto max-h-[calc(100vh-180px)] scrollbar-none">
         {navItems.map((item) => {
           const isActive = pathname === item.path || (item.path !== '/' && pathname?.startsWith(item.path));
           return (

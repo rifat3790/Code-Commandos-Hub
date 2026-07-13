@@ -359,19 +359,19 @@ export default function MeetingsPage() {
                       </div>
                       <h3 className="text-white font-black text-sm mt-4 tracking-wide uppercase">Join Room</h3>
                     </div>
-                    <div className="flex gap-1.5 mt-3">
+                    <div className="flex flex-col gap-2 mt-4">
                       <input
                         type="text"
                         value={joinMeetingId}
                         onChange={e => setJoinMeetingId(e.target.value)}
                         placeholder="Meeting ID"
-                        className="flex-1 bg-black/60 border border-glass-border rounded-xl px-3 py-1.5 text-xs text-white placeholder-gray-550 focus:outline-none focus:border-blue-500"
+                        className="w-full bg-black/60 border border-glass-border rounded-xl px-3 py-2 text-xs text-white placeholder-gray-550 focus:outline-none focus:border-blue-500"
                       />
                       <button
                         onClick={handleManualJoin}
-                        className="bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-bold px-3 py-1.5 rounded-xl uppercase tracking-wider cursor-pointer"
+                        className="w-full bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-bold py-2 rounded-xl uppercase tracking-wider cursor-pointer transition-colors shadow"
                       >
-                        Join
+                        Join Room
                       </button>
                     </div>
                   </div>
