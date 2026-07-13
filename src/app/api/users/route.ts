@@ -49,3 +49,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
+
+export async function GET() {
+  try {
+    await connectToDatabase();
+    const users = await User.find({}).sort({ createdAt: -1 });
+    return NextResponse.json({ success: true, users }, { status: 200 });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}

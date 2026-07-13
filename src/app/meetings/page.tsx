@@ -48,6 +48,58 @@ export default function MeetingsPage() {
   const [dateTime, setDateTime] = useState('');
   const [selectedInvitees, setSelectedInvitees] = useState<string[]>([]);
   
+  // Custom calendar picker states
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const [pickerDate, setPickerDate] = useState(new Date());
+  const [selectedHour, setSelectedHour] = useState('09');
+  const [selectedMinute, setSelectedMinute] = useState('00');
+
+  const getDaysInMonth = (year: number, month: number) => {
+    return new Date(year, month + 1, 0).getDate();
+  };
+
+  const getFirstDayOfMonth = (year: number, month: number) => {
+    return new Date(year, month, 1).getDay();
+  };
+
+  const handleDaySelect = (day: number) => {
+    const year = pickerDate.getFullYear();
+    const month = pickerDate.getMonth();
+    const formattedMonth = (month + 1).toString().padStart(2, '0');
+    const formattedDay = day.toString().padStart(2, '0');
+    
+    const dateStr = `${year}-${formattedMonth}-${formattedDay}T${selectedHour}:${selectedMinute}`;
+    setDateTime(dateStr);
+    setIsCalendarOpen(false);
+  };
+
+  const handleTimeChange = (hour: string, minute: string) => {
+    setSelectedHour(hour);
+    setSelectedMinute(minute);
+    if (dateTime) {
+      const baseDate = dateTime.split('T')[0];
+      setDateTime(`${baseDate}T${hour}:${minute}`);
+    } else {
+      const now = new Date();
+      const year = now.getFullYear();
+      const formattedMonth = (now.getMonth() + 1).toString().padStart(2, '0');
+      const formattedDay = now.getDate().toString().padStart(2, '0');
+      setDateTime(`${year}-${formattedMonth}-${formattedDay}T${hour}:${minute}`);
+    }
+  };
+
+  const handlePrevMonth = () => {
+    setPickerDate(new Date(pickerDate.getFullYear(), pickerDate.getMonth() - 1, 1));
+  };
+
+  const handleNextMonth = () => {
+    setPickerDate(new Date(pickerDate.getFullYear(), pickerDate.getMonth() + 1, 1));
+  };
+
+  const daysInMonth = getDaysInMonth(pickerDate.getFullYear(), pickerDate.getMonth());
+  const firstDay = getFirstDayOfMonth(pickerDate.getFullYear(), pickerDate.getMonth());
+  const monthName = pickerDate.toLocaleString('default', { month: 'long' });
+  
   // Join Manual ID state
   const [joinMeetingId, setJoinMeetingId] = useState('');
 
@@ -174,7 +226,7 @@ export default function MeetingsPage() {
   return (
     <div className="space-y-6 w-full select-none">
       {/* Upper header section */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-glass-border pb-5">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-glass-border pb-5 md:pr-36">
         <div>
           <h1 className="text-2xl font-black text-white tracking-wider uppercase">Meetings & Collaboration</h1>
           <p className="text-gray-400 text-xs mt-1">Schedule, invite, sync, and launch real-time zoom-style developer sessions.</p>
@@ -365,14 +417,111 @@ export default function MeetingsPage() {
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
+                    <div className="space-y-1.5 relative">
                       <label className="text-[10px] text-gray-400 font-extrabold uppercase tracking-wider">Date & Time</label>
-                      <input
-                        type="datetime-local"
-                        value={dateTime}
-                        onChange={e => { setDateTime(e.target.value); soundSynth.playClick(); }}
-                        className="w-full bg-gray-950 border border-gray-850 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-brand-green"
-                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsCalendarOpen(!isCalendarOpen);
+                          soundSynth.playClick();
+                        }}
+                        className="w-full bg-gray-950 border border-gray-850 rounded-xl px-4 py-2.5 text-xs text-left text-white focus:outline-none focus:border-brand-green flex items-center justify-between cursor-pointer"
+                      >
+                        <span>
+                          {dateTime ? new Date(dateTime).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : 'Select Date & Time'}
+                        </span>
+                        <Calendar className="w-4 h-4 text-purple-400" />
+                      </button>
+
+                      {/* Dropdown Calendar Picker */}
+                      {isCalendarOpen && (
+                        <div className="absolute top-full left-0 mt-2 p-4 bg-gray-950 border border-glass-border rounded-2xl shadow-2xl z-[90] w-64 space-y-3.5">
+                          <div className="flex items-center justify-between border-b border-glass-border pb-2">
+                            <button
+                              type="button"
+                              onClick={handlePrevMonth}
+                              className="p-1.5 hover:bg-gray-850 rounded-lg text-gray-450 hover:text-white cursor-pointer"
+                            >
+                              &larr;
+                            </button>
+                            <span className="text-xs font-bold text-white uppercase tracking-wider">{monthName} {pickerDate.getFullYear()}</span>
+                            <button
+                              type="button"
+                              onClick={handleNextMonth}
+                              className="p-1.5 hover:bg-gray-850 rounded-lg text-gray-450 hover:text-white cursor-pointer"
+                            >
+                              &rarr;
+                            </button>
+                          </div>
+
+                          {/* Calendar Grid */}
+                          <div className="grid grid-cols-7 gap-1 text-center text-[10px] text-gray-500 font-bold mb-1">
+                            {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(d => <span key={d}>{d}</span>)}
+                          </div>
+                          <div className="grid grid-cols-7 gap-1">
+                            {[...Array(firstDay)].map((_, i) => (
+                              <div key={`empty-${i}`} className="h-6" />
+                            ))}
+                            {[...Array(daysInMonth)].map((_, i) => {
+                              const dayNum = i + 1;
+                              const year = pickerDate.getFullYear();
+                              const month = pickerDate.getMonth();
+                              const formattedMonth = (month + 1).toString().padStart(2, '0');
+                              const formattedDay = dayNum.toString().padStart(2, '0');
+                              const currentSelectDay = dateTime.split('T')[0];
+                              const thisDateStr = `${year}-${formattedMonth}-${formattedDay}`;
+                              const isSelected = currentSelectDay === thisDateStr;
+
+                              return (
+                                <button
+                                  key={dayNum}
+                                  type="button"
+                                  onClick={() => {
+                                    handleDaySelect(dayNum);
+                                    soundSynth.playClick();
+                                  }}
+                                  className={`h-6 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${isSelected ? 'bg-purple-600 text-white shadow shadow-purple-500/30' : 'text-gray-300 hover:bg-gray-800'}`}
+                                >
+                                  {dayNum}
+                                </button>
+                              );
+                            })}
+                          </div>
+
+                          {/* Time select slider or dropdown */}
+                          <div className="flex gap-2 border-t border-glass-border pt-3.5 items-center justify-between">
+                            <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Start Time</span>
+                            <div className="flex items-center gap-1">
+                              <select
+                                value={selectedHour}
+                                onChange={e => {
+                                  handleTimeChange(e.target.value, selectedMinute);
+                                  soundSynth.playClick();
+                                }}
+                                className="bg-black border border-gray-850 rounded-lg px-2 py-1 text-[10px] text-white focus:outline-none"
+                              >
+                                {[...Array(24)].map((_, h) => {
+                                  const hr = h.toString().padStart(2, '0');
+                                  return <option key={hr} value={hr}>{hr}</option>;
+                                })}
+                              </select>
+                              <span className="text-white text-xs">:</span>
+                              <select
+                                value={selectedMinute}
+                                onChange={e => {
+                                  handleTimeChange(selectedHour, e.target.value);
+                                  soundSynth.playClick();
+                                }}
+                                className="bg-black border border-gray-850 rounded-lg px-2 py-1 text-[10px] text-white focus:outline-none"
+                              >
+                                {['00', '15', '30', '45'].map(m => (
+                                  <option key={m} value={m}>{m}</option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     <div className="space-y-1.5">
@@ -402,27 +551,33 @@ export default function MeetingsPage() {
                   <div className="space-y-2">
                     <label className="text-[10px] text-gray-400 font-extrabold uppercase tracking-wider">Invite Developers</label>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 border border-gray-850 p-3 rounded-2xl max-h-[160px] overflow-y-auto">
-                      {allUsers.filter(u => u.firebaseUid !== user?.uid).map(u => {
-                        const isSelected = selectedInvitees.includes(u.firebaseUid);
-                        return (
-                          <label key={u.firebaseUid} className="flex items-center gap-2.5 p-2 rounded-xl hover:bg-gray-950/60 transition-colors cursor-pointer text-xs text-gray-300">
-                            <input
-                              type="checkbox"
-                              checked={isSelected}
-                              onChange={() => {
-                                soundSynth.playClick();
-                                if (isSelected) {
-                                  setSelectedInvitees(prev => prev.filter(uid => uid !== u.firebaseUid));
-                                } else {
-                                  setSelectedInvitees(prev => [...prev, u.firebaseUid]);
-                                }
-                              }}
-                              className="rounded border-gray-800 text-brand-green focus:ring-brand-green bg-gray-950"
-                            />
-                            <span>{u.name || u.email}</span>
-                          </label>
-                        );
-                      })}
+                      {allUsers.filter(u => u.firebaseUid && u.firebaseUid !== user?.uid).length === 0 ? (
+                        <div className="col-span-2 text-center text-xs text-gray-500 italic py-4">
+                          No other developers found.
+                        </div>
+                      ) : (
+                        allUsers.filter(u => u.firebaseUid && u.firebaseUid !== user?.uid).map(u => {
+                          const isSelected = selectedInvitees.includes(u.firebaseUid);
+                          return (
+                            <label key={u.firebaseUid} className="flex items-center gap-2.5 p-2 rounded-xl hover:bg-gray-950/60 transition-colors cursor-pointer text-xs text-gray-300">
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => {
+                                  soundSynth.playClick();
+                                  if (isSelected) {
+                                    setSelectedInvitees(prev => prev.filter(uid => uid !== u.firebaseUid));
+                                  } else {
+                                    setSelectedInvitees(prev => [...prev, u.firebaseUid]);
+                                  }
+                                }}
+                                className="rounded border-gray-800 text-brand-green focus:ring-brand-green bg-gray-950 animate-pulse-slow"
+                              />
+                              <span>{u.name || u.email}</span>
+                            </label>
+                          );
+                        })
+                      )}
                     </div>
                   </div>
 

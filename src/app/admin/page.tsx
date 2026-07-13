@@ -9,7 +9,7 @@ import { useCall } from '@/context/CallContext';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const allAvailableMenus = [
-  'Home', 'Workspace', 'Order Tracker', 'Personal Projects', 'Message Helper', 'Templates', 'Schema Builder',
+  'Home', 'Workspace', 'Meetings', 'Order Tracker', 'Personal Projects', 'Message Helper', 'Templates', 'Schema Builder',
   'Audit Suite', 'Projects', 'Mockup Studio', 'Focus Studio', 'AI Assistant', 
   'Team Notes', 'Downloads', 'Member Profile', 'Shopify Codes', 'Settings'
 ];
