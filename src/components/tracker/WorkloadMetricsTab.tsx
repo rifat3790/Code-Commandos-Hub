@@ -59,13 +59,12 @@ export default function WorkloadMetricsTab({
               delete row[' '];
             });
           }
-          else if (firstRow[''] !== undefined && firstRow['Status'] === undefined && firstRow['Assign Team']) {
-            results.data.forEach((row: any) => {
-              if (row['Assign Team']) {
-                row['Status'] = row[''];
-              }
-            });
-          }
+          
+          results.data.forEach((row: any) => {
+            if (row[''] !== undefined) {
+              row['Assign Team'] = row[''];
+            }
+          });
         }
         setData(results.data);
       }

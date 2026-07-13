@@ -445,26 +445,27 @@ export default function OrdersDashboard({ csvData, activeLayout }: { csvData: st
       complete: (results) => {
         let extractedColumns: string[] = [];
         if (results.data.length > 0) {
-          // The "Status" column in the sheet currently has a header of " " (single space).
-          // We need to rename it to 'Status' so it works with the rest of the code.
           const firstRow = results.data[0] as Record<string, any>;
+          
+          // Rename space-based status column
           if (firstRow[' '] !== undefined && firstRow['Status'] === undefined) {
             results.data.forEach((row: any) => {
               row['Status'] = row[' '];
               delete row[' '];
             });
           }
-          // Similarly, sometimes it might just be an empty string depending on PapaParse settings.
-          else if (firstRow[''] !== undefined && firstRow['Status'] === undefined && firstRow['Assign Team']) {
-            // ensure we aren't picking the trailing empty column
-            results.data.forEach((row: any) => {
-              if (row['Assign Team']) { // Just a sanity check
-                row['Status'] = row[''];
-              }
-            });
-          }
 
-          extractedColumns = Object.keys(results.data[0] as Record<string, unknown>).filter(k => k && k.trim() !== '' && !k.startsWith('_'));
+          // Map the unnamed column to 'Assign Team'
+          results.data.forEach((row: any) => {
+            if (row[''] !== undefined) {
+              row['Assign Team'] = row[''];
+            }
+          });
+
+          extractedColumns = Object.keys(firstRow).filter(k => k && k.trim() !== '' && !k.startsWith('_'));
+          if (!extractedColumns.includes('Assign Team') && firstRow['Assign Team'] !== undefined) {
+            extractedColumns.push('Assign Team');
+          }
           setAllColumns(extractedColumns);
         }
 
