@@ -183,6 +183,8 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       });
       meshConnectionsRef.current = {};
       setMeshRemoteStreams({});
+      // Clean up all DOM audio elements
+      document.querySelectorAll('[id^="audio_play_"]').forEach(el => el.remove());
       return;
     }
 
@@ -211,6 +213,10 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
             delete copy[peerUid];
             return copy;
           });
+          const audioEl = document.getElementById(`audio_play_${peerUid}`);
+          if (audioEl) {
+            audioEl.remove();
+          }
         }
       });
 
@@ -219,7 +225,11 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         if (meshConnectionsRef.current[peerUid]) continue;
 
         const pc = new RTCPeerConnection({
-          iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+          iceServers: [
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' },
+            { urls: 'stun:stun2.l.google.com:19302' }
+          ]
         });
         meshConnectionsRef.current[peerUid] = pc;
 
@@ -227,12 +237,40 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
           localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
         }
 
+        const candidateQueue: any[] = [];
+
+        const flushCandidates = async () => {
+          while (candidateQueue.length > 0) {
+            const cand = candidateQueue.shift();
+            if (cand) {
+              try {
+                await pc.addIceCandidate(new RTCIceCandidate(cand));
+              } catch (e) {}
+            }
+          }
+        };
+
         pc.ontrack = (event) => {
           if (event.streams && event.streams[0]) {
+            const remoteStream = event.streams[0];
             setMeshRemoteStreams(prev => ({
               ...prev,
-              [peerUid]: event.streams[0]
+              [peerUid]: remoteStream
             }));
+
+            // Play remote audio programmatically in a dedicated hidden audio tag
+            const audioElId = `audio_play_${peerUid}`;
+            let audioEl = document.getElementById(audioElId) as HTMLAudioElement;
+            if (!audioEl) {
+              audioEl = document.createElement('audio');
+              audioEl.id = audioElId;
+              audioEl.style.display = 'none';
+              document.body.appendChild(audioEl);
+            }
+            audioEl.srcObject = remoteStream;
+            audioEl.play().catch(err => {
+              console.warn("Autoplay audio failed or was blocked:", err);
+            });
           }
         };
 
@@ -258,9 +296,13 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
             if (change.type === 'added') {
               const data = change.doc.data();
               if (data.senderUid !== user.uid) {
-                try {
-                  await pc.addIceCandidate(new RTCIceCandidate(data));
-                } catch (err) {}
+                if (pc.remoteDescription) {
+                  try {
+                    await pc.addIceCandidate(new RTCIceCandidate(data));
+                  } catch (err) {}
+                } else {
+                  candidateQueue.push(data);
+                }
               }
             }
           });
@@ -285,6 +327,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
               const data = connSnap.data();
               if (data.answer && !pc.currentRemoteDescription) {
                 await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
+                await flushCandidates();
               }
             }
           });
@@ -295,6 +338,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
               const data = connSnap.data();
               if (data.offer && !pc.currentRemoteDescription) {
                 await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
+                await flushCandidates();
                 const answerDescription = await pc.createAnswer();
                 await pc.setLocalDescription(answerDescription);
                 await updateDoc(connectionDocRef, {
@@ -313,6 +357,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     return () => {
       unsubscribeParticipants();
       deleteDoc(myPresenceRef).catch(console.error);
+      document.querySelectorAll('[id^="audio_play_"]').forEach(el => el.remove());
     };
   }, [activeCall, user, localStream]);
 
@@ -859,7 +904,26 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       });
       setLocalStream(stream);
     } catch (err) {
-      console.warn("Media access failed:", err);
+      console.warn("Video + Audio media access failed, trying audio only:", err);
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ 
+          audio: true, 
+          video: false 
+        });
+        setLocalStream(stream);
+        setIsVideoMuted(true);
+      } catch (err2) {
+        console.warn("Audio only access failed, trying video only:", err2);
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ 
+            audio: false, 
+            video: true 
+          });
+          setLocalStream(stream);
+        } catch (err3) {
+          console.error("All media devices access failed:", err3);
+        }
+      }
     }
 
     const session = {
