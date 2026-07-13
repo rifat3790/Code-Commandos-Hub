@@ -30,6 +30,14 @@ export default function MeetingsPage() {
   const [meetings, setMeetings] = useState<any[]>([]);
   const [allUsers, setAllUsers] = useState<any[]>([]);
   const [selectedMeeting, setSelectedMeeting] = useState<any | null>(null);
+  const [activeAmbience, setActiveAmbience] = useState<'off' | 'rain' | 'space'>('off');
+  
+  // Cleanup audio on unmount
+  useEffect(() => {
+    return () => {
+      soundSynth.stopAllAmbience();
+    };
+  }, []);
   
   // Tab states
   const [activePanel, setActivePanel] = useState<'list' | 'schedule'>('list');
@@ -164,7 +172,7 @@ export default function MeetingsPage() {
   };
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto select-none">
+    <div className="space-y-6 w-full select-none">
       {/* Upper header section */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-glass-border pb-5">
         <div>
@@ -518,6 +526,67 @@ export default function MeetingsPage() {
               <div className="flex-1 flex flex-col items-center justify-center text-center p-6 text-gray-500 border border-dashed border-glass-border rounded-2xl bg-gray-900/10">
                 <FileText className="w-8 h-8 text-gray-600 mb-2" />
                 <p className="text-xs italic leading-relaxed">Select a meeting from the list to view attendee response statuses, meeting details, and room credentials.</p>
+              </div>
+            )}
+          </div>
+
+          {/* Soundtrack Card */}
+          <div className="p-5 rounded-2xl bg-gray-900/60 border border-glass-border text-left flex flex-col gap-4">
+            <div>
+              <h3 className="text-white font-bold text-xs tracking-wider uppercase">Focus Ambient Soundscape</h3>
+              <p className="text-[10px] text-gray-500 mt-1">Immersive synthesized audio atmospheres to block distractions.</p>
+            </div>
+            
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  soundSynth.stopAllAmbience();
+                  setActiveAmbience('off');
+                  soundSynth.playClick();
+                }}
+                className={`py-2 px-2.5 rounded-xl border text-[10px] font-bold uppercase transition-all flex flex-col items-center justify-center gap-1.5 cursor-pointer ${activeAmbience === 'off' ? 'bg-red-500/10 border-red-500 text-red-400' : 'bg-gray-950 border-gray-850 text-gray-400 hover:text-white'}`}
+              >
+                <span>Off</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  soundSynth.playRainAmbience();
+                  setActiveAmbience('rain');
+                  soundSynth.playClick();
+                }}
+                className={`py-2 px-2.5 rounded-xl border text-[10px] font-bold uppercase transition-all flex flex-col items-center justify-center gap-1.5 cursor-pointer ${activeAmbience === 'rain' ? 'bg-blue-500/10 border-blue-500 text-blue-400 glow-blue animate-pulse' : 'bg-gray-950 border-gray-850 text-gray-400 hover:text-white'}`}
+              >
+                <span>Cyber Rain</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  soundSynth.playSynthAmbience();
+                  setActiveAmbience('space');
+                  soundSynth.playClick();
+                }}
+                className={`py-2 px-2.5 rounded-xl border text-[10px] font-bold uppercase transition-all flex flex-col items-center justify-center gap-1.5 cursor-pointer ${activeAmbience === 'space' ? 'bg-purple-500/10 border-purple-500 text-purple-400 glow-purple animate-pulse' : 'bg-gray-950 border-gray-850 text-gray-400 hover:text-white'}`}
+              >
+                <span>Space Drone</span>
+              </button>
+            </div>
+
+            {/* Equalizer Simulator Visualization */}
+            {activeAmbience !== 'off' && (
+              <div className="flex items-center justify-center gap-1 h-6 bg-black/40 border border-glass-border/30 rounded-xl p-2.5">
+                {[...Array(9)].map((_, i) => (
+                  <span
+                    key={i}
+                    className="w-1 bg-purple-500 rounded-full animate-bounce"
+                    style={{
+                      height: '100%',
+                      animationDuration: `${0.4 + (i % 3) * 0.15}s`,
+                      animationDelay: `${i * 50}ms`
+                    }}
+                  />
+                ))}
               </div>
             )}
           </div>

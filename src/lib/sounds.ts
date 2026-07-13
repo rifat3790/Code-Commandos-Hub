@@ -1,8 +1,15 @@
 class SoundSynthesizer {
+  private activeNodes: { source: AudioBufferSourceNode | OscillatorNode[]; gain: GainNode }[] = [];
+  private currentContext: AudioContext | null = null;
+
   private getContext(): AudioContext | null {
     if (typeof window === 'undefined') return null;
+    if (this.currentContext) return this.currentContext;
     const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-    return AudioCtx ? new AudioCtx() : null;
+    if (AudioCtx) {
+      this.currentContext = new AudioCtx();
+    }
+    return this.currentContext;
   }
 
   playClick() {
@@ -73,6 +80,88 @@ class SoundSynthesizer {
 
     osc.start();
     osc.stop(ctx.currentTime + 0.2);
+  }
+
+  stopAllAmbience() {
+    this.activeNodes.forEach(node => {
+      try {
+        if (Array.isArray(node.source)) {
+          node.source.forEach(osc => osc.stop());
+        } else {
+          node.source.stop();
+        }
+        node.gain.disconnect();
+      } catch (err) {
+        // Audio node already stopped
+      }
+    });
+    this.activeNodes = [];
+  }
+
+  playRainAmbience() {
+    this.stopAllAmbience();
+    const ctx = this.getContext();
+    if (!ctx) return;
+    if (ctx.state === 'suspended') ctx.resume();
+
+    const bufferSize = 2 * ctx.sampleRate;
+    const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const output = noiseBuffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      output[i] = Math.random() * 2 - 1;
+    }
+
+    const whiteNoise = ctx.createBufferSource();
+    whiteNoise.buffer = noiseBuffer;
+    whiteNoise.loop = true;
+
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(800, ctx.currentTime);
+
+    const gainNode = ctx.createGain();
+    gainNode.gain.setValueAtTime(0.08, ctx.currentTime);
+
+    whiteNoise.connect(filter);
+    filter.connect(gainNode);
+    gainNode.connect(ctx.destination);
+
+    whiteNoise.start();
+    
+    this.activeNodes.push({ source: whiteNoise, gain: gainNode });
+  }
+
+  playSynthAmbience() {
+    this.stopAllAmbience();
+    const ctx = this.getContext();
+    if (!ctx) return;
+    if (ctx.state === 'suspended') ctx.resume();
+
+    const osc1 = ctx.createOscillator();
+    const osc2 = ctx.createOscillator();
+    const filter = ctx.createBiquadFilter();
+    const gainNode = ctx.createGain();
+
+    osc1.type = 'sawtooth';
+    osc1.frequency.setValueAtTime(55, ctx.currentTime); // A1
+
+    osc2.type = 'triangle';
+    osc2.frequency.setValueAtTime(55.3, ctx.currentTime); // Binary pulse
+
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(100, ctx.currentTime);
+
+    gainNode.gain.setValueAtTime(0.18, ctx.currentTime);
+
+    osc1.connect(filter);
+    osc2.connect(filter);
+    filter.connect(gainNode);
+    gainNode.connect(ctx.destination);
+
+    osc1.start();
+    osc2.start();
+
+    this.activeNodes.push({ source: [osc1, osc2], gain: gainNode });
   }
 }
 
