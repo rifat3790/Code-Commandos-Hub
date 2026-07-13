@@ -900,28 +900,49 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const replaceTrackInMesh = async (kind: 'audio' | 'video', newTrack: MediaStreamTrack | null) => {
+    for (const peerUid of Object.keys(meshConnectionsRef.current)) {
+      const pc = meshConnectionsRef.current[peerUid];
+      try {
+        const senders = pc.getSenders();
+        const sender = senders.find(s => s.track && s.track.kind === kind);
+        if (sender && newTrack) {
+          await sender.replaceTrack(newTrack);
+        }
+      } catch (err) {
+        console.error(`Error replacing ${kind} track for peer ${peerUid}:`, err);
+      }
+    }
+  };
+
   const toggleVideo = async () => {
-    if (!peerConnectionRef.current || !localStream) return;
+    if (!localStream || !activeCall) return;
+    const isGroup = activeCall.isGroupCall;
+    const pc = isGroup ? null : peerConnectionRef.current;
 
     const videoTrack = localStream.getVideoTracks()[0];
     const isDummy = videoTrack && (videoTrack as any).isDummy;
 
     if (videoTrack && !isDummy) {
-      // Real camera is on, let's turn it off and switch back to dummy track
+      // Camera is on, turn off and switch back to dummy track
       videoTrack.stop();
       localStream.removeTrack(videoTrack);
 
       const dummyTrack = createDummyVideoTrack();
       if (dummyTrack) {
         localStream.addTrack(dummyTrack);
-        const videoTransceiver = peerConnectionRef.current.getTransceivers().find(t => t.receiver.track.kind === 'video');
-        if (videoTransceiver?.sender) {
-          await videoTransceiver.sender.replaceTrack(dummyTrack);
+        if (isGroup) {
+          await replaceTrackInMesh('video', dummyTrack);
+        } else if (pc) {
+          const videoTransceiver = pc.getTransceivers().find(t => t.receiver.track.kind === 'video');
+          if (videoTransceiver?.sender) {
+            await videoTransceiver.sender.replaceTrack(dummyTrack);
+          }
         }
       }
       setIsVideoMuted(true);
     } else {
-      // Camera is off (or dummy is running), let's turn on the real camera
+      // Camera is off, turn it on
       try {
         const cameraStream = await navigator.mediaDevices.getUserMedia({ video: true });
         const cameraTrack = cameraStream.getVideoTracks()[0];
@@ -932,14 +953,18 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         }
 
         localStream.addTrack(cameraTrack);
-        const videoTransceiver = peerConnectionRef.current.getTransceivers().find(t => t.receiver.track.kind === 'video');
-        if (videoTransceiver?.sender) {
-          await videoTransceiver.sender.replaceTrack(cameraTrack);
+        if (isGroup) {
+          await replaceTrackInMesh('video', cameraTrack);
+        } else if (pc) {
+          const videoTransceiver = pc.getTransceivers().find(t => t.receiver.track.kind === 'video');
+          if (videoTransceiver?.sender) {
+            await videoTransceiver.sender.replaceTrack(cameraTrack);
+          }
         }
         setIsVideoMuted(false);
 
         // Upgrade call to video call in Firestore
-        if (activeCall) {
+        if (!isGroup) {
           await updateDoc(doc(db, 'calls', activeCall.id), { type: 'video' });
         }
       } catch (err) {
@@ -950,7 +975,10 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   };
 
   const toggleScreenShare = async () => {
-    if (!peerConnectionRef.current || !activeCall) return;
+    if (!activeCall) return;
+    const isGroup = activeCall.isGroupCall;
+    const pc = isGroup ? null : peerConnectionRef.current;
+
     if (dbUser && dbUser.callingAllowed === false) {
       alert("Your calling and screen sharing permissions have been disabled by an administrator.");
       return;
@@ -966,11 +994,14 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         screenStreamRef.current = screenStream;
         const screenTrack = screenStream.getVideoTracks()[0];
 
-        const videoTransceiver = peerConnectionRef.current.getTransceivers().find(t => t.receiver.track.kind === 'video');
-        const videoSender = videoTransceiver?.sender;
-
-        if (videoSender) {
-          await videoSender.replaceTrack(screenTrack);
+        if (isGroup) {
+          await replaceTrackInMesh('video', screenTrack);
+        } else if (pc) {
+          const videoTransceiver = pc.getTransceivers().find(t => t.receiver.track.kind === 'video');
+          const videoSender = videoTransceiver?.sender;
+          if (videoSender) {
+            await videoSender.replaceTrack(screenTrack);
+          }
         }
 
         if (localVideoRef.current) {
@@ -979,9 +1010,15 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
 
         // Update Firestore screenSharerUid
         const myUid = isAdminOrSuperAdmin ? 'admin' : user?.uid;
-        await updateDoc(doc(db, 'calls', activeCall.id), {
-          screenSharerUid: myUid
-        });
+        if (isGroup) {
+          await updateDoc(doc(db, 'groupCalls', activeCall.id), {
+            screenSharerUid: myUid
+          });
+        } else {
+          await updateDoc(doc(db, 'calls', activeCall.id), {
+            screenSharerUid: myUid
+          });
+        }
 
         screenTrack.onended = () => {
           stopScreenShare();
@@ -997,35 +1034,42 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   };
 
   const stopScreenShare = async () => {
-    if (!peerConnectionRef.current) return;
+    if (!activeCall) return;
+    const isGroup = activeCall.isGroupCall;
+    const pc = isGroup ? null : peerConnectionRef.current;
 
     if (screenStreamRef.current) {
       screenStreamRef.current.getTracks().forEach(track => track.stop());
       screenStreamRef.current = null;
     }
 
-    const videoTransceiver = peerConnectionRef.current.getTransceivers().find(t => t.receiver.track.kind === 'video');
-    const videoSender = videoTransceiver?.sender;
+    const fallbackTrack = localStream?.getVideoTracks()[0] || null;
 
-    if (videoSender) {
-      const cameraTrack = localStream?.getVideoTracks()[0] || null;
-      await videoSender.replaceTrack(cameraTrack);
-    }
-
-    if (localVideoRef.current) {
-      localVideoRef.current.srcObject = localStream;
-    }
-
-    if (activeCall) {
+    if (isGroup) {
+      await replaceTrackInMesh('video', fallbackTrack);
+      await updateDoc(doc(db, 'groupCalls', activeCall.id), {
+        screenSharerUid: null
+      });
+    } else if (pc) {
+      const videoTransceiver = pc.getTransceivers().find(t => t.receiver.track.kind === 'video');
+      const videoSender = videoTransceiver?.sender;
+      if (videoSender && fallbackTrack) {
+        await videoSender.replaceTrack(fallbackTrack);
+      }
       await updateDoc(doc(db, 'calls', activeCall.id), {
         screenSharerUid: null
       });
+    }
+
+    if (localVideoRef.current && localStream) {
+      localVideoRef.current.srcObject = localStream;
     }
 
     setIsScreenSharing(false);
   };
 
   const cleanupCall = (finalState: 'idle' | 'calling' | 'ringing' | 'connecting' | 'connected' | 'ended' | 'declined') => {
+    const isGroup = activeCall?.isGroupCall;
     if (unsubscribeCallRef.current) unsubscribeCallRef.current();
     if (unsubscribeIceRef.current) unsubscribeIceRef.current();
     
@@ -1046,7 +1090,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
 
     setRemoteStream(null);
     setActiveCall(null);
-    setCallState(finalState);
+    setCallState(isGroup ? 'idle' : finalState);
     setIsMuted(false);
     setIsVideoMuted(false);
     setIsScreenSharing(false);
@@ -1054,7 +1098,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     setScreenSharerUid(null);
     setIsCallMinimized(false);
     
-    if (finalState === 'ended' || finalState === 'declined') {
+    if (!isGroup && (finalState === 'ended' || finalState === 'declined')) {
       setTimeout(() => {
         setCallState('idle');
       }, 3000);
