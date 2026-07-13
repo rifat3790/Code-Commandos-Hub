@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useCall } from '@/context/CallContext';
 import { db } from '@/lib/firebase';
-import { collection, query, onSnapshot, doc, setDoc, orderBy } from 'firebase/firestore';
+import { collection, query, onSnapshot, doc, setDoc, orderBy, updateDoc } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Video, 
@@ -18,7 +18,8 @@ import {
   CheckCircle, 
   XCircle, 
   AlertCircle,
-  FileText
+  FileText,
+  Bell
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { soundSynth } from '@/lib/sounds';
@@ -47,6 +48,7 @@ export default function MeetingsPage() {
   const [description, setDescription] = useState('');
   const [dateTime, setDateTime] = useState('');
   const [selectedInvitees, setSelectedInvitees] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
   
   // Custom calendar picker states
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
@@ -223,6 +225,26 @@ export default function MeetingsPage() {
     toast.success('Meeting link copied to clipboard!');
   };
 
+  const pendingReceivedInvites = useMemo(() => {
+    if (!user) return [];
+    return meetings.filter(m => m.invitees?.includes(user.uid) && m.responses?.[user.uid] === 'pending');
+  }, [meetings, user]);
+
+  const handleResponse = async (meetingId: string, status: 'accepted' | 'declined') => {
+    if (!user) return;
+    try {
+      const meetingRef = doc(db, 'meetings', meetingId);
+      await updateDoc(meetingRef, {
+        [`responses.${user.uid}`]: status
+      });
+      soundSynth.playSuccess();
+      toast.success(status === 'accepted' ? 'Invitation accepted!' : 'Invitation declined.');
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to update response');
+    }
+  };
+
   return (
     <div className="space-y-6 w-full select-none">
       {/* Upper header section */}
@@ -261,6 +283,44 @@ export default function MeetingsPage() {
                 exit={{ opacity: 0, y: -15 }}
                 className="space-y-6"
               >
+                {/* Pending Received Invitations */}
+                {pendingReceivedInvites.length > 0 && (
+                  <div className="p-5 rounded-2xl bg-purple-950/20 border border-purple-500/30 shadow-[0_4px_25px_rgba(168,85,247,0.12)] text-left space-y-3.5">
+                    <div className="flex items-center gap-2 text-purple-400">
+                      <Bell className="w-4 h-4 animate-bounce" />
+                      <h4 className="text-xs font-black uppercase tracking-wider">Pending Invitations ({pendingReceivedInvites.length})</h4>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {pendingReceivedInvites.map(m => (
+                        <div key={m.id} className="flex justify-between items-center p-3 rounded-xl bg-black/40 border border-purple-500/20 gap-3">
+                          <div className="min-w-0">
+                            <h5 className="text-white font-bold text-xs truncate">{m.title}</h5>
+                            <p className="text-[9px] text-gray-400 truncate mt-0.5">By {m.creatorName}</p>
+                            <div className="flex items-center gap-1 text-[9px] text-purple-300 mt-1 font-semibold">
+                              <Clock className="w-3 h-3" />
+                              <span>{new Date(m.dateTime).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}</span>
+                            </div>
+                          </div>
+                          <div className="flex gap-1.5 shrink-0">
+                            <button
+                              onClick={() => { handleResponse(m.id, 'declined'); soundSynth.playClick(); }}
+                              className="py-1 px-2.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 font-bold text-[9px] hover:bg-red-500/20 transition-all cursor-pointer"
+                            >
+                              Decline
+                            </button>
+                            <button
+                              onClick={() => { handleResponse(m.id, 'accepted'); soundSynth.playClick(); }}
+                              className="py-1 px-2.5 rounded-lg bg-brand-green/20 border border-brand-green/30 text-brand-green font-bold text-[9px] hover:bg-brand-green hover:text-black transition-all glow-green cursor-pointer"
+                            >
+                              Accept
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Quick Action Zoom Cards */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   {/* Card 1: Start Instant */}
