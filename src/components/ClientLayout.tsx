@@ -1,7 +1,12 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 import Sidebar from './Sidebar';
+
+const ThreeBackground = dynamic(() => import('./ThreeBackground'), {
+  ssr: false
+});
 import { Menu, Terminal, ShieldAlert } from 'lucide-react';
 import Link from 'next/link';
 import { CallProvider } from '@/context/CallContext';
@@ -11,14 +16,16 @@ import { playKeyboardClick } from '@/lib/audioSynth';
 if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
   const originalError = console.error;
   console.error = (...args) => {
-    const errorMsg = args[0]?.toString() || '';
+    const fullErrorMsg = args.map(arg => arg?.toString() || '').join(' ');
     if (
-      errorMsg.includes('Hydration failed') ||
-      errorMsg.includes('hydration-error') ||
-      errorMsg.includes('Mismatched') ||
-      errorMsg.includes('does not match the server') ||
-      errorMsg.includes('bis_skin_checked') ||
-      errorMsg.includes('Text content did not match')
+      fullErrorMsg.includes('Hydration failed') ||
+      fullErrorMsg.includes('hydration-error') ||
+      fullErrorMsg.includes('Mismatched') ||
+      fullErrorMsg.includes('does not match') ||
+      fullErrorMsg.includes('didn\'t match') ||
+      fullErrorMsg.includes('bis_skin_checked') ||
+      fullErrorMsg.includes('Text content did not match') ||
+      fullErrorMsg.includes('A tree hydrated')
     ) {
       return;
     }
@@ -128,13 +135,13 @@ function ProtectedMainContent({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AnimatePresence>
+    <AnimatePresence mode="wait">
       <motion.div
         key={pathname}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        transition={{ duration: 0.15, ease: 'easeOut' }}
+        initial={{ opacity: 0, y: 8, scale: 0.99 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: -8, scale: 0.99 }}
+        transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
         className="h-full"
       >
         {children}
@@ -351,6 +358,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
           
           {isLoginPage ? (
             <div className="h-screen w-screen bg-[#030712] overflow-hidden relative">
+              <ThreeBackground layoutTheme={storeSettings?.globalLayout || 'default'} animationStyle={storeSettings?.global3DStyle || 'default'} />
               {children}
             </div>
           ) : (
@@ -367,7 +375,8 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
               )}
               <HeartbeatTrigger />
               <WorkspaceHydrator />
-              <div className="flex flex-col md:flex-row h-screen w-screen overflow-hidden bg-[#030712]">
+              <div className="flex flex-col md:flex-row h-screen w-screen overflow-hidden bg-[#030712] relative">
+                <ThreeBackground layoutTheme={storeSettings?.globalLayout || 'default'} animationStyle={storeSettings?.global3DStyle || 'default'} />
                 {/* Sidebar - responsive built-in mobile/desktop */}
                 <Sidebar isMobileOpen={isMobileOpen} onCloseMobile={() => setIsMobileOpen(false)} />
                 

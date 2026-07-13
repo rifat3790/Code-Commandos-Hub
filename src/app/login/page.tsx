@@ -1,7 +1,11 @@
 'use client';
 
 import React, { useState } from 'react';
+import { motion } from 'framer-motion';
+import dynamic from 'next/dynamic';
 import { auth } from '@/lib/firebase';
+
+
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, sendPasswordResetEmail } from 'firebase/auth';
 import { Terminal, Lock, Mail, LogIn, CheckCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -85,11 +89,18 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-screen flex-col justify-center items-center p-4 sm:p-8 bg-[#030712] relative overflow-hidden">
-      {/* Background decorations */}
+
+
+      {/* Ambient background glow behind canvas */}
       <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-green-500/5 rounded-full blur-[120px] pointer-events-none"></div>
       <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-emerald-500/5 rounded-full blur-[120px] pointer-events-none"></div>
 
-      <div className="w-full max-w-md bg-gray-900/50 backdrop-blur-xl border border-glass-border rounded-2xl p-8 relative z-10 shadow-2xl">
+      <motion.div 
+        initial={{ opacity: 0, y: 25, scale: 0.96 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ type: 'spring', stiffness: 200, damping: 20, delay: 0.15 }}
+        className="w-full max-w-md bg-gray-900/40 backdrop-blur-2xl border border-glass-border rounded-2xl p-8 relative z-10 shadow-2xl"
+      >
         {isForgotPassword ? (
           <div>
             <div className="flex flex-col items-center mb-8">
@@ -286,7 +297,7 @@ export default function LoginPage() {
         </p>
           </>
         )}
-      </div>
+      </motion.div>
 
       {/* Success Modal */}
       {showSuccess && (

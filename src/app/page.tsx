@@ -2,7 +2,11 @@
 
 import React, { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import { motion } from 'framer-motion';
+import TiltCard from '@/components/TiltCard';
+
+
 import { 
   ShieldCheck, 
   FileCode, 
@@ -416,6 +420,7 @@ export default function HomePage() {
   return (
     <div className="relative w-full h-full min-h-[calc(100vh-100px)]">
       {homeLayoutStyles.starBackground && <StarBackground />}
+
       <motion.div 
         variants={containerVariants}
         initial="hidden"
@@ -470,20 +475,22 @@ export default function HomePage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 lg:gap-6">
                 {quickActions.map((action) => (
                   <Link key={action.id} href={action.href} className="group">
-                    <div className={homeLayoutStyles.cardContainer}>
-                      <div className="flex items-start justify-between relative z-10">
-                        <div className={homeLayoutStyles.cardIconBox}>
-                          <action.icon className="w-7 h-7 stroke-[1.7]" />
+                    <TiltCard className="h-full">
+                      <div className={homeLayoutStyles.cardContainer}>
+                        <div className="flex items-start justify-between relative z-10">
+                          <div className={homeLayoutStyles.cardIconBox}>
+                            <action.icon className="w-7 h-7 stroke-[1.7]" />
+                          </div>
+                          <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center group-hover:bg-white/10 transition-colors">
+                            <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-white transition-colors" />
+                          </div>
                         </div>
-                        <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center group-hover:bg-white/10 transition-colors">
-                          <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-white transition-colors" />
+                        <div className="relative z-10">
+                          <h4 className={`text-base font-bold text-white group-hover:text-green-400 transition-colors`}>{action.name}</h4>
+                          <p className="text-xs text-gray-450 mt-1.5 leading-relaxed">{action.desc}</p>
                         </div>
                       </div>
-                      <div className="relative z-10">
-                        <h4 className={`text-base font-bold text-white group-hover:text-green-400 transition-colors`}>{action.name}</h4>
-                        <p className="text-xs text-gray-450 mt-1.5 leading-relaxed">{action.desc}</p>
-                      </div>
-                    </div>
+                    </TiltCard>
                   </Link>
                 ))}
               </div>
@@ -494,18 +501,20 @@ export default function HomePage() {
               <h3 className={homeLayoutStyles.sectionTitle}>Your Overview</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {categories.map((cat, i) => (
-                  <div key={i} className={homeLayoutStyles.statCard}>
-                    <div className={homeLayoutStyles.statIconBox}>
-                      <cat.icon className="w-5 h-5" />
+                  <TiltCard key={i} className="h-full">
+                    <div className={homeLayoutStyles.statCard}>
+                      <div className={homeLayoutStyles.statIconBox}>
+                        <cat.icon className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">{cat.name}</h4>
+                        <p className="text-[10px] text-gray-500 mt-1">{cat.desc}</p>
+                      </div>
+                      <div className={homeLayoutStyles.statValue}>
+                        {cat.items}
+                      </div>
                     </div>
-                    <div>
-                      <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">{cat.name}</h4>
-                      <p className="text-[10px] text-gray-500 mt-1">{cat.desc}</p>
-                    </div>
-                    <div className={homeLayoutStyles.statValue}>
-                      {cat.items}
-                    </div>
-                  </div>
+                  </TiltCard>
                 ))}
               </div>
             </div>

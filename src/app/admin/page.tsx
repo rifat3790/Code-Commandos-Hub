@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { ShieldAlert, Check, X, Database, Phone, Video, Palette, Type, Square, Calendar } from 'lucide-react';
+import { ShieldAlert, Check, X, Database, Phone, Video, Palette, Type, Square, Calendar, Sparkles } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useWorkspaceStore } from '@/store/workspaceStore';
 import { useCall } from '@/context/CallContext';
@@ -797,13 +797,18 @@ export default function AdminDashboard() {
               <label className="text-xs font-bold text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
                 <Palette className="w-4 h-4 text-green-400" /> Global Dashboard Layout Theme
               </label>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
                 {[
                   { id: 'default', name: 'Layout 1: Neon Glassmorphic', desc: 'Futuristic glass-blur panels with neon green glow effects.' },
                   { id: 'slate', name: 'Layout 2: Clean Slate & Platinum', desc: 'Minimalist corporate look. Solid flat panels and steel headers.' },
-                  { id: 'aurora', name: 'Layout 3: Aurora Gradient', desc: 'Soft purple-indigo aurora lighting with curved glass pannels.' },
+                  { id: 'aurora', name: 'Layout 3: Aurora Gradient', desc: 'Soft purple-indigo aurora lighting with curved glass panels.' },
                   { id: 'cyber', name: 'Layout 4: Cyberpunk Matrix', desc: 'Deep hacker terminal console with green monospace syntax.' },
-                  { id: 'gold', name: 'Layout 5: Royal Gold & Onyx', desc: 'Premium gold gradient highlights on onyx black panels.' }
+                  { id: 'gold', name: 'Layout 5: Royal Gold & Onyx', desc: 'Premium gold gradient highlights on onyx black panels.' },
+                  { id: 'nebula', name: 'Layout 6: Cosmic Nebula', desc: 'Space stardust clusters drifting in cyan and magenta stars.' },
+                  { id: 'matrix', name: 'Layout 7: Digital Rain Matrix', desc: 'Vertically streaming digital terminal codes in matrix green.' },
+                  { id: 'lava', name: 'Layout 8: Volcanic Lava Flow', desc: 'Pulsing geometric rock meshes floating inside warm amber lava embers.' },
+                  { id: 'ocean', name: 'Layout 9: Bioluminescent Deep Sea', desc: 'Rolling cyan and turquoise wave particles mimicking the ocean abyss.' },
+                  { id: 'glitch', name: 'Layout 10: Retro Synthwave Glitch', desc: 'Retro pink and cyber cyan shapes triggering quick digital glitches.' }
                 ].map((l) => {
                   const isSelected = (storeSettings?.globalLayout || 'default') === l.id;
                   return (
@@ -818,10 +823,59 @@ export default function AdminDashboard() {
                     >
                       <div className="space-y-1">
                         <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-white">{l.name}</span>
+                          <span className="text-xs font-bold text-white leading-tight">{l.name}</span>
                           {isSelected && <span className="w-2 h-2 rounded-full bg-green-400" />}
                         </div>
                         <p className="text-[10px] text-gray-400 leading-relaxed">{l.desc}</p>
+                      </div>
+                      
+                      <div className="pt-2 border-t border-glass-border/30 flex justify-between items-center text-[9px] uppercase tracking-wider">
+                        <span className="text-gray-500">Status</span>
+                        <span className={isSelected ? 'text-green-400 font-bold' : 'text-gray-550 font-semibold'}>
+                          {isSelected ? 'Active' : 'Select'}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Global 3D Background Animation Style Selection */}
+            <div className="space-y-3 pt-4 border-t border-glass-border">
+              <label className="text-xs font-bold text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
+                <Sparkles className="w-4 h-4 text-green-400" /> Global 3D Background Animation Style
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                {[
+                  { id: 'default', name: 'Neon Grid Flow', desc: 'Classic futuristic green grid floor with floating wireframes.' },
+                  { id: 'aurora', name: 'Aurora Space', desc: 'Soft purple/indigo space dust grids with glowing shapes.' },
+                  { id: 'gold', name: 'Royal Gold Grid', desc: 'Luxury gold wireframe meshes and coordinates.' },
+                  { id: 'slate', name: 'Platinum Slate', desc: 'Minimalist steel grey geometries and simple starlight.' },
+                  { id: 'cyber', name: 'Emerald Cyber', desc: 'High-contrast cyan and emerald digital wireframes.' },
+                  { id: 'nebula', name: 'Cosmic Nebula', desc: 'Drifting space stardust clusters in cyan and pink particles.' },
+                  { id: 'matrix', name: 'Digital Rain Matrix', desc: 'Matrix green code streams falling vertically in 3D space.' },
+                  { id: 'lava', name: 'Volcanic Lava Flow', desc: 'Pulsing orange magma meshes floating with rising embers.' },
+                  { id: 'ocean', name: 'Bioluminescent Deep Sea', desc: 'Sky blue ocean waves flowing and shifting in complex heights.' },
+                  { id: 'glitch', name: 'Retro Synthwave Glitch', desc: 'Neon pink geometries that trigger sudden digital glitch jumps.' }
+                ].map((styleItem) => {
+                  const isSelected = (storeSettings?.global3DStyle || 'default') === styleItem.id;
+                  return (
+                    <div
+                      key={styleItem.id}
+                      onClick={() => updateSettings({ global3DStyle: styleItem.id })}
+                      className={`p-4 rounded-xl border transition-all cursor-pointer text-left space-y-2 flex flex-col justify-between ${
+                        isSelected 
+                          ? 'border-green-500 bg-green-500/10' 
+                          : 'border-glass-border bg-black/40 hover:border-gray-600'
+                      }`}
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-white leading-tight">{styleItem.name}</span>
+                          {isSelected && <span className="w-2 h-2 rounded-full bg-green-400" />}
+                        </div>
+                        <p className="text-[10px] text-gray-400 leading-relaxed">{styleItem.desc}</p>
                       </div>
                       
                       <div className="pt-2 border-t border-glass-border/30 flex justify-between items-center text-[9px] uppercase tracking-wider">

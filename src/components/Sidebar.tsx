@@ -26,7 +26,8 @@ import {
   LogOut,
   FolderKanban,
   Headphones,
-  Video
+  Video,
+  Sparkles
 } from 'lucide-react';
 import { useWorkspaceStore } from '@/store/workspaceStore';
 import { useAuth } from '@/context/AuthContext';
@@ -45,6 +46,20 @@ export default function Sidebar({ isMobileOpen = false, onCloseMobile }: Sidebar
   const profile = useWorkspaceStore((state) => state.memberProfile);
   const isHydrated = useWorkspaceStore((state) => state.isHydrated);
   const { user, dbUser } = useAuth();
+
+  const [threeDEnabled, setThreeDEnabled] = useState(true);
+
+  useEffect(() => {
+    const mode = localStorage.getItem('3d_mode') !== 'false';
+    setThreeDEnabled(mode);
+  }, []);
+
+  const toggle3DMode = () => {
+    const newValue = !threeDEnabled;
+    setThreeDEnabled(newValue);
+    localStorage.setItem('3d_mode', String(newValue));
+    window.dispatchEvent(new Event('3d_mode_changed'));
+  };
 
   useEffect(() => {
     hydrate();
@@ -192,6 +207,20 @@ export default function Sidebar({ isMobileOpen = false, onCloseMobile }: Sidebar
           {renderNavLinks(true)}
         </div>
 
+        {/* 3D Mode Toggle for Mobile */}
+        <div className="px-4 py-3 border-t border-glass-border flex items-center justify-between">
+          <div className="flex items-center gap-2 text-xs text-gray-400 font-medium">
+            <Sparkles className="w-3.5 h-3.5 text-green-400" />
+            <span>3D Animations</span>
+          </div>
+          <button
+            onClick={toggle3DMode}
+            className={`relative w-8 h-4.5 rounded-full transition-colors duration-200 cursor-pointer ${threeDEnabled ? 'bg-green-500' : 'bg-gray-800'}`}
+          >
+            <span className={`absolute top-0.5 left-0.5 w-3.5 h-3.5 rounded-full bg-black transition-transform duration-200 ${threeDEnabled ? 'translate-x-3.5' : 'translate-x-0'}`} />
+          </button>
+        </div>
+
         {/* User profile footer */}
         <div className="p-4 pb-16 border-t border-glass-border flex items-center gap-3">
           <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-green-500 to-emerald-800 flex items-center justify-center font-bold text-sm text-white border border-green-500/30 overflow-hidden shrink-0">
@@ -256,6 +285,37 @@ export default function Sidebar({ isMobileOpen = false, onCloseMobile }: Sidebar
 
         {/* Bottom Profile Section */}
         <div className="p-3 pb-16 border-t border-glass-border">
+          {/* 3D Mode Toggle for Desktop */}
+          <div className="mb-3 px-2 py-1 flex items-center justify-between">
+            {!isCollapsed ? (
+              <>
+                <div className="flex items-center gap-2 text-xs text-gray-400 font-medium">
+                  <Sparkles className="w-3.5 h-3.5 text-green-400" />
+                  <span>3D Animations</span>
+                </div>
+                <button
+                  onClick={toggle3DMode}
+                  className={`relative w-8 h-4.5 rounded-full transition-colors duration-200 cursor-pointer ${threeDEnabled ? 'bg-green-500' : 'bg-gray-800'}`}
+                >
+                  <span className={`absolute top-0.5 left-0.5 w-3.5 h-3.5 rounded-full bg-black transition-transform duration-200 ${threeDEnabled ? 'translate-x-3.5' : 'translate-x-0'}`} />
+                </button>
+              </>
+            ) : (
+              <div className="w-full flex justify-center group relative">
+                <button
+                  onClick={toggle3DMode}
+                  className={`p-1.5 rounded-lg border transition-colors duration-200 cursor-pointer ${threeDEnabled ? 'text-green-400 bg-green-950/20 border-green-500/30' : 'text-gray-500 bg-transparent border-transparent hover:text-white'}`}
+                >
+                  <Sparkles className="w-4 h-4" />
+                </button>
+                <div className="absolute left-[55px] bg-gray-900 border border-glass-border px-2 py-1 rounded text-[10px] text-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
+                  Toggle 3D
+                </div>
+              </div>
+            )}
+          </div>
+          <div className="h-px bg-glass-border mb-3" />
+
           {!isCollapsed ? (
             <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-glass-hover transition-colors overflow-hidden">
               <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-green-500 to-emerald-800 flex items-center justify-center font-bold text-sm text-white border border-green-500/30 overflow-hidden shrink-0">

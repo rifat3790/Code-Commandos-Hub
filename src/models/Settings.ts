@@ -13,6 +13,7 @@ export interface ISettings extends Document {
   fontFamily: string;
   borderRadius: string;
   globalLayout: string;
+  global3DStyle: string;
 }
 
 const SettingsSchema: Schema = new Schema({
@@ -27,7 +28,12 @@ const SettingsSchema: Schema = new Schema({
   templatesLayout: { type: String, default: 'default' },
   fontFamily: { type: String, default: 'sans' },
   borderRadius: { type: String, default: 'xl' },
-  globalLayout: { type: String, default: 'default' }
+  globalLayout: { type: String, default: 'default' },
+  global3DStyle: { type: String, default: 'default' }
 });
 
-export default mongoose.models.Settings || mongoose.model<ISettings>('Settings', SettingsSchema);
+if (mongoose.models.Settings) {
+  delete mongoose.models.Settings;
+}
+
+export default mongoose.model<ISettings>('Settings', SettingsSchema);
