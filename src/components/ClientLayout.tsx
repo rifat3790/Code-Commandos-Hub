@@ -142,7 +142,7 @@ function ProtectedMainContent({ children }: { children: React.ReactNode }) {
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: -8, scale: 0.99 }}
         transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-        className="h-full"
+        className="min-h-full w-full flex flex-col"
       >
         {children}
       </motion.div>
@@ -382,24 +382,32 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
                 
                 {/* Main Content container */}
                 <div className="flex-1 flex flex-col h-full overflow-hidden relative">
-                  {/* Mobile Header Bar */}
-                  <header className="md:hidden flex items-center justify-between px-4 py-3 bg-gray-950/80 border-b border-glass-border select-none shrink-0 z-30 backdrop-blur-md">
-                    <div className="flex items-center gap-2.5">
+                  {/* Unified Header Bar */}
+                  <header className="flex items-center justify-between px-4 md:px-6 py-3 bg-[#030712]/45 border-b border-glass-border select-none shrink-0 z-30 backdrop-blur-md">
+                    <div className="flex items-center gap-3">
+                      {/* Mobile navigation toggle */}
                       <button 
                         onClick={() => setIsMobileOpen(true)}
-                        className="p-2 rounded-lg bg-gray-900 border border-glass-border text-gray-400 hover:text-white transition-colors"
+                        className="md:hidden p-2 rounded-lg bg-gray-900 border border-glass-border text-gray-400 hover:text-white transition-colors"
                         aria-label="Toggle navigation menu"
                       >
                         <Menu className="w-5 h-5" />
                       </button>
-                      <Link href="/" className="flex items-center gap-2">
-                        <div className="w-7.5 h-7.5 rounded-lg bg-brand-green flex items-center justify-center glow-green shrink-0" style={{ backgroundColor: 'var(--color-brand-green)' }}>
-                          <Terminal className="w-4.5 h-4.5 text-black stroke-[2.5]" />
+                      
+                      {/* Mobile Logo Link */}
+                      <Link href="/" className="md:hidden flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-lg bg-brand-green flex items-center justify-center glow-green shrink-0" style={{ backgroundColor: 'var(--color-brand-green)' }}>
+                          <Terminal className="w-4 h-4 text-black stroke-[2.5]" />
                         </div>
-                        <span className="font-bold text-sm tracking-wider text-white hidden sm:inline-block">CODE COMMANDOS HUB</span>
                       </Link>
+
+                      {/* Header Title / Section Name */}
+                      <span className="font-extrabold text-xs md:text-sm tracking-widest text-gray-200 uppercase bg-gradient-to-r from-white via-gray-100 to-gray-450 bg-clip-text text-transparent">
+                        {currentMenuName || 'Code Commandos'}
+                      </span>
                     </div>
-                    <div className="flex items-center gap-2">
+
+                    <div className="flex items-center gap-3">
                       <NotificationBell />
                       <FocusTimer />
                     </div>
@@ -407,10 +415,6 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
 
                   {/* Main page content scroll viewport */}
                   <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 relative bg-radial-[circle_at_top_right,rgba(16,185,129,0.03),transparent_40%]">
-                    <div className="hidden md:flex absolute top-6 right-8 z-50 items-center gap-4">
-                      <NotificationBell />
-                      <FocusTimer />
-                    </div>
                     <ProtectedMainContent>{children}</ProtectedMainContent>
                   </main>
                 </div>
