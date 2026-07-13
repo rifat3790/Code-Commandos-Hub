@@ -46,42 +46,39 @@ import NotificationBell from './NotificationBell';
 
 import { motion, AnimatePresence } from 'framer-motion';
 
+const ROUTE_TO_MENU_MAP: Record<string, string> = {
+  '/workspace': 'Workspace',
+  '/meetings': 'Meetings',
+  '/tracker': 'Order Tracker',
+  '/personal-projects': 'Personal Projects',
+  '/message-helper': 'Message Helper',
+  '/templates': 'Templates',
+  '/schema': 'Schema Builder',
+  '/audit': 'Audit Suite',
+  '/credentials': 'Projects',
+  '/mockup': 'Mockup Studio',
+  '/focus': 'Focus Studio',
+  '/chat': 'AI Assistant',
+  '/notes': 'Team Notes',
+  '/downloads': 'Downloads',
+  '/member': 'Member Profile',
+  '/settings': 'Settings',
+  '/': 'Home'
+};
+
 function ProtectedMainContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const storeSettings = useWorkspaceStore(state => state.settings);
   const isHydrated = useWorkspaceStore(state => state.isHydrated);
   const { dbUser } = useAuth();
 
-  // Route map to identify which menu controls which path
-  const routeToMenuMap: Record<string, string> = {
-    '/workspace': 'Workspace',
-    '/meetings': 'Meetings',
-    '/tracker': 'Order Tracker',
-    '/personal-projects': 'Personal Projects',
-    '/message-helper': 'Message Helper',
-    '/templates': 'Templates',
-    '/schema': 'Schema Builder',
-    '/audit': 'Audit Suite',
-    '/credentials': 'Projects',
-    '/mockup': 'Mockup Studio',
-    '/focus': 'Focus Studio',
-    '/chat': 'AI Assistant',
-    '/notes': 'Team Notes',
-    '/downloads': 'Downloads',
-    '/member': 'Member Profile',
-    '/settings': 'Settings',
-    '/': 'Home'
-  };
-
   let currentMenuName = '';
-  // Check exact match first
-  if (routeToMenuMap[pathname]) {
-    currentMenuName = routeToMenuMap[pathname];
+  if (ROUTE_TO_MENU_MAP[pathname]) {
+    currentMenuName = ROUTE_TO_MENU_MAP[pathname];
   } else {
-    // Check if pathname starts with any of the routes (excluding '/')
-    const matchedRoute = Object.keys(routeToMenuMap).find(route => route !== '/' && pathname.startsWith(route));
+    const matchedRoute = Object.keys(ROUTE_TO_MENU_MAP).find(route => route !== '/' && pathname.startsWith(route));
     if (matchedRoute) {
-      currentMenuName = routeToMenuMap[matchedRoute];
+      currentMenuName = ROUTE_TO_MENU_MAP[matchedRoute];
     }
   }
 
@@ -95,15 +92,14 @@ function ProtectedMainContent({ children }: { children: React.ReactNode }) {
     if (pathname.startsWith('/admin') && !isAdminOrSuperAdmin) {
        isAuthorized = false;
     } else if (!isSuperAdmin && currentMenuName) {
-       // Check settings based on role
        // Check settings based on role or specific user allowedMenus
        let enabledMenus = [];
        if (dbUser?.allowedMenus && dbUser.allowedMenus.length > 0) {
          enabledMenus = dbUser.allowedMenus;
        } else {
-         const userMenus = storeSettings?.userEnabledMenus?.length ? storeSettings.userEnabledMenus : (storeSettings?.enabledMenus || Object.values(routeToMenuMap));
-         const adminMenus = storeSettings?.adminEnabledMenus?.length ? storeSettings.adminEnabledMenus : (storeSettings?.enabledMenus || Object.values(routeToMenuMap));
-         enabledMenus = dbUser?.role === 'admin' ? adminMenus : userMenus;
+          const userMenus = storeSettings?.userEnabledMenus?.length ? storeSettings.userEnabledMenus : (storeSettings?.enabledMenus || Object.values(ROUTE_TO_MENU_MAP));
+          const adminMenus = storeSettings?.adminEnabledMenus?.length ? storeSettings.adminEnabledMenus : (storeSettings?.enabledMenus || Object.values(ROUTE_TO_MENU_MAP));
+          enabledMenus = dbUser?.role === 'admin' ? adminMenus : userMenus;
        }
 
        if (!enabledMenus.includes(currentMenuName)) {
@@ -193,6 +189,16 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const pathname = usePathname();
   const storeSettings = useWorkspaceStore(state => state.settings);
+
+  let currentMenuName = '';
+  if (ROUTE_TO_MENU_MAP[pathname]) {
+    currentMenuName = ROUTE_TO_MENU_MAP[pathname];
+  } else {
+    const matchedRoute = Object.keys(ROUTE_TO_MENU_MAP).find(route => route !== '/' && pathname.startsWith(route));
+    if (matchedRoute) {
+      currentMenuName = ROUTE_TO_MENU_MAP[matchedRoute];
+    }
+  }
 
   const activeFont = storeSettings?.fontFamily || 'sans';
   const activeRadius = storeSettings?.borderRadius || 'xl';
