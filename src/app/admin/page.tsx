@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { useWorkspaceStore } from '@/store/workspaceStore';
 import { useCall } from '@/context/CallContext';
 import { motion, AnimatePresence } from 'framer-motion';
+import toast from 'react-hot-toast';
 
 const allAvailableMenus = [
   'Home', 'Workspace', 'Meetings', 'Order Tracker', 'Personal Projects', 'Message Helper', 'Templates', 'Schema Builder',
@@ -178,6 +179,25 @@ export default function AdminDashboard() {
       body: JSON.stringify({ promoterUid: user?.uid, targetUserId: userId, newRole })
     });
     fetchUsers();
+  };
+
+  const handleDeleteUser = async (userId: string) => {
+    if (!confirm("Are you sure you want to permanently delete this user from the database? This action cannot be undone.")) return;
+    try {
+      const res = await fetch(`/api/users/roles?id=${userId}&promoterUid=${user?.uid}`, {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        toast.success("User deleted permanently from database.");
+        fetchUsers();
+      } else {
+        const errData = await res.json();
+        toast.error(errData.error || "Failed to delete user");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Network error deleting user");
+    }
   };
 
   const handleToggleCallingPermission = async (userId: string, currentAllowed: boolean) => {
@@ -537,10 +557,14 @@ export default function AdminDashboard() {
                         {u.role === 'admin' && (
                           <button onClick={() => handlePromote(u._id, 'user')} className="text-xs px-3 py-1.5 bg-gray-500/10 border border-gray-500/20 text-gray-400 rounded font-bold hover:bg-gray-500/20 transition-all">Demote to User</button>
                         )}
-                        <button onClick={() => handlePromote(u._id, 'banned')} className="text-xs px-3 py-1.5 bg-red-500/10 border border-red-500/20 text-red-400 rounded font-bold hover:bg-red-500/20 transition-all">Remove User</button>
+                        <button onClick={() => handlePromote(u._id, 'banned')} className="text-xs px-3 py-1.5 bg-orange-500/10 border border-orange-500/20 text-orange-450 rounded font-bold hover:bg-orange-500/20 transition-all">Ban User</button>
+                        <button onClick={() => handleDeleteUser(u._id)} className="text-xs px-3 py-1.5 bg-red-500/10 border border-red-500/20 text-red-400 rounded font-bold hover:bg-red-500/20 transition-all">Remove User</button>
                       </>
                     ) : (
-                      <button onClick={() => handlePromote(u._id, 'user')} className="text-xs px-3 py-1.5 bg-green-500/10 border border-green-500/20 text-green-400 rounded font-bold hover:bg-green-500/20 transition-all">Restore User</button>
+                      <>
+                        <button onClick={() => handlePromote(u._id, 'user')} className="text-xs px-3 py-1.5 bg-green-500/10 border border-green-500/20 text-green-400 rounded font-bold hover:bg-green-500/20 transition-all">Restore User</button>
+                        <button onClick={() => handleDeleteUser(u._id)} className="text-xs px-3 py-1.5 bg-red-500/10 border border-red-500/20 text-red-400 rounded font-bold hover:bg-red-500/20 transition-all">Remove User</button>
+                      </>
                     )}
                   </div>
                 )}

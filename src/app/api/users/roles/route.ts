@@ -62,3 +62,29 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
+
+export async function DELETE(req: Request) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const targetUserId = searchParams.get('id');
+    const promoterUid = searchParams.get('promoterUid');
+
+    if (!targetUserId || !promoterUid) {
+      return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });
+    }
+
+    await connectToDatabase();
+    
+    const promoter = await User.findOne({ firebaseUid: promoterUid });
+    const isSuperAdmin = promoter && (promoter.role === 'super_admin' || promoter.email === 'refayethossenmd@gmail.com');
+    if (!isSuperAdmin) {
+      return NextResponse.json({ error: 'Unauthorized: Only super admin can delete users' }, { status: 403 });
+    }
+
+    await User.findByIdAndDelete(targetUserId);
+    
+    return NextResponse.json({ success: true, message: 'User deleted from database' }, { status: 200 });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
