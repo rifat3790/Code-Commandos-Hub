@@ -1335,7 +1335,10 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
                     {/* Local Video Stream */}
                     <div className="relative bg-gray-900 border border-purple-500/20 rounded-2xl overflow-hidden shadow-xl aspect-video flex items-center justify-center">
                       <video
-                        ref={localVideoRef}
+                        ref={el => {
+                          localVideoRef.current = el;
+                          if (el && localStream) el.srcObject = screenStreamRef.current || localStream;
+                        }}
                         autoPlay
                         playsInline
                         muted
@@ -1398,7 +1401,10 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
                   <>
                     {/* Remote Video Stream (Main Feed) */}
                     <video
-                      ref={remoteVideoRef}
+                      ref={el => {
+                        remoteVideoRef.current = el;
+                        if (el && remoteStream) el.srcObject = remoteStream;
+                      }}
                       autoPlay
                       playsInline
                       className="w-full h-full object-contain"
@@ -1408,7 +1414,10 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
                     {!isCallMinimized && (
                       <div className="absolute bottom-4 right-4 w-40 h-28 md:w-52 md:h-36 bg-gray-900 border border-purple-500/30 rounded-2xl overflow-hidden shadow-2xl z-10">
                         <video
-                          ref={localVideoRef}
+                          ref={el => {
+                            localVideoRef.current = el;
+                            if (el && localStream) el.srcObject = screenStreamRef.current || localStream;
+                          }}
                           autoPlay
                           playsInline
                           muted

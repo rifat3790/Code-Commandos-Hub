@@ -62,6 +62,7 @@ export default function ChatbotWidget() {
   const emojiRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const widgetRef = useRef<HTMLDivElement>(null);
 
   // Integrate AI Chat for the widget
   const { messages: aiMessages, sendMessage: appendAi, status: aiStatus } = useChat({
@@ -75,6 +76,9 @@ export default function ChatbotWidget() {
     function handleClickOutside(event: MouseEvent) {
       if (emojiRef.current && !emojiRef.current.contains(event.target as Node)) {
         setIsEmojiOpen(false);
+      }
+      if (widgetRef.current && !widgetRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -523,7 +527,7 @@ export default function ChatbotWidget() {
   if (!user) return null;
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end">
+    <div ref={widgetRef} className="fixed bottom-6 right-6 z-50 flex flex-col items-end">
       <AnimatePresence>
         {isOpen && (
           <motion.div
