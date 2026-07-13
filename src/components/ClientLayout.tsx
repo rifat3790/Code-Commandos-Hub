@@ -32,6 +32,7 @@ import { usePathname } from 'next/navigation';
 import { useWorkspaceStore } from '@/store/workspaceStore';
 import GlobalPendingModal from './GlobalPendingModal';
 import ChatbotWidget from './chat/ChatbotWidget';
+import MeetingInvitePopup from './MeetingInvitePopup';
 import CommandMenu from './CommandMenu';
 import FocusTimer from './FocusTimer';
 import NotificationBell from './NotificationBell';
@@ -47,6 +48,7 @@ function ProtectedMainContent({ children }: { children: React.ReactNode }) {
   // Route map to identify which menu controls which path
   const routeToMenuMap: Record<string, string> = {
     '/workspace': 'Workspace',
+    '/meetings': 'Meetings',
     '/tracker': 'Order Tracker',
     '/personal-projects': 'Personal Projects',
     '/message-helper': 'Message Helper',
@@ -413,6 +415,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
               <CommandMenu />
               <GlobalPendingModal />
               <ChatbotWidget />
+              <MeetingInvitePopup />
             </>
           )}
         </CallProvider>

@@ -25,7 +25,8 @@ import {
   Gauge,
   LogOut,
   FolderKanban,
-  Headphones
+  Headphones,
+  Video
 } from 'lucide-react';
 import { useWorkspaceStore } from '@/store/workspaceStore';
 import { useAuth } from '@/context/AuthContext';
@@ -65,6 +66,7 @@ export default function Sidebar({ isMobileOpen = false, onCloseMobile }: Sidebar
   const baseNavItemsRaw = [
     { name: 'Home', path: '/', icon: Home },
     { name: 'Workspace', path: '/workspace', icon: LayoutDashboard },
+    { name: 'Meetings', path: '/meetings', icon: Video },
     { name: 'Order Tracker', path: '/tracker', icon: LayoutDashboard },
     { name: 'Personal Projects', path: '/personal-projects', icon: FolderKanban },
     { name: 'Message Helper', path: '/message-helper', icon: ShieldAlert },

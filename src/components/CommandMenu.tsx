@@ -14,7 +14,8 @@ import {
   StickyNote, 
   FileCode,
   LogOut,
-  Command
+  Command,
+  Video
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { signOut } from 'firebase/auth';
@@ -53,6 +54,7 @@ export default function CommandMenu() {
   const items = [
     { name: 'Home Dashboard', path: '/', icon: Home, category: 'Navigation' },
     { name: 'Workspace Board', path: '/workspace', icon: Command, category: 'Navigation' },
+    { name: 'Meetings Room', path: '/meetings', icon: Video, category: 'Navigation' },
     { name: 'Order Tracker', path: '/tracker', icon: Briefcase, category: 'Navigation' },
     { name: 'Personal Projects', path: '/personal-projects', icon: FileCode, category: 'Navigation' },
     { name: 'Team Notes', path: '/notes', icon: StickyNote, category: 'Navigation' },
