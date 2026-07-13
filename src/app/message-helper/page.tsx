@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { useWorkspaceStore } from '@/store/workspaceStore';
 import { useAuth } from '@/context/AuthContext';
+import { soundSynth } from '@/lib/sounds';
 
 // Helper to get a randomized obfuscated bypass term for words to avoid bot pattern matches
 const getDynamicReplacement = (word: string): string => {
@@ -116,15 +117,17 @@ const getObfuscatedWord = (word: string, level: 'low' | 'medium' | 'high' | 'hom
 
 // Restricted words list and their professional replacement alternatives
 const RESTRICTED_WORDS_MAP: { pattern: RegExp, word: string, getReplacement: () => string, professional: string }[] = [
+  { pattern: /\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b/gi, word: 'email address', getReplacement: () => 'c-ontact d-etails', professional: 'contact details' },
+  { pattern: /\b\d{4,}\b/g, word: 'digits', getReplacement: () => 'n-umbers', professional: 'details' },
   { pattern: /\bpay\b/gi, word: 'pay', getReplacement: () => getDynamicReplacement('pay'), professional: 'order setups' },
   { pattern: /\bpayment\b/gi, word: 'payment', getReplacement: () => getDynamicReplacement('payment'), professional: 'order setups' },
   { pattern: /\bpayments\b/gi, word: 'payments', getReplacement: () => getDynamicReplacement('payments'), professional: 'order setups' },
   { pattern: /\bmoney\b/gi, word: 'money', getReplacement: () => getDynamicReplacement('money'), professional: 'order setups' },
   { pattern: /\bcash\b/gi, word: 'cash', getReplacement: () => getDynamicReplacement('cash'), professional: 'order setups' },
   { pattern: /\bbank\b/gi, word: 'bank', getReplacement: () => getDynamicReplacement('bank'), professional: 'order setups' },
-  { pattern: /\bbank\\s+transfer\b/gi, word: 'bank transfer', getReplacement: () => getDynamicReplacement('bank transfer'), professional: 'order setups' },
-  { pattern: /\bwestern\\s+union\b/gi, word: 'western union', getReplacement: () => getDynamicReplacement('western union'), professional: 'order setups' },
-  { pattern: /\bwire\\s+transfer\b/gi, word: 'wire transfer', getReplacement: () => getDynamicReplacement('wire transfer'), professional: 'order setups' },
+  { pattern: /\bbank\s+transfer\b/gi, word: 'bank transfer', getReplacement: () => getDynamicReplacement('bank transfer'), professional: 'order setups' },
+  { pattern: /\bwestern\s+union\b/gi, word: 'western union', getReplacement: () => getDynamicReplacement('western union'), professional: 'order setups' },
+  { pattern: /\bwire\s+transfer\b/gi, word: 'wire transfer', getReplacement: () => getDynamicReplacement('wire transfer'), professional: 'order setups' },
   { pattern: /\bpaypal\b/gi, word: 'paypal', getReplacement: () => getDynamicReplacement('paypal'), professional: 'order setups' },
   { pattern: /\bpayoneer\b/gi, word: 'payoneer', getReplacement: () => getDynamicReplacement('payoneer'), professional: 'order setups' },
   { pattern: /\bcrypto\b/gi, word: 'crypto', getReplacement: () => getDynamicReplacement('crypto'), professional: 'order setups' },
@@ -138,15 +141,15 @@ const RESTRICTED_WORDS_MAP: { pattern: RegExp, word: string, getReplacement: () 
   { pattern: /\bpayout\b/gi, word: 'payout', getReplacement: () => getDynamicReplacement('payout'), professional: 'order setups' },
   { pattern: /\bdollar\b/gi, word: 'dollar', getReplacement: () => getDynamicReplacement('dollar'), professional: 'order setups' },
   { pattern: /\busd\b/gi, word: 'usd', getReplacement: () => getDynamicReplacement('usd'), professional: 'order setups' },
-  { pattern: /\bsend\\s+payment\b/gi, word: 'send payment', getReplacement: () => getDynamicReplacement('send payment'), professional: 'order setups' },
-  { pattern: /\bdirect\\s+payment\b/gi, word: 'direct payment', getReplacement: () => getDynamicReplacement('direct payment'), professional: 'order setups' },
-  { pattern: /\boutside\\s+payment\b/gi, word: 'outside payment', getReplacement: () => getDynamicReplacement('outside payment'), professional: 'order setups' },
-  { pattern: /\bemail\b/gi, word: 'email', getReplacement: () => getDynamicReplacement('email'), professional: 'communication' },
-  { pattern: /\bmail\b/gi, word: 'mail', getReplacement: () => getDynamicReplacement('mail'), professional: 'communication' },
-  { pattern: /\bgmail\b/gi, word: 'gmail', getReplacement: () => getDynamicReplacement('gmail'), professional: 'communication' },
-  { pattern: /\bphone\b/gi, word: 'phone', getReplacement: () => getDynamicReplacement('phone'), professional: 'communication' },
-  { pattern: /\bnumber\b/gi, word: 'number', getReplacement: () => getDynamicReplacement('number'), professional: 'communication' },
-  { pattern: /\bmobile\b/gi, word: 'mobile', getReplacement: () => getDynamicReplacement('mobile'), professional: 'communication' },
+  { pattern: /\bsend\s+payment\b/gi, word: 'send payment', getReplacement: () => getDynamicReplacement('send payment'), professional: 'order setups' },
+  { pattern: /\bdirect\s+payment\b/gi, word: 'direct payment', getReplacement: () => getDynamicReplacement('direct payment'), professional: 'order setups' },
+  { pattern: /\boutside\s+payment\b/gi, word: 'outside payment', getReplacement: () => getDynamicReplacement('outside payment'), professional: 'order setups' },
+  { pattern: /\bemails?\b/gi, word: 'email', getReplacement: () => getDynamicReplacement('email'), professional: 'communication' },
+  { pattern: /\bmails?\b/gi, word: 'mail', getReplacement: () => getDynamicReplacement('mail'), professional: 'communication' },
+  { pattern: /\bgmails?\b/gi, word: 'gmail', getReplacement: () => getDynamicReplacement('gmail'), professional: 'communication' },
+  { pattern: /\bphones?\b/gi, word: 'phone', getReplacement: () => getDynamicReplacement('phone'), professional: 'communication' },
+  { pattern: /\bnumbers?\b/gi, word: 'number', getReplacement: () => getDynamicReplacement('number'), professional: 'communication' },
+  { pattern: /\bmobiles?\b/gi, word: 'mobile', getReplacement: () => getDynamicReplacement('mobile'), professional: 'communication' },
   { pattern: /\bwhatsapp\b/gi, word: 'whatsapp', getReplacement: () => getDynamicReplacement('whatsapp'), professional: 'communication' },
   { pattern: /\bimo\b/gi, word: 'imo', getReplacement: () => getDynamicReplacement('imo'), professional: 'communication' },
   { pattern: /\bskype\b/gi, word: 'skype', getReplacement: () => getDynamicReplacement('skype'), professional: 'communication' },
@@ -157,46 +160,46 @@ const RESTRICTED_WORDS_MAP: { pattern: RegExp, word: string, getReplacement: () 
   { pattern: /\binsta\b/gi, word: 'insta', getReplacement: () => getDynamicReplacement('insta'), professional: 'communication' },
   { pattern: /\binstagram\b/gi, word: 'instagram', getReplacement: () => getDynamicReplacement('instagram'), professional: 'communication' },
   { pattern: /\blinkedin\b/gi, word: 'linkedin', getReplacement: () => getDynamicReplacement('linkedin'), professional: 'communication' },
-  { pattern: /\bsocial\\s+media\b/gi, word: 'social media', getReplacement: () => getDynamicReplacement('social media'), professional: 'communication' },
-  { pattern: /\bcontact\\s+me\\s+directly\b/gi, word: 'contact me directly', getReplacement: () => getDynamicReplacement('contact me directly'), professional: 'communication' },
-  { pattern: /\bcall\\s+me\b/gi, word: 'call me', getReplacement: () => getDynamicReplacement('call me'), professional: 'communication' },
-  { pattern: /\bmessage\\s+me\\s+outside\b/gi, word: 'message me outside', getReplacement: () => getDynamicReplacement('message me outside'), professional: 'communication' },
+  { pattern: /\bsocial\s+media\b/gi, word: 'social media', getReplacement: () => getDynamicReplacement('social media'), professional: 'communication' },
+  { pattern: /\bcontact\s+me\s+directly\b/gi, word: 'contact me directly', getReplacement: () => getDynamicReplacement('contact me directly'), professional: 'communication' },
+  { pattern: /\bcall\s+me\b/gi, word: 'call me', getReplacement: () => getDynamicReplacement('call me'), professional: 'communication' },
+  { pattern: /\bmessage\s+me\s+outside\b/gi, word: 'message me outside', getReplacement: () => getDynamicReplacement('message me outside'), professional: 'communication' },
   { pattern: /\bcontact\b/gi, word: 'contact', getReplacement: () => getDynamicReplacement('contact'), professional: 'communication' },
   { pattern: /\baddress\b/gi, word: 'address', getReplacement: () => getDynamicReplacement('address'), professional: 'communication' },
   { pattern: /\breview\b/gi, word: 'review', getReplacement: () => getDynamicReplacement('review'), professional: 'feedback' },
   { pattern: /\breviews\b/gi, word: 'reviews', getReplacement: () => getDynamicReplacement('reviews'), professional: 'feedback' },
   { pattern: /\bfeedback\b/gi, word: 'feedback', getReplacement: () => getDynamicReplacement('feedback'), professional: 'feedback' },
-  { pattern: /\b5\\s+stars\b/gi, word: '5 stars', getReplacement: () => getDynamicReplacement('5 stars'), professional: 'feedback' },
-  { pattern: /\b5\\s+star\\s+review\b/gi, word: '5 star review', getReplacement: () => getDynamicReplacement('5 star review'), professional: 'feedback' },
+  { pattern: /\b5\s+stars\b/gi, word: '5 stars', getReplacement: () => getDynamicReplacement('5 stars'), professional: 'feedback' },
+  { pattern: /\b5\s+star\s+review\b/gi, word: '5 star review', getReplacement: () => getDynamicReplacement('5 star review'), professional: 'feedback' },
   { pattern: /\brating\b/gi, word: 'rating', getReplacement: () => getDynamicReplacement('rating'), professional: 'feedback' },
-  { pattern: /\bratings\b/gi, word: 'ratings', getReplacement: () => getDynamicReplacement('ratings'), professional: 'feedback' },
-  { pattern: /\bpositive\\s+review\b/gi, word: 'positive review', getReplacement: () => getDynamicReplacement('positive review'), professional: 'feedback' },
-  { pattern: /\bgood\\s+rating\b/gi, word: 'good rating', getReplacement: () => getDynamicReplacement('good rating'), professional: 'feedback' },
-  { pattern: /\bleave\\s+a\\s+review\b/gi, word: 'leave a review', getReplacement: () => getDynamicReplacement('leave a review'), professional: 'feedback' },
-  { pattern: /\bincrease\\s+my\\s+rating\b/gi, word: 'increase my rating', getReplacement: () => getDynamicReplacement('increase my rating'), professional: 'feedback' },
+  { pattern: /\ bratings\b/gi, word: 'ratings', getReplacement: () => getDynamicReplacement('ratings'), professional: 'feedback' },
+  { pattern: /\bpositive\s+review\b/gi, word: 'positive review', getReplacement: () => getDynamicReplacement('positive review'), professional: 'feedback' },
+  { pattern: /\bgood\s+rating\b/gi, word: 'good rating', getReplacement: () => getDynamicReplacement('good rating'), professional: 'feedback' },
+  { pattern: /\bleave\s+a\s+review\b/gi, word: 'leave a review', getReplacement: () => getDynamicReplacement('leave a review'), professional: 'feedback' },
+  { pattern: /\bincrease\s+my\s+rating\b/gi, word: 'increase my rating', getReplacement: () => getDynamicReplacement('increase my rating'), professional: 'feedback' },
   { pattern: /\btestimonials\b/gi, word: 'testimonials', getReplacement: () => getDynamicReplacement('testimonials'), professional: 'feedback' },
-  { pattern: /\blogin\\s+credentials\b/gi, word: 'login credentials', getReplacement: () => getDynamicReplacement('login credentials'), professional: 'profile credentials' },
+  { pattern: /\blogin\s+credentials\b/gi, word: 'login credentials', getReplacement: () => getDynamicReplacement('login credentials'), professional: 'profile credentials' },
   { pattern: /\bpassword\b/gi, word: 'password', getReplacement: () => getDynamicReplacement('password'), professional: 'profile credentials' },
-  { pattern: /\badmin\\s+access\b/gi, word: 'admin access', getReplacement: () => getDynamicReplacement('admin access'), professional: 'profile credentials' },
-  { pattern: /\baccount\\s+transfer\b/gi, word: 'account transfer', getReplacement: () => getDynamicReplacement('account transfer'), professional: 'profile credentials' },
-  { pattern: /\bownership\\s+transfer\b/gi, word: 'ownership transfer', getReplacement: () => getDynamicReplacement('ownership transfer'), professional: 'profile credentials' },
-  { pattern: /\baccount\\s+details\b/gi, word: 'account details', getReplacement: () => getDynamicReplacement('account details'), professional: 'profile credentials' },
+  { pattern: /\badmin\s+access\b/gi, word: 'admin access', getReplacement: () => getDynamicReplacement('admin access'), professional: 'profile credentials' },
+  { pattern: /\baccount\s+transfer\b/gi, word: 'account transfer', getReplacement: () => getDynamicReplacement('account transfer'), professional: 'profile credentials' },
+  { pattern: /\bownership\s+transfer\b/gi, word: 'ownership transfer', getReplacement: () => getDynamicReplacement('ownership transfer'), professional: 'profile credentials' },
+  { pattern: /\baccount\s+details\b/gi, word: 'account details', getReplacement: () => getDynamicReplacement('account details'), professional: 'profile credentials' },
   { pattern: /\baccount\b/gi, word: 'account', getReplacement: () => getDynamicReplacement('account'), professional: 'profile credentials' },
-  { pattern: /\bgoogle\\s+drive\\s+link\b/gi, word: 'google drive link', getReplacement: () => getDynamicReplacement('google drive link'), professional: 'reference links' },
+  { pattern: /\bgoogle\s+drive\s+link\b/gi, word: 'google drive link', getReplacement: () => getDynamicReplacement('google drive link'), professional: 'reference links' },
   { pattern: /\bdropbox\b/gi, word: 'dropbox', getReplacement: () => getDynamicReplacement('dropbox'), professional: 'reference links' },
   { pattern: /\bwetransfer\b/gi, word: 'wetransfer', getReplacement: () => getDynamicReplacement('wetransfer'), professional: 'reference links' },
-  { pattern: /\bgithub\\s+repository\b/gi, word: 'github repository', getReplacement: () => getDynamicReplacement('github repository'), professional: 'reference links' },
-  { pattern: /\bexternal\\s+link\b/gi, word: 'external link', getReplacement: () => getDynamicReplacement('external link'), professional: 'reference links' },
-  { pattern: /\bwork\\s+outside\\s+the\\s+platform\b/gi, word: 'work outside the platform', getReplacement: () => getDynamicReplacement('work outside the platform'), professional: 'internal order steps' },
-  { pattern: /\bavoid\\s+platform\\s+fee\b/gi, word: 'avoid platform fee', getReplacement: () => getDynamicReplacement('avoid platform fee'), professional: 'internal order steps' },
-  { pattern: /\bdirect\\s+deal\b/gi, word: 'direct deal', getReplacement: () => getDynamicReplacement('direct deal'), professional: 'internal order steps' },
-  { pattern: /\bcontinue\\s+privately\b/gi, word: 'continue privately', getReplacement: () => getDynamicReplacement('continue privately'), professional: 'internal order steps' },
+  { pattern: /\bgithub\s+repository\b/gi, word: 'github repository', getReplacement: () => getDynamicReplacement('github repository'), professional: 'reference links' },
+  { pattern: /\bexternal\s+link\b/gi, word: 'external link', getReplacement: () => getDynamicReplacement('external link'), professional: 'reference links' },
+  { pattern: /\bwork\s+outside\s+the\s+platform\b/gi, word: 'work outside the platform', getReplacement: () => getDynamicReplacement('work outside the platform'), professional: 'internal order steps' },
+  { pattern: /\bavoid\s+platform\s+fee\b/gi, word: 'avoid platform fee', getReplacement: () => getDynamicReplacement('avoid platform fee'), professional: 'internal order steps' },
+  { pattern: /\bdirect\s+deal\b/gi, word: 'direct deal', getReplacement: () => getDynamicReplacement('direct deal'), professional: 'internal order steps' },
+  { pattern: /\bcontinue\s+privately\b/gi, word: 'continue privately', getReplacement: () => getDynamicReplacement('continue privately'), professional: 'internal order steps' },
   { pattern: /\bhomework\b/gi, word: 'homework', getReplacement: () => getDynamicReplacement('homework'), professional: 'project criteria' },
   { pattern: /\bassignment\b/gi, word: 'assignment', getReplacement: () => getDynamicReplacement('assignment'), professional: 'project criteria' },
   { pattern: /\bexam\b/gi, word: 'exam', getReplacement: () => getDynamicReplacement('exam'), professional: 'project criteria' },
   { pattern: /\btest\b/gi, word: 'test', getReplacement: () => getDynamicReplacement('test'), professional: 'project criteria' },
   { pattern: /\bacademic\b/gi, word: 'academic', getReplacement: () => getDynamicReplacement('academic'), professional: 'project criteria' },
-  { pattern: /\bessay\\s+writing\b/gi, word: 'essay writing', getReplacement: () => getDynamicReplacement('essay writing'), professional: 'project criteria' },
+  { pattern: /\bessay\s+writing\b/gi, word: 'essay writing', getReplacement: () => getDynamicReplacement('essay writing'), professional: 'project criteria' },
   { pattern: /\bfake\b/gi, word: 'fake', getReplacement: () => getDynamicReplacement('fake'), professional: 'project criteria' },
   { pattern: /\bbot\b/gi, word: 'bot', getReplacement: () => getDynamicReplacement('bot'), professional: 'project criteria' },
   { pattern: /\bgenerate\b/gi, word: 'generate', getReplacement: () => getDynamicReplacement('generate'), professional: 'project criteria' },
@@ -352,6 +355,7 @@ export default function MessageHelperPage() {
     const text = inputText.toLowerCase();
     const found: string[] = [];
     RESTRICTED_WORDS_MAP.forEach(item => {
+      item.pattern.lastIndex = 0;
       if (item.pattern.test(text)) {
         found.push(item.word);
       }
@@ -403,28 +407,25 @@ export default function MessageHelperPage() {
     let cleanText = inputText;
     let profRewrite = inputText;
 
-    // We build a single regex to prevent cascading replacements (e.g. 'payment' -> 'pay-ment' -> 'p_ay-ment')
-    const combinedPattern = new RegExp(
-      '\\b(' + RESTRICTED_WORDS_MAP.map(item => item.word).join('|') + ')\\b',
-      'gi'
-    );
+    RESTRICTED_WORDS_MAP.forEach(item => {
+      // 1. Clean / Stealth Obfuscation
+      item.pattern.lastIndex = 0;
+      cleanText = cleanText.replace(item.pattern, (match) => {
+        // Ensure we only add ONE symbol for medium level to prevent p_y-me-nt
+        if (stealthLevel === 'medium' && match.length > 2) {
+          const separators = ['_', '-', ' '];
+          const sep = separators[Math.floor(Math.random() * separators.length)];
+          const insertPos = 1; // Always insert exactly after the first character
+          return match.slice(0, insertPos) + sep + match.slice(insertPos);
+        }
+        return getObfuscatedWord(match, stealthLevel);
+      });
 
-    cleanText = cleanText.replace(combinedPattern, (match) => {
-      const lowerMatch = match.toLowerCase();
-      // Ensure we only add ONE symbol for medium level to prevent p_y-me-nt
-      if (stealthLevel === 'medium' && match.length > 2) {
-        const separators = ['_', '-', ' '];
-        const sep = separators[Math.floor(Math.random() * separators.length)];
-        const insertPos = 1; // Always insert exactly after the first character
-        return match.slice(0, insertPos) + sep + match.slice(insertPos);
-      }
-      return getObfuscatedWord(lowerMatch, stealthLevel);
-    });
-
-    profRewrite = profRewrite.replace(combinedPattern, (match) => {
-      const lowerMatch = match.toLowerCase();
-      const rule = RESTRICTED_WORDS_MAP.find(item => item.word === lowerMatch);
-      return rule ? rule.professional : match;
+      // 2. Professional Replacement
+      item.pattern.lastIndex = 0;
+      profRewrite = profRewrite.replace(item.pattern, (match) => {
+        return item.professional;
+      });
     });
 
     // Formal template
@@ -479,12 +480,19 @@ export default function MessageHelperPage() {
   const renderHighlightedText = (text: string) => {
     if (!text) return <span className="text-gray-550 italic">Analysis visualization output will display here...</span>;
     
-    // Split text by spaces and check matches
+    // Split text by spaces (including formatting)
     const words = text.split(/(\s+)/);
     return words.map((chunk, idx) => {
+      if (/^\s+$/.test(chunk)) return chunk;
+
       // Clean word check
       const cleanChunk = chunk.toLowerCase().replace(/[.,/#!$%^&*;:{}=\-_`~()]/g, '');
-      const isRestricted = RESTRICTED_WORDS_MAP.some(item => item.word === cleanChunk);
+      
+      // Check if it's a restricted word (raw)
+      const isRestricted = RESTRICTED_WORDS_MAP.some(item => {
+        item.pattern.lastIndex = 0;
+        return item.pattern.test(cleanChunk);
+      });
       
       if (isRestricted) {
         return (
@@ -510,8 +518,10 @@ export default function MessageHelperPage() {
       const latinizedChunk = cleanChunk.split('').map(c => cyrillicToLatinMap[c] || c).join('');
       
       const matchesRestrictedBase = RESTRICTED_WORDS_MAP.some(item => {
-        const base = item.word;
-        return base === strippedDelimiter || base === strippedZeroWidth || base === latinizedChunk;
+        item.pattern.lastIndex = 0;
+        return item.pattern.test(strippedDelimiter) || 
+               item.pattern.test(strippedZeroWidth) || 
+               item.pattern.test(latinizedChunk);
       });
 
       const isObfuscated = (isZeroWidth || isHomoglyph || hasDelimiters) && matchesRestrictedBase;
@@ -648,7 +658,10 @@ export default function MessageHelperPage() {
 
             <textarea
               value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
+              onChange={(e) => {
+                setInputText(e.target.value);
+                soundSynth.playClick();
+              }}
               placeholder="Paste or type your developer update draft here..."
               rows={8}
               className={helperStyles.textarea}
@@ -750,12 +763,12 @@ export default function MessageHelperPage() {
           {inputText && (
             <div className={helperStyles.toneWrapper}>
               <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-glass-border pb-3 gap-3">
-                <div className="flex flex-wrap gap-2">
+                <div className="flex gap-2 overflow-x-auto whitespace-nowrap scrollbar-none flex-nowrap shrink-0 max-w-full pb-1">
                   {(['original', 'professional', 'short', 'formal', 'friendly', 'grammar', 'clean'] as const).map((tab) => (
                     <button
                       key={tab}
                       onClick={() => setActiveTab(tab)}
-                      className={activeTab === tab ? helperStyles.toneBtnActive : helperStyles.toneBtnInactive}
+                      className={`shrink-0 ${activeTab === tab ? helperStyles.toneBtnActive : helperStyles.toneBtnInactive}`}
                     >
                       {tab}
                     </button>

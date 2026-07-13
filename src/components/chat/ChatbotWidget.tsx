@@ -3,13 +3,14 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { db } from '@/lib/firebase';
-import { collection, query, where, or, onSnapshot, addDoc, orderBy, serverTimestamp, getDocs, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, query, where, or, onSnapshot, addDoc, orderBy, serverTimestamp, getDocs, doc, updateDoc, deleteDoc, setDoc } from 'firebase/firestore';
 import { MessageCircle, X, Send, User, ChevronLeft, Phone, Video, Bot, Sparkles, Trash2, Search } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useWorkspaceStore } from '@/store/workspaceStore';
 import { useCall } from '@/context/CallContext';
 import { useChat } from '@ai-sdk/react';
 import toast from 'react-hot-toast';
+import { soundSynth } from '@/lib/sounds';
 
 interface ChatMessage {
   id: string;
@@ -19,11 +20,21 @@ interface ChatMessage {
   text: string;
   timestamp: any;
   readStatus: boolean;
+  isGroup?: boolean;
 }
+
+const showDesktopNotification = (title: string, body: string) => {
+  if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+    new Notification(title, {
+      body,
+      icon: '/favicon.ico'
+    });
+  }
+};
 
 export default function ChatbotWidget() {
   const { user, dbUser } = useAuth();
-  const { startCall } = useCall();
+  const { startCall, joinGroupCall, activeGroupCalls } = useCall();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
@@ -34,6 +45,19 @@ export default function ChatbotWidget() {
   const [isEmojiOpen, setIsEmojiOpen] = useState(false);
   const [threadSearchQuery, setThreadSearchQuery] = useState('');
   const [isThreadSearchOpen, setIsThreadSearchOpen] = useState(false);
+  
+  // Group & Meeting states
+  const [groups, setGroups] = useState<any[]>([]);
+  const [meetings, setMeetings] = useState<any[]>([]);
+  const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
+  const [isScheduleMeetingOpen, setIsScheduleMeetingOpen] = useState(false);
+  const [newGroupName, setNewGroupName] = useState('');
+  const [selectedGroupMembers, setSelectedGroupMembers] = useState<string[]>([]);
+  const [newMeetingTitle, setNewMeetingTitle] = useState('');
+  const [newMeetingDesc, setNewMeetingDesc] = useState('');
+  const [newMeetingDateTime, setNewMeetingDateTime] = useState('');
+  const [selectedMeetingInvitees, setSelectedMeetingInvitees] = useState<string[]>([]);
+
   const emojiRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -81,40 +105,133 @@ export default function ChatbotWidget() {
     }
   }, [isOpen, allUsers.length]);
 
+  // Listen for real-time messages (entire collection to support group chats)
   useEffect(() => {
     if (!user) return;
-
-    let q;
-    if (isAdminOrSuperAdmin) {
-      q = query(
-        collection(db, 'chats'),
-        orderBy('timestamp', 'asc')
-      );
-    } else {
-      q = query(
-        collection(db, 'chats'),
-        or(
-          where('senderUid', '==', user.uid),
-          where('receiverUid', '==', user.uid)
-        )
-      );
-    }
     
+    const q = query(
+      collection(db, 'chats'),
+      orderBy('timestamp', 'asc')
+    );
+    
+    let isFirstLoad = true;
     const unsubscribe = onSnapshot(q, (snapshot) => {
       let msgs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ChatMessage));
       
-      if (!isAdminOrSuperAdmin) {
-        msgs.sort((a, b) => {
-          const timeA = a.timestamp?.seconds || 0;
-          const timeB = b.timestamp?.seconds || 0;
-          return timeA - timeB;
+      msgs.sort((a, b) => {
+        const timeA = a.timestamp?.seconds || 0;
+        const timeB = b.timestamp?.seconds || 0;
+        return timeA - timeB;
+      });
+
+      // Notification Logic
+      if (!isFirstLoad) {
+        snapshot.docChanges().forEach(change => {
+          if (change.type === 'added') {
+            const data = change.doc.data() as ChatMessage;
+            const myId = isAdminOrSuperAdmin ? 'admin' : user.uid;
+            if (data.senderUid !== myId && data.senderUid !== user.uid) {
+              showDesktopNotification(data.senderName || 'New Message', data.text);
+            }
+          }
         });
+      } else {
+        isFirstLoad = false;
       }
+
       setMessages(msgs);
     });
     
     return () => unsubscribe();
   }, [user, isAdminOrSuperAdmin]);
+
+  // Listen for Groups
+  useEffect(() => {
+    if (!user) return;
+    const q = query(collection(db, 'groups'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const allGroups = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+      const myId = user.uid;
+      const filtered = allGroups.filter(g => 
+        g.members?.includes(myId) || 
+        g.createdById === myId ||
+        isAdminOrSuperAdmin
+      );
+      setGroups(filtered);
+    });
+    return () => unsubscribe();
+  }, [user, isAdminOrSuperAdmin]);
+
+  // Listen for Meetings
+  useEffect(() => {
+    if (!user) return;
+    const q = query(collection(db, 'meetings'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const allMeetings = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+      const myId = user.uid;
+      const filtered = allMeetings.filter(m => 
+        m.invitees?.includes(myId) || 
+        m.createdById === myId ||
+        isAdminOrSuperAdmin
+      );
+      setMeetings(filtered);
+    });
+    return () => unsubscribe();
+  }, [user, isAdminOrSuperAdmin]);
+
+  const handleCreateGroup = async () => {
+    if (!user) return;
+    if (!newGroupName.trim()) {
+      toast.error('Please enter a group name');
+      return;
+    }
+    try {
+      const newGroupId = 'group_' + Math.random().toString(36).substring(2);
+      await setDoc(doc(db, 'groups', newGroupId), {
+        id: newGroupId,
+        name: newGroupName,
+        members: [...selectedGroupMembers, user.uid],
+        createdById: user.uid,
+        createdAt: new Date().getTime()
+      });
+      setNewGroupName('');
+      setSelectedGroupMembers([]);
+      setIsCreateGroupOpen(false);
+      toast.success('Group created successfully!');
+    } catch (err) {
+      console.error('Error creating group:', err);
+      toast.error('Failed to create group');
+    }
+  };
+
+  const handleScheduleMeeting = async () => {
+    if (!user) return;
+    if (!newMeetingTitle.trim() || !newMeetingDateTime) {
+      toast.error('Please enter a title and date/time');
+      return;
+    }
+    try {
+      const newMeetingId = 'meeting_' + Math.random().toString(36).substring(2);
+      await setDoc(doc(db, 'meetings', newMeetingId), {
+        id: newMeetingId,
+        title: newMeetingTitle,
+        description: newMeetingDesc,
+        dateTime: newMeetingDateTime,
+        invitees: [...selectedMeetingInvitees, user.uid],
+        createdById: user.uid,
+        createdAt: new Date().getTime()
+      });
+      setNewMeetingTitle('');
+      setNewMeetingDesc('');
+      setNewMeetingDateTime('');
+      setSelectedMeetingInvitees([]);
+      setIsScheduleMeetingOpen(false);
+      toast.success('Meeting scheduled successfully!');
+    } catch (err) {
+      console.error('Error scheduling meeting:', err);
+      toast.error('Failed to schedule meeting');
+    }
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -135,6 +252,7 @@ export default function ChatbotWidget() {
     });
 
     messages.forEach(m => {
+      if (m.isGroup || m.receiverUid?.startsWith('group_') || m.receiverUid?.startsWith('meeting_')) return;
       const myId = isAdminOrSuperAdmin ? 'admin' : user.uid;
       const amISender = m.senderUid === myId || m.senderUid === user.uid;
       const amIReceiver = m.receiverUid === myId || m.receiverUid === user.uid;
@@ -236,14 +354,17 @@ export default function ChatbotWidget() {
 
     let receiver = activeChatUser;
 
+    const isGroup = activeChatUser.startsWith('group_') || activeChatUser.startsWith('meeting_');
+
     try {
       await addDoc(collection(db, 'chats'), {
-        senderUid: (isAdminOrSuperAdmin && receiver !== 'admin') ? 'admin' : user.uid, 
-        senderName: (isAdminOrSuperAdmin && receiver !== 'admin') ? 'Support Team' : (dbUser?.name || user.email || 'User'),
+        senderUid: (isAdminOrSuperAdmin && receiver !== 'admin' && !isGroup) ? 'admin' : user.uid, 
+        senderName: (isAdminOrSuperAdmin && receiver !== 'admin' && !isGroup) ? 'Support Team' : (dbUser?.name || user.email || 'User'),
         receiverUid: receiver,
         text: msgText,
         timestamp: serverTimestamp(),
-        readStatus: false
+        readStatus: false,
+        isGroup: isGroup
       });
 
       // AI Auto-reply for Support
@@ -379,6 +500,9 @@ export default function ChatbotWidget() {
       ? aiDisplayMessages
       : activeChatUser
         ? messages.filter(m => {
+            if (activeChatUser.startsWith('group_') || activeChatUser.startsWith('meeting_')) {
+              return m.receiverUid === activeChatUser;
+            }
             const myId = isAdminOrSuperAdmin ? 'admin' : (user?.uid || '');
             const amISender = m.senderUid === myId || m.senderUid === user?.uid;
             const amIReceiver = m.receiverUid === myId || m.receiverUid === user?.uid;
@@ -427,24 +551,37 @@ export default function ChatbotWidget() {
               <div className="flex items-center gap-1.5 shrink-0">
                 {activeChatUser && activeChatUser !== 'ai_assistant' && (
                   <>
-                    <button
-                      onClick={() => {
-                        startCall(activeChatUser, activeChatName, 'audio');
-                      }}
-                      className="p-1 hover:bg-black/10 rounded transition-all hover:scale-105 text-black"
-                      title="Audio Call"
-                    >
-                      <Phone className="w-4.5 h-4.5" />
-                    </button>
-                    <button
-                      onClick={() => {
-                        startCall(activeChatUser, activeChatName, 'video');
-                      }}
-                      className="p-1 hover:bg-black/10 rounded transition-all hover:scale-105 text-black"
-                      title="Video Call"
-                    >
-                      <Video className="w-4.5 h-4.5" />
-                    </button>
+                    {activeGroupCalls?.some((call: any) => call.id === activeChatUser) ? (
+                      <button
+                        onClick={() => {
+                          joinGroupCall(activeChatUser, activeChatName);
+                        }}
+                        className="bg-red-600 hover:bg-red-500 text-white text-[10px] font-bold px-2.5 py-1.5 rounded-xl uppercase tracking-wider glow-red cursor-pointer mr-1 animate-pulse"
+                      >
+                        Join Call
+                      </button>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => {
+                            startCall(activeChatUser, activeChatName, 'audio');
+                          }}
+                          className="p-1 hover:bg-black/10 rounded transition-all hover:scale-105 text-black"
+                          title="Audio Call"
+                        >
+                          <Phone className="w-4.5 h-4.5" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            startCall(activeChatUser, activeChatName, 'video');
+                          }}
+                          className="p-1 hover:bg-black/10 rounded transition-all hover:scale-105 text-black"
+                          title="Video Call"
+                        >
+                          <Video className="w-4.5 h-4.5" />
+                        </button>
+                      </>
+                    )}
                     <button
                       onClick={() => {
                         setIsThreadSearchOpen(!isThreadSearchOpen);
@@ -493,38 +630,156 @@ export default function ChatbotWidget() {
               </div>
             )}
 
-            {/* Body */}
             <div className="flex-1 overflow-y-auto bg-gray-950/50 p-4 flex flex-col gap-3">
               {!activeChatUser ? (
-                // User Directory
-                <div className="flex flex-col gap-2">
-                  {chatList.length === 0 ? (
-                    <p className="text-gray-500 text-center text-sm mt-10">No users found.</p>
-                  ) : (
-                    chatList.map(c => (
-                      <div key={c.uid} className="relative group flex items-center">
-                        <button 
-                          onClick={() => { setActiveChatUser(c.uid); setActiveChatName(c.name); }}
-                          className={`flex-1 flex items-center justify-between p-3 rounded-xl border border-glass-border transition-colors text-left ${c.uid === 'ai_assistant' ? 'bg-green-500/10 hover:bg-green-500/20 border-green-500/20' : 'bg-gray-900 hover:bg-gray-800'}`}
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${c.uid === 'ai_assistant' ? 'bg-green-500 text-black' : 'bg-brand-green/20'}`}>
-                              {c.uid === 'ai_assistant' ? <Bot className="w-5 h-5" /> : <User className="w-5 h-5 text-brand-green" />}
-                            </div>
-                            <div>
-                              <p className={`font-medium text-sm ${c.uid === 'ai_assistant' ? 'text-green-400 font-bold' : 'text-white'}`}>{c.name}</p>
-                              <p className="text-gray-400 text-xs truncate max-w-[180px]">
-                                {c.lastMessage || 'Tap to reply'}
-                              </p>
-                            </div>
+                // User Directory (Categorized)
+                <div className="flex flex-col gap-4">
+                  {/* AI Assistant */}
+                  <div className="flex flex-col gap-2">
+                    <h3 className="text-gray-500 font-bold uppercase tracking-wider text-[10px] text-left">AI Assistant</h3>
+                    {chatList.filter(c => c.uid === 'ai_assistant').map(c => (
+                      <button 
+                        key={c.uid}
+                        onClick={() => { setActiveChatUser(c.uid); setActiveChatName(c.name); }}
+                        className="flex items-center justify-between p-3 rounded-xl border border-glass-border transition-colors text-left bg-green-500/10 hover:bg-green-500/20 border-green-500/20 w-full"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full flex items-center justify-center bg-green-500 text-black">
+                            <Bot className="w-5 h-5" />
                           </div>
-                          {c.unread > 0 && (
-                            <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
-                              {c.unread}
-                            </span>
-                          )}
-                        </button>
-                        {c.uid !== 'ai_assistant' && (
+                          <div>
+                            <p className="font-bold text-sm text-green-400">{c.name}</p>
+                            <p className="text-gray-400 text-xs truncate max-w-[180px]">
+                              {c.lastMessage || 'Tap to reply'}
+                            </p>
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Group Channels */}
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-gray-500 font-bold uppercase tracking-wider text-[10px] text-left">Group Channels</h3>
+                      <button 
+                        onClick={() => setIsCreateGroupOpen(true)}
+                        className="text-[10px] text-brand-green hover:underline uppercase font-bold tracking-wider"
+                      >
+                        + Create
+                      </button>
+                    </div>
+                    {groups.length === 0 ? (
+                      <p className="text-gray-600 text-[11px] italic text-left px-1">No groups created yet.</p>
+                    ) : (
+                      groups.map(g => {
+                        const isCallActive = activeGroupCalls?.some((call: any) => call.id === g.id);
+                        return (
+                          <div key={g.id} className="relative group flex items-center w-full">
+                            <button 
+                              onClick={() => { setActiveChatUser(g.id); setActiveChatName(g.name); }}
+                              className="flex-1 flex items-center justify-between p-3 rounded-xl border border-glass-border bg-gray-900 hover:bg-gray-800 transition-colors text-left"
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full flex items-center justify-center bg-purple-500/20 text-purple-400 border border-purple-500/35 font-bold text-sm">
+                                  G
+                                </div>
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <p className="font-bold text-sm text-white">{g.name}</p>
+                                    {isCallActive && (
+                                      <span className="w-2 h-2 rounded-full bg-red-550 animate-pulse" title="Active Call" />
+                                    )}
+                                  </div>
+                                  <p className="text-gray-450 text-[11px] truncate max-w-[180px]">
+                                    {g.members?.length || 0} members
+                                  </p>
+                                </div>
+                              </div>
+                              {isCallActive && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    joinGroupCall(g.id, g.name);
+                                  }}
+                                  className="bg-red-600 hover:bg-red-500 text-white text-[9px] font-bold px-2 py-1 rounded-lg uppercase tracking-wider glow-red cursor-pointer z-10 shrink-0"
+                                >
+                                  Join Call
+                                </button>
+                              )}
+                            </button>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+
+                  {/* Meetings Schedule */}
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-gray-500 font-bold uppercase tracking-wider text-[10px] text-left">Meetings Schedule</h3>
+                      <button 
+                        onClick={() => setIsScheduleMeetingOpen(true)}
+                        className="text-[10px] text-brand-green hover:underline uppercase font-bold tracking-wider"
+                      >
+                        + Schedule
+                      </button>
+                    </div>
+                    {meetings.length === 0 ? (
+                      <p className="text-gray-600 text-[11px] italic text-left px-1">No meetings scheduled.</p>
+                    ) : (
+                      meetings.map(m => (
+                        <div key={m.id} className="p-3 rounded-xl border border-purple-500/20 bg-purple-950/10 flex flex-col gap-2 text-left">
+                          <div>
+                            <p className="font-bold text-xs text-white uppercase tracking-wider">{m.title}</p>
+                            <p className="text-gray-400 text-[11px] mt-0.5">{m.description || 'No description'}</p>
+                            <p className="text-purple-400 text-[10px] font-mono mt-1">
+                              {new Date(m.dateTime).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => {
+                              joinGroupCall(m.id, `Meeting: ${m.title}`);
+                            }}
+                            className="w-full bg-purple-600/25 border border-purple-500/35 text-purple-300 py-1.5 rounded-xl text-[10px] font-bold tracking-wider uppercase hover:bg-purple-600 hover:text-white transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                          >
+                            <Video className="w-3.5 h-3.5" />
+                            <span>Join Meeting Call</span>
+                          </button>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  {/* Direct Messages */}
+                  <div className="flex flex-col gap-2">
+                    <h3 className="text-gray-500 font-bold uppercase tracking-wider text-[10px] text-left">Direct Messages</h3>
+                    {chatList.filter(c => c.uid !== 'ai_assistant').length === 0 ? (
+                      <p className="text-gray-650 text-xs italic text-left px-1">No chats yet.</p>
+                    ) : (
+                      chatList.filter(c => c.uid !== 'ai_assistant').map(c => (
+                        <div key={c.uid} className="relative group flex items-center w-full">
+                          <button 
+                            onClick={() => { setActiveChatUser(c.uid); setActiveChatName(c.name); }}
+                            className="flex-1 flex items-center justify-between p-3 rounded-xl border border-glass-border bg-gray-900 hover:bg-gray-800 transition-colors text-left"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-full flex items-center justify-center bg-brand-green/20 text-brand-green">
+                                <User className="w-5 h-5 text-brand-green" />
+                              </div>
+                              <div>
+                                <p className="font-medium text-sm text-white">{c.name}</p>
+                                <p className="text-gray-400 text-xs truncate max-w-[180px]">
+                                  {c.lastMessage || 'Tap to reply'}
+                                </p>
+                              </div>
+                            </div>
+                            {c.unread > 0 && (
+                              <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                                {c.unread}
+                              </span>
+                            )}
+                          </button>
                           <button
                             onClick={(e) => handleDeleteConversation(e, c.uid)}
                             className="absolute right-3 opacity-0 group-hover:opacity-100 p-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 hover:scale-105 transition-all z-10"
@@ -532,10 +787,10 @@ export default function ChatbotWidget() {
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
-                        )}
-                      </div>
-                    ))
-                  )}
+                        </div>
+                      ))
+                    )}
+                  </div>
                 </div>
               ) : (
                 // Chat Thread
@@ -625,7 +880,10 @@ export default function ChatbotWidget() {
                     ref={inputRef}
                     type="text"
                     value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
+                    onChange={(e) => {
+                      setNewMessage(e.target.value);
+                      soundSynth.playClick();
+                    }}
                     placeholder="Type a message..."
                     disabled={activeChatUser === 'ai_assistant' && aiStatus === 'submitted'}
                     className="flex-1 bg-gray-950 border border-gray-800 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-brand-green transition-colors disabled:opacity-50"
@@ -649,6 +907,133 @@ export default function ChatbotWidget() {
                     <Send className="w-4 h-4" />
                   </button>
                 </form>
+              </div>
+            )}
+            {/* Create Group Modal */}
+            {isCreateGroupOpen && (
+              <div className="absolute inset-0 bg-gray-950/95 z-[60] flex flex-col p-4">
+                <div className="flex items-center justify-between border-b border-glass-border pb-2.5 mb-4">
+                  <h3 className="font-bold text-sm text-white">Create Group Channel</h3>
+                  <button onClick={() => setIsCreateGroupOpen(false)} className="text-gray-400 hover:text-white cursor-pointer">
+                    <X className="w-4.5 h-4.5" />
+                  </button>
+                </div>
+                <div className="space-y-4 flex-1 overflow-y-auto">
+                  <div className="space-y-1.5 text-left">
+                    <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wider">Group Name</label>
+                    <input
+                      type="text"
+                      value={newGroupName}
+                      onChange={e => setNewGroupName(e.target.value)}
+                      placeholder="e.g. Code commandos team"
+                      className="w-full bg-gray-900 border border-gray-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-brand-green"
+                    />
+                  </div>
+                  <div className="space-y-2 text-left">
+                    <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wider">Select Members</label>
+                    <div className="space-y-2 max-h-[220px] overflow-y-auto border border-gray-900 p-2.5 rounded-xl">
+                      {allUsers.filter(u => u.firebaseUid !== user.uid).map(u => {
+                        const isSelected = selectedGroupMembers.includes(u.firebaseUid);
+                        return (
+                          <label key={u.firebaseUid} className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-gray-800 transition-colors cursor-pointer text-xs text-gray-300">
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => {
+                                if (isSelected) {
+                                  setSelectedGroupMembers(prev => prev.filter(uid => uid !== u.firebaseUid));
+                                } else {
+                                  setSelectedGroupMembers(prev => [...prev, u.firebaseUid]);
+                                }
+                              }}
+                              className="rounded border-gray-800 text-brand-green focus:ring-brand-green bg-gray-900"
+                            />
+                            <span>{u.name || u.email}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={handleCreateGroup}
+                  className="w-full mt-4 bg-brand-green hover:bg-brand-green-hover text-black py-2.5 rounded-xl text-xs font-bold tracking-wider uppercase transition-colors cursor-pointer"
+                >
+                  Create Group
+                </button>
+              </div>
+            )}
+
+            {/* Schedule Meeting Modal */}
+            {isScheduleMeetingOpen && (
+              <div className="absolute inset-0 bg-gray-950/95 z-[60] flex flex-col p-4">
+                <div className="flex items-center justify-between border-b border-glass-border pb-2.5 mb-4">
+                  <h3 className="font-bold text-sm text-white">Schedule Meeting</h3>
+                  <button onClick={() => setIsScheduleMeetingOpen(false)} className="text-gray-400 hover:text-white cursor-pointer">
+                    <X className="w-4.5 h-4.5" />
+                  </button>
+                </div>
+                <div className="space-y-3 flex-1 overflow-y-auto">
+                  <div className="space-y-1 text-left">
+                    <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wider">Meeting Title</label>
+                    <input
+                      type="text"
+                      value={newMeetingTitle}
+                      onChange={e => setNewMeetingTitle(e.target.value)}
+                      placeholder="e.g. Daily Standup / Sync"
+                      className="w-full bg-gray-900 border border-gray-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-brand-green"
+                    />
+                  </div>
+                  <div className="space-y-1 text-left">
+                    <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wider">Description</label>
+                    <textarea
+                      value={newMeetingDesc}
+                      onChange={e => setNewMeetingDesc(e.target.value)}
+                      placeholder="Agenda, notes..."
+                      className="w-full bg-gray-900 border border-gray-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-brand-green h-12 resize-none"
+                    />
+                  </div>
+                  <div className="space-y-1 text-left">
+                    <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wider">Date & Time</label>
+                    <input
+                      type="datetime-local"
+                      value={newMeetingDateTime}
+                      onChange={e => setNewMeetingDateTime(e.target.value)}
+                      className="w-full bg-gray-900 border border-gray-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-brand-green"
+                    />
+                  </div>
+                  <div className="space-y-2 text-left">
+                    <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wider">Invite Members</label>
+                    <div className="space-y-2 max-h-[100px] overflow-y-auto border border-gray-900 p-2 rounded-xl">
+                      {allUsers.filter(u => u.firebaseUid !== user.uid).map(u => {
+                        const isSelected = selectedMeetingInvitees.includes(u.firebaseUid);
+                        return (
+                          <label key={u.firebaseUid} className="flex items-center gap-2.5 p-1.5 rounded-lg hover:bg-gray-800 transition-colors cursor-pointer text-xs text-gray-300">
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => {
+                                if (isSelected) {
+                                  setSelectedMeetingInvitees(prev => prev.filter(uid => uid !== u.firebaseUid));
+                                } else {
+                                  setSelectedMeetingInvitees(prev => [...prev, u.firebaseUid]);
+                                }
+                              }}
+                              className="rounded border-gray-800 text-brand-green focus:ring-brand-green bg-gray-900"
+                            />
+                            <span>{u.name || u.email}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={handleScheduleMeeting}
+                  className="w-full mt-4 bg-brand-green hover:bg-brand-green-hover text-black py-2.5 rounded-xl text-xs font-bold tracking-wider uppercase transition-colors cursor-pointer"
+                >
+                  Schedule Meeting
+                </button>
               </div>
             )}
           </motion.div>

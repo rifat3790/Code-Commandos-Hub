@@ -210,6 +210,14 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   }, [pathname]);
 
   useEffect(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      if (Notification.permission === 'default') {
+        Notification.requestPermission();
+      }
+    }
+  }, []);
+
+  useEffect(() => {
     if (typeof window === 'undefined') return;
 
     const handleGlobalKeyDown = (e: KeyboardEvent) => {

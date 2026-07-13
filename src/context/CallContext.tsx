@@ -3,8 +3,8 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { useAuth } from './AuthContext';
 import { db } from '@/lib/firebase';
-import { collection, doc, addDoc, setDoc, updateDoc, onSnapshot, query, where, limit } from 'firebase/firestore';
-import { Phone, PhoneOff, Mic, MicOff, Video, VideoOff, ScreenShare, Volume2, Maximize } from 'lucide-react';
+import { collection, doc, addDoc, setDoc, updateDoc, onSnapshot, query, where, limit, getDoc } from 'firebase/firestore';
+import { Phone, PhoneOff, Mic, MicOff, Video, VideoOff, ScreenShare, Volume2, Maximize, Minimize2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface CallContextType {
@@ -22,6 +22,8 @@ interface CallContextType {
   isScreenSharing: boolean;
   toggleScreenShare: () => Promise<void>;
   screenSharerUid: string | null;
+  activeGroupCalls: any[];
+  joinGroupCall: (groupId: string, groupName: string) => Promise<void>;
 }
 
 const CallContext = createContext<CallContextType | undefined>(undefined);
@@ -110,6 +112,53 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   const [callDuration, setCallDuration] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [screenSharerUid, setScreenSharerUid] = useState<string | null>(null);
+  const [isCallMinimized, setIsCallMinimized] = useState(false);
+  const [activeGroupCalls, setActiveGroupCalls] = useState<any[]>([]);
+  const [groupCallParticipants, setGroupCallParticipants] = useState<string[]>([]);
+  const [allUsers, setAllUsers] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!user) return;
+    async function fetchUsers() {
+      try {
+        const res = await fetch('/api/admin/users');
+        if (res.ok) {
+          const data = await res.json();
+          setAllUsers(data.users || []);
+        }
+      } catch (err) {
+        console.error('Error fetching users in call context:', err);
+      }
+    }
+    fetchUsers();
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    const q = query(
+      collection(db, 'groupCalls'),
+      where('status', '==', 'active')
+    );
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const calls = snapshot.docs.map(doc => doc.data());
+      setActiveGroupCalls(calls);
+    });
+    return () => unsubscribe();
+  }, [user]);
+
+  useEffect(() => {
+    if (!activeCall?.isGroupCall) {
+      setGroupCallParticipants([]);
+      return;
+    }
+    const unsubscribe = onSnapshot(doc(db, 'groupCalls', activeCall.id), (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+        setGroupCallParticipants(data.activeParticipants || []);
+      }
+    });
+    return () => unsubscribe();
+  }, [activeCall]);
 
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
   const videoGridRef = useRef<HTMLDivElement>(null);
@@ -199,6 +248,13 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       if (new Date().getTime() - docData.createdAt < 45000) {
         setIncomingCall(docData);
         setCallState('ringing');
+        if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+          new Notification(`Incoming Call from ${docData.callerName}`, {
+            body: `Answer the call to start sharing screen or video.`,
+            icon: '/favicon.ico',
+            requireInteraction: true
+          });
+        }
       }
     });
 
@@ -287,6 +343,48 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       alert("Your calling and screen sharing permissions have been disabled by an administrator.");
       return;
     }
+
+    const isGroupCall = receiverUid.startsWith('group_') || receiverUid.startsWith('meeting_');
+    if (isGroupCall) {
+      setCallState('connected');
+      setIsVideoMuted(type === 'audio');
+      let stream: MediaStream | null = null;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ 
+          audio: true, 
+          video: type === 'video' 
+        });
+        setLocalStream(stream);
+      } catch (err) {
+        console.warn("Media access failed:", err);
+      }
+
+      const session = {
+        id: receiverUid,
+        callerUid: user.uid,
+        callerName: dbUser?.name || 'Developer',
+        receiverUid: receiverUid,
+        receiverName: receiverName,
+        type: type,
+        isGroupCall: true,
+        createdAt: new Date().getTime()
+      };
+      setActiveCall(session);
+
+      try {
+        await setDoc(doc(db, 'groupCalls', receiverUid), {
+          id: receiverUid,
+          name: receiverName,
+          activeParticipants: [user.uid],
+          createdAt: new Date().getTime(),
+          status: 'active'
+        });
+      } catch (err) {
+        console.error("Error creating group call doc:", err);
+      }
+      return;
+    }
+
     setCallState('calling');
     setIsVideoMuted(type === 'audio');
 
@@ -559,29 +657,92 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   const endCall = async () => {
     const targetCall = activeCall || incomingCall;
     if (targetCall) {
-      try {
-        await updateDoc(doc(db, 'calls', targetCall.id), { status: 'ended' });
-
-        const myUid = isAdminOrSuperAdmin ? 'admin' : user?.uid;
-        if (callState === 'calling' && targetCall.callerUid === myUid) {
-          await addDoc(collection(db, 'notifications'), {
-            userId: targetCall.receiverUid,
-            title: 'Missed Call',
-            message: `You missed a call from ${targetCall.callerName}`,
-            type: 'missed_call',
-            read: false,
-            createdAt: new Date().getTime(),
-            actionData: {
-              callerUid: targetCall.callerUid,
-              callerName: targetCall.callerName,
+      if (targetCall.isGroupCall) {
+        try {
+          const callRef = doc(db, 'groupCalls', targetCall.id);
+          const docSnap = await getDoc(callRef);
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            const currentParts = data.activeParticipants || [];
+            const updatedParts = currentParts.filter((uid: string) => uid !== user?.uid);
+            if (updatedParts.length === 0) {
+              await updateDoc(callRef, { activeParticipants: [], status: 'ended' });
+            } else {
+              await updateDoc(callRef, { activeParticipants: updatedParts });
             }
-          });
+          }
+        } catch (err) {
+          console.error("Error leaving group call:", err);
         }
-      } catch (err) {
-        console.error(err);
+      } else {
+        try {
+          await updateDoc(doc(db, 'calls', targetCall.id), { status: 'ended' });
+
+          const myUid = isAdminOrSuperAdmin ? 'admin' : user?.uid;
+          if (callState === 'calling' && targetCall.callerUid === myUid) {
+            await addDoc(collection(db, 'notifications'), {
+              userId: targetCall.receiverUid,
+              title: 'Missed Call',
+              message: `You missed a call from ${targetCall.callerName}`,
+              type: 'missed_call',
+              read: false,
+              createdAt: new Date().getTime(),
+              actionData: {
+                callerUid: targetCall.callerUid,
+                callerName: targetCall.callerName,
+              }
+            });
+          }
+        } catch (err) {
+          console.error(err);
+        }
       }
     }
     cleanupCall('ended');
+  };
+
+  const joinGroupCall = async (groupId: string, groupName: string) => {
+    if (!user) return;
+    setCallState('connected');
+    setIsVideoMuted(false);
+    let stream: MediaStream | null = null;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: true, 
+        video: true 
+      });
+      setLocalStream(stream);
+    } catch (err) {
+      console.warn("Media access failed:", err);
+    }
+
+    const session = {
+      id: groupId,
+      callerUid: 'group',
+      callerName: 'Group Call',
+      receiverUid: groupId,
+      receiverName: groupName,
+      type: 'video',
+      isGroupCall: true,
+      createdAt: new Date().getTime()
+    };
+    setActiveCall(session);
+
+    try {
+      const callRef = doc(db, 'groupCalls', groupId);
+      const docSnap = await getDoc(callRef);
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        const currentParts = data.activeParticipants || [];
+        if (!currentParts.includes(user.uid)) {
+          await updateDoc(callRef, {
+            activeParticipants: [...currentParts, user.uid]
+          });
+        }
+      }
+    } catch (err) {
+      console.error("Error joining group call:", err);
+    }
   };
 
   const toggleMute = () => {
@@ -745,6 +906,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     setIsScreenSharing(false);
     setRemoteHasVideo(false);
     setScreenSharerUid(null);
+    setIsCallMinimized(false);
     
     if (finalState === 'ended' || finalState === 'declined') {
       setTimeout(() => {
@@ -760,7 +922,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <CallContext.Provider value={{ startCall, activeCall, callState, endCall, acceptCall, declineCall, incomingCall, isMuted, toggleMute, isVideoMuted, toggleVideo, isScreenSharing, toggleScreenShare, screenSharerUid }}>
+    <CallContext.Provider value={{ startCall, activeCall, callState, endCall, acceptCall, declineCall, incomingCall, isMuted, toggleMute, isVideoMuted, toggleVideo, isScreenSharing, toggleScreenShare, screenSharerUid, activeGroupCalls, joinGroupCall }}>
       {children}
       <audio ref={remoteAudioRef} style={{ display: 'none' }} />
 
@@ -881,95 +1043,172 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
-            className="fixed inset-0 bg-black/85 backdrop-blur-md z-[100] flex items-center justify-center p-4 md:p-6"
+            className={isCallMinimized 
+              ? "fixed bottom-6 right-6 z-[100] w-[340px] h-[260px] pointer-events-none" 
+              : "fixed inset-0 bg-black/85 backdrop-blur-md z-[100] flex items-center justify-center p-4 md:p-6"
+            }
           >
-            <div className="bg-gray-950 border border-purple-500/20 rounded-3xl w-full max-w-4xl h-[80vh] flex flex-col overflow-hidden relative shadow-[0_0_50px_rgba(168,85,247,0.25)]">
+            <div className={isCallMinimized
+              ? "bg-gray-950 border border-purple-500/30 rounded-2xl w-full h-full flex flex-col overflow-hidden relative shadow-2xl pointer-events-auto"
+              : "bg-gray-950 border border-purple-500/20 rounded-3xl w-full max-w-4xl h-[80vh] flex flex-col overflow-hidden relative shadow-[0_0_50px_rgba(168,85,247,0.25)]"
+            }>
               {/* Top Banner Info */}
-              <div className="absolute top-4 left-4 z-20 bg-black/60 backdrop-blur-md px-3.5 py-2 rounded-xl flex items-center gap-2 border border-glass-border">
-                <div className="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse" />
-                <span className="text-xs font-bold text-white">
-                  {activeCall.callerUid === (isAdminOrSuperAdmin ? 'admin' : user?.uid) ? activeCall.receiverName : activeCall.callerName}
-                </span>
-                <span className="text-[10px] text-purple-400 font-mono pl-1.5 border-l border-white/20">
-                  {formatDuration(callDuration)}
-                </span>
+              <div className="absolute top-4 left-4 right-4 z-20 flex items-center justify-between pointer-events-none">
+                <div className="bg-black/60 backdrop-blur-md px-3.5 py-2 rounded-xl flex items-center gap-2 border border-glass-border pointer-events-auto">
+                  <div className="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse" />
+                  <span className="text-xs font-bold text-white">
+                    {activeCall.callerUid === (isAdminOrSuperAdmin ? 'admin' : user?.uid) ? activeCall.receiverName : activeCall.callerName}
+                  </span>
+                  <span className="text-[10px] text-purple-400 font-mono pl-1.5 border-l border-white/20">
+                    {formatDuration(callDuration)}
+                  </span>
+                </div>
+                
+                {/* Minimize/Maximize button */}
+                <button
+                  onClick={() => setIsCallMinimized(!isCallMinimized)}
+                  className="bg-black/60 backdrop-blur-md p-2 rounded-xl border border-glass-border text-white hover:bg-purple-600/30 hover:border-purple-500/50 transition-all pointer-events-auto flex items-center justify-center"
+                  title={isCallMinimized ? "Maximize Call" : "Minimize Call"}
+                >
+                  {isCallMinimized ? <Maximize className="w-3.5 h-3.5" /> : <Minimize2 className="w-3.5 h-3.5" />}
+                </button>
               </div>
 
               {/* Video Grid Viewport */}
               <div ref={videoGridRef} className="flex-1 bg-black relative flex items-center justify-center overflow-hidden">
-                {/* Remote Video Stream (Main Feed) */}
-                <video
-                  ref={remoteVideoRef}
-                  autoPlay
-                  playsInline
-                  className="w-full h-full object-contain"
-                />
-
-                {/* Local Video Stream (Floating PIP) */}
-                <div className="absolute bottom-4 right-4 w-40 h-28 md:w-52 md:h-36 bg-gray-900 border border-purple-500/30 rounded-2xl overflow-hidden shadow-2xl z-10">
-                  <video
-                    ref={localVideoRef}
-                    autoPlay
-                    playsInline
-                    muted
-                    className={`w-full h-full object-cover ${isScreenSharing ? '' : 'scale-x-[-1]'}`}
-                  />
-                  {isVideoMuted && (
-                    <div className="absolute inset-0 bg-gray-950/80 flex flex-col items-center justify-center gap-1.5">
-                      <VideoOff className="w-6 h-6 text-gray-500" />
-                      <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Cam Off</span>
+                {activeCall?.isGroupCall ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full h-full p-4 bg-gray-950 overflow-y-auto pointer-events-auto">
+                    {/* Local Video Stream */}
+                    <div className="relative bg-gray-900 border border-purple-500/20 rounded-2xl overflow-hidden shadow-xl aspect-video flex items-center justify-center">
+                      <video
+                        ref={localVideoRef}
+                        autoPlay
+                        playsInline
+                        muted
+                        className={`w-full h-full object-cover ${isScreenSharing ? '' : 'scale-x-[-1]'}`}
+                      />
+                      {isVideoMuted && (
+                        <div className="absolute inset-0 bg-gray-950 flex flex-col items-center justify-center gap-1.5 z-10">
+                          <VideoOff className="w-8 h-8 text-gray-600 animate-pulse" />
+                          <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Camera Disabled</span>
+                        </div>
+                      )}
+                      <div className="absolute bottom-3 left-3 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-lg border border-glass-border">
+                        <span className="text-[10px] font-bold text-white">You (Local)</span>
+                      </div>
                     </div>
-                  )}
-                </div>
 
-                {isScreenSharing && (
-                  <div className="absolute top-4 right-4 z-20 bg-purple-600/90 text-white text-[10px] font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 animate-pulse">
-                    <ScreenShare className="w-3.5 h-3.5" />
-                    <span>Screen Sharing Active</span>
+                    {/* Other group participants */}
+                    {groupCallParticipants.filter(uid => uid !== user?.uid).map(uid => {
+                      const participantUser = allUsers.find(u => u.firebaseUid === uid || u.uid === uid);
+                      const name = participantUser?.name || participantUser?.email || 'Developer';
+                      return (
+                        <div key={uid} className="relative bg-gray-900 border border-glass-border rounded-2xl overflow-hidden shadow-xl aspect-video flex items-center justify-center">
+                          <div className="flex flex-col items-center justify-center gap-3">
+                            <div className="w-16 h-16 rounded-full bg-purple-500/10 border-2 border-purple-500/50 flex items-center justify-center text-purple-400 font-bold text-xl animate-pulse shadow-[0_0_15px_rgba(168,85,247,0.3)]">
+                              {name.charAt(0).toUpperCase()}
+                            </div>
+                            <span className="text-xs font-bold text-gray-300">{name}</span>
+                          </div>
+                          
+                          <div className="absolute bottom-3 left-3 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-lg border border-glass-border">
+                            <span className="text-[10px] font-bold text-green-400">Connected</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    
+                    {/* If alone in the call, show waiting placeholder */}
+                    {groupCallParticipants.length <= 1 && (
+                      <div className="relative bg-gray-900 border border-glass-border rounded-2xl overflow-hidden shadow-xl aspect-video flex items-center justify-center border-dashed">
+                        <div className="flex flex-col items-center justify-center gap-2">
+                          <span className="text-xs text-gray-500 italic">Waiting for others to join...</span>
+                          <span className="text-[10px] text-purple-400 font-mono">Room ID: {activeCall.id}</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
+                ) : (
+                  <>
+                    {/* Remote Video Stream (Main Feed) */}
+                    <video
+                      ref={remoteVideoRef}
+                      autoPlay
+                      playsInline
+                      className="w-full h-full object-contain"
+                    />
+
+                    {/* Local Video Stream (Floating PIP) */}
+                    {!isCallMinimized && (
+                      <div className="absolute bottom-4 right-4 w-40 h-28 md:w-52 md:h-36 bg-gray-900 border border-purple-500/30 rounded-2xl overflow-hidden shadow-2xl z-10">
+                        <video
+                          ref={localVideoRef}
+                          autoPlay
+                          playsInline
+                          muted
+                          className={`w-full h-full object-cover ${isScreenSharing ? '' : 'scale-x-[-1]'}`}
+                        />
+                        {isVideoMuted && (
+                          <div className="absolute inset-0 bg-gray-950/80 flex flex-col items-center justify-center gap-1.5">
+                            <VideoOff className="w-6 h-6 text-gray-500" />
+                            <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Cam Off</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {isScreenSharing && !isCallMinimized && (
+                      <div className="absolute top-4 right-4 z-20 bg-purple-600/90 text-white text-[10px] font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 animate-pulse">
+                        <ScreenShare className="w-3.5 h-3.5" />
+                        <span>Screen Sharing Active</span>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
 
               {/* Bottom Controls Bar */}
-              <div className="p-4 bg-gray-950 border-t border-glass-border flex justify-center gap-4 items-center shrink-0">
+              <div className={`${isCallMinimized ? 'p-2.5 gap-2' : 'p-4 gap-4'} bg-gray-950 border-t border-glass-border flex justify-center items-center shrink-0`}>
                 <button
                   onClick={toggleMute}
-                  className={`p-3 rounded-2xl border transition-all flex items-center justify-center ${isMuted ? 'bg-red-500/10 border-red-500 text-red-400 animate-pulse' : 'bg-gray-900 border-gray-800 text-gray-400 hover:text-white hover:bg-gray-800'}`}
+                  className={`${isCallMinimized ? 'p-2 rounded-xl' : 'p-3 rounded-2xl'} border transition-all flex items-center justify-center ${isMuted ? 'bg-red-500/10 border-red-500 text-red-400 animate-pulse' : 'bg-gray-900 border-gray-800 text-gray-400 hover:text-white hover:bg-gray-800'}`}
                   title={isMuted ? "Unmute Mic" : "Mute Mic"}
                 >
-                  {isMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+                  {isMuted ? <MicOff className={isCallMinimized ? "w-4 h-4" : "w-5 h-5"} /> : <Mic className={isCallMinimized ? "w-4 h-4" : "w-5 h-5"} />}
                 </button>
 
                 <button
                   onClick={toggleVideo}
-                  className={`p-3 rounded-2xl border transition-all flex items-center justify-center ${isVideoMuted ? 'bg-red-500/10 border-red-500 text-red-400' : 'bg-gray-900 border-gray-800 text-gray-400 hover:text-white hover:bg-gray-800'}`}
+                  className={`${isCallMinimized ? 'p-2 rounded-xl' : 'p-3 rounded-2xl'} border transition-all flex items-center justify-center ${isVideoMuted ? 'bg-red-500/10 border-red-500 text-red-400' : 'bg-gray-900 border-gray-800 text-gray-400 hover:text-white hover:bg-gray-800'}`}
                   title={isVideoMuted ? "Enable Camera" : "Disable Camera"}
                 >
-                  {isVideoMuted ? <VideoOff className="w-5 h-5" /> : <Video className="w-5 h-5" />}
+                  {isVideoMuted ? <VideoOff className={isCallMinimized ? "w-4 h-4" : "w-5 h-5"} /> : <Video className={isCallMinimized ? "w-4 h-4" : "w-5 h-5"} />}
                 </button>
 
                 <button
                   onClick={toggleScreenShare}
-                  className={`p-3 rounded-2xl border transition-all flex items-center justify-center ${isScreenSharing ? 'bg-purple-500/20 border-purple-500 text-purple-400' : 'bg-gray-900 border-gray-800 text-gray-400 hover:text-white hover:bg-gray-800'}`}
+                  className={`${isCallMinimized ? 'p-2 rounded-xl' : 'p-3 rounded-2xl'} border transition-all flex items-center justify-center ${isScreenSharing ? 'bg-purple-500/20 border-purple-500 text-purple-400' : 'bg-gray-900 border-gray-800 text-gray-400 hover:text-white hover:bg-gray-800'}`}
                   title={isScreenSharing ? "Stop Sharing Screen" : "Share Screen"}
                 >
-                  <ScreenShare className="w-5 h-5" />
+                  <ScreenShare className={isCallMinimized ? "w-4 h-4" : "w-5 h-5"} />
                 </button>
 
-                <button
-                  onClick={toggleFullscreen}
-                  className={`p-3 rounded-2xl border transition-all flex items-center justify-center ${isFullscreen ? 'bg-blue-500/20 border-blue-500 text-blue-400' : 'bg-gray-900 border-gray-800 text-gray-400 hover:text-white hover:bg-gray-800'}`}
-                  title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
-                >
-                  <Maximize className="w-5 h-5" />
-                </button>
+                {!isCallMinimized && (
+                  <button
+                    onClick={toggleFullscreen}
+                    className="p-3 rounded-2xl border border-gray-800 bg-gray-900 text-gray-400 hover:text-white hover:bg-gray-800 transition-all flex items-center justify-center"
+                    title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
+                  >
+                    <Maximize className="w-5 h-5" />
+                  </button>
+                )}
 
                 <button
                   onClick={endCall}
-                  className="p-3 rounded-2xl bg-red-600 hover:bg-red-500 text-white font-bold transition-all shadow-[0_0_15px_rgba(239,68,68,0.25)]"
+                  className={`${isCallMinimized ? 'p-2 rounded-xl' : 'p-3 rounded-2xl'} bg-red-600 hover:bg-red-500 text-white font-bold transition-all shadow-[0_0_15px_rgba(239,68,68,0.25)]`}
                   title="Hang Up"
                 >
-                  <PhoneOff className="w-5 h-5" />
+                  <PhoneOff className={isCallMinimized ? "w-4 h-4" : "w-5 h-5"} />
                 </button>
               </div>
             </div>
