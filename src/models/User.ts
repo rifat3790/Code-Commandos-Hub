@@ -11,6 +11,8 @@ export interface IUser extends Document {
   role: 'super_admin' | 'admin' | 'user' | 'banned';
   callingAllowed?: boolean;
   showWorkloadMetrics?: boolean;
+  canViewWorkspaceMonthlyTarget?: boolean;
+  canViewWorkspaceTeamDelivery?: boolean;
   allowedMenus?: string[];
   trackerFilters?: any;
   issuesFilters?: any;
@@ -38,6 +40,8 @@ const UserSchema: Schema = new Schema({
   role: { type: String, enum: ['super_admin', 'admin', 'user', 'banned'], default: 'user' },
   callingAllowed: { type: Boolean, default: true },
   showWorkloadMetrics: { type: Boolean, default: false },
+  canViewWorkspaceMonthlyTarget: { type: Boolean, default: false },
+  canViewWorkspaceTeamDelivery: { type: Boolean, default: false },
   allowedMenus: { type: [String], default: undefined },
   trackerFilters: { type: Object },
   issuesFilters: { type: Object },

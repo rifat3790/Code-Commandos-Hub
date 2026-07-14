@@ -218,6 +218,24 @@ export default function AdminDashboard() {
     fetchUsers();
   };
 
+  const handleToggleWorkspaceMonthlyTarget = async (userId: string, currentAllowed: boolean) => {
+    await fetch('/api/users/roles', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ promoterUid: user?.uid, targetUserId: userId, canViewWorkspaceMonthlyTarget: !currentAllowed })
+    });
+    fetchUsers();
+  };
+
+  const handleToggleWorkspaceTeamDelivery = async (userId: string, currentAllowed: boolean) => {
+    await fetch('/api/users/roles', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ promoterUid: user?.uid, targetUserId: userId, canViewWorkspaceTeamDelivery: !currentAllowed })
+    });
+    fetchUsers();
+  };
+
   const handleSaveUserPermissions = async (userId: string, menus: string[] | null) => {
     await fetch('/api/users/roles', {
       method: 'POST',
@@ -482,6 +500,28 @@ export default function AdminDashboard() {
                         {u.showWorkloadMetrics === true ? 'Allowed' : 'Blocked'}
                       </button>
                     </div>
+                  )}
+                  {(dbUser?.role === 'super_admin' || dbUser?.email === 'refayethossenmd@gmail.com') && (
+                    <>
+                      <div className="flex items-center justify-between text-xs text-gray-500 mt-2 pt-2 border-t border-white/5">
+                        <span>Workspace Target Tab:</span>
+                        <button
+                          onClick={() => handleToggleWorkspaceMonthlyTarget(u._id, u.canViewWorkspaceMonthlyTarget === true)}
+                          className={`px-2 py-0.5 rounded font-extrabold uppercase text-[9px] border transition-colors ${u.canViewWorkspaceMonthlyTarget === true ? 'bg-green-500/10 border-green-500/20 text-green-400 hover:bg-green-500/20' : 'bg-red-500/10 border-red-500/20 text-red-400 hover:bg-red-500/20'}`}
+                        >
+                          {u.canViewWorkspaceMonthlyTarget === true ? 'Allowed' : 'Blocked'}
+                        </button>
+                      </div>
+                      <div className="flex items-center justify-between text-xs text-gray-500 mt-2 pt-2 border-t border-white/5">
+                        <span>Workspace Team Delivery Tab:</span>
+                        <button
+                          onClick={() => handleToggleWorkspaceTeamDelivery(u._id, u.canViewWorkspaceTeamDelivery === true)}
+                          className={`px-2 py-0.5 rounded font-extrabold uppercase text-[9px] border transition-colors ${u.canViewWorkspaceTeamDelivery === true ? 'bg-green-500/10 border-green-500/20 text-green-400 hover:bg-green-500/20' : 'bg-red-500/10 border-red-500/20 text-red-400 hover:bg-red-500/20'}`}
+                        >
+                          {u.canViewWorkspaceTeamDelivery === true ? 'Allowed' : 'Blocked'}
+                        </button>
+                      </div>
+                    </>
                   )}
                   <div className="flex items-center justify-between text-xs text-gray-500 mt-2 pt-2 border-t border-white/5">
                     <span>Page Permissions:</span>

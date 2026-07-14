@@ -16,7 +16,7 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const { promoterUid, targetUserId, newRole, callingAllowed, allowedMenus, showWorkloadMetrics } = await req.json();
+    const { promoterUid, targetUserId, newRole, callingAllowed, allowedMenus, showWorkloadMetrics, canViewWorkspaceMonthlyTarget, canViewWorkspaceTeamDelivery } = await req.json();
 
     if (!promoterUid || !targetUserId) {
       return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });
@@ -44,6 +44,18 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'Only refayethossenmd@gmail.com can change workload metrics visibility' }, { status: 403 });
       }
       updateObj.showWorkloadMetrics = showWorkloadMetrics;
+    }
+    if (canViewWorkspaceMonthlyTarget !== undefined) {
+      if (promoter.role !== 'super_admin' && promoter.email !== 'refayethossenmd@gmail.com') {
+        return NextResponse.json({ error: 'Only super_admin can change workspace tab permissions' }, { status: 403 });
+      }
+      updateObj.canViewWorkspaceMonthlyTarget = canViewWorkspaceMonthlyTarget;
+    }
+    if (canViewWorkspaceTeamDelivery !== undefined) {
+      if (promoter.role !== 'super_admin' && promoter.email !== 'refayethossenmd@gmail.com') {
+        return NextResponse.json({ error: 'Only super_admin can change workspace tab permissions' }, { status: 403 });
+      }
+      updateObj.canViewWorkspaceTeamDelivery = canViewWorkspaceTeamDelivery;
     }
     if (allowedMenus !== undefined) {
       updateObj.allowedMenus = allowedMenus === null ? undefined : allowedMenus;
