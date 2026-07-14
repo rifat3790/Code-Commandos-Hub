@@ -455,9 +455,9 @@ export default function OrdersDashboard({ csvData, activeLayout }: { csvData: st
             });
           }
 
-          // Map the unnamed column to 'Assign Team'
+          // Map the unnamed column to 'Assign Team' if 'Assign Team' is not already present or is empty
           results.data.forEach((row: any) => {
-            if (row[''] !== undefined) {
+            if (row[''] !== undefined && (!row['Assign Team'] || row['Assign Team'].trim() === '')) {
               row['Assign Team'] = row[''];
             }
           });

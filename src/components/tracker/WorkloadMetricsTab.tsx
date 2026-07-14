@@ -61,7 +61,7 @@ export default function WorkloadMetricsTab({
           }
           
           results.data.forEach((row: any) => {
-            if (row[''] !== undefined) {
+            if (row[''] !== undefined && (!row['Assign Team'] || row['Assign Team'].trim() === '')) {
               row['Assign Team'] = row[''];
             }
           });
