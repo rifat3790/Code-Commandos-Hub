@@ -94,3 +94,36 @@ export async function PUT(req: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
+
+export async function DELETE(req: Request) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const uid = searchParams.get('uid');
+    const id = searchParams.get('id');
+    const month = searchParams.get('month');
+
+    if (!uid) {
+      return NextResponse.json({ error: 'Missing user uid' }, { status: 400 });
+    }
+
+    await connectToDatabase();
+
+    // Only super admin or admin can delete
+    const user = await User.findOne({ firebaseUid: uid });
+    if (!user || (user.role !== 'super_admin' && user.role !== 'admin')) {
+      return NextResponse.json({ error: 'Unauthorized: Only admins can delete targets' }, { status: 403 });
+    }
+
+    if (id) {
+      await WorkspaceTarget.findByIdAndDelete(id);
+      return NextResponse.json({ success: true, message: 'Target deleted' }, { status: 200 });
+    } else if (month) {
+      await WorkspaceTarget.deleteMany({ monthName: month });
+      return NextResponse.json({ success: true, message: 'Month targets deleted' }, { status: 200 });
+    }
+
+    return NextResponse.json({ error: 'Missing target ID or month parameter' }, { status: 400 });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
