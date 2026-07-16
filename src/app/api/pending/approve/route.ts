@@ -32,25 +32,39 @@ export async function POST(req: Request) {
     }
 
     if (decision === 'approve') {
-      // Merge into Live DB
-      let Model;
-      switch (change.collectionName) {
-        case 'templates': Model = TemplateModel; break;
-        case 'notes': Model = NoteModel; break;
-        case 'chatSessions': Model = ChatSessionModel; break;
-        case 'stickyNotes': Model = StickyNoteModel; break;
-        case 'downloads': Model = DownloadModel; break;
-        case 'activities': Model = ActivityModel; break;
-        case 'credentials': Model = CredentialModel; break;
-      }
+      if (change.collectionName === 'workspaceTargets') {
+        const WorkspaceTarget = (await import('@/models/WorkspaceTarget')).default;
+        const { targetId, memberEmployeeId, requestedAchieved } = change.data;
+        const target = await WorkspaceTarget.findById(targetId);
+        if (target) {
+          const member = target.members.find((m: any) => m.employeeId === memberEmployeeId);
+          if (member) {
+            member.achieved = Number(requestedAchieved);
+            target.markModified('members');
+            await target.save();
+          }
+        }
+      } else {
+        // Merge into Live DB
+        let Model;
+        switch (change.collectionName) {
+          case 'templates': Model = TemplateModel; break;
+          case 'notes': Model = NoteModel; break;
+          case 'chatSessions': Model = ChatSessionModel; break;
+          case 'stickyNotes': Model = StickyNoteModel; break;
+          case 'downloads': Model = DownloadModel; break;
+          case 'activities': Model = ActivityModel; break;
+          case 'credentials': Model = CredentialModel; break;
+        }
 
-      if (Model) {
-        if (change.action === 'create') {
-          await Model.create(change.data);
-        } else if (change.action === 'update' && change.documentId) {
-          await Model.findOneAndUpdate({ id: change.documentId }, change.data, { upsert: true });
-        } else if (change.action === 'delete' && change.documentId) {
-          await Model.findOneAndDelete({ id: change.documentId });
+        if (Model) {
+          if (change.action === 'create') {
+            await Model.create(change.data);
+          } else if (change.action === 'update' && change.documentId) {
+            await Model.findOneAndUpdate({ id: change.documentId }, change.data, { upsert: true });
+          } else if (change.action === 'delete' && change.documentId) {
+            await Model.findOneAndDelete({ id: change.documentId });
+          }
         }
       }
 

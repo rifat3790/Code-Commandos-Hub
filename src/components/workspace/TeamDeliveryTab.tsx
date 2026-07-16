@@ -26,7 +26,8 @@ import {
   Layers3,
   Calendar,
   ShieldAlert,
-  User
+  User,
+  FileSpreadsheet
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
@@ -135,6 +136,17 @@ function VaultDropdown({
     </div>
   );
 }
+
+const formatMatrixValue = (val: number) => {
+  if (val === 0) return '0';
+  if (val >= 1000000) {
+    return `$${(val / 1000000).toFixed(1)}M`;
+  }
+  if (val >= 1000) {
+    return `$${(val / 1000).toFixed(1)}k`;
+  }
+  return `$${Math.round(val)}`;
+};
 
 export default function TeamDeliveryTab({ csvDataOrders }: Props) {
   const [data, setData] = useState<any[]>([]);
@@ -409,9 +421,9 @@ export default function TeamDeliveryTab({ csvDataOrders }: Props) {
 
     deliveredOrders.forEach(row => {
       const serviceLine = row['Service Line']?.trim() || 'Unassigned';
-      serviceLineMap[serviceLine] = (serviceLineMap[serviceLine] || 0) + 1;
-
       const orderVal = parseValueToNumber(row['Value'] || row['Amount']);
+      serviceLineMap[serviceLine] = (serviceLineMap[serviceLine] || 0) + orderVal;
+
       const orderId = row['Order ID'] || 'N/A';
       const clientName = row['Client name'] || row['Client Name'] || 'Direct Client';
       const profileName = row['Profile Name']?.trim() || 'N/A';
@@ -442,7 +454,7 @@ export default function TeamDeliveryTab({ csvDataOrders }: Props) {
         if (!matrixMap[serviceLine]) {
           matrixMap[serviceLine] = {};
         }
-        matrixMap[serviceLine][team] = (matrixMap[serviceLine][team] || 0) + 1;
+        matrixMap[serviceLine][team] = (matrixMap[serviceLine][team] || 0) + orderVal;
 
         // Update Team Stats map
         if (!teamStatsMap[team]) {
@@ -456,7 +468,7 @@ export default function TeamDeliveryTab({ csvDataOrders }: Props) {
         }
         teamStatsMap[team].totalDeliveries++;
         teamStatsMap[team].totalRevenue += orderVal;
-        teamStatsMap[team].serviceLineBreakdown[serviceLine] = (teamStatsMap[team].serviceLineBreakdown[serviceLine] || 0) + 1;
+        teamStatsMap[team].serviceLineBreakdown[serviceLine] = (teamStatsMap[team].serviceLineBreakdown[serviceLine] || 0) + orderVal;
 
         // Update Member map
         if (!memberMap[name]) {
@@ -501,16 +513,17 @@ export default function TeamDeliveryTab({ csvDataOrders }: Props) {
       }
     });
 
-    // Sort member leaderboards by count, then by revenue
+    // Sort member leaderboards by revenue, then by count
     Object.keys(teamStatsMap).forEach(team => {
-      teamStatsMap[team].memberLeaderboard.sort((a, b) => b.count - a.count || b.revenue - a.revenue);
+      teamStatsMap[team].memberLeaderboard.sort((a, b) => b.revenue - a.revenue || b.count - a.count);
     });
 
     return {
-      teamStats: Object.values(teamStatsMap).sort((a, b) => b.totalDeliveries - a.totalDeliveries),
+      teamStats: Object.values(teamStatsMap).sort((a, b) => b.totalRevenue - a.totalRevenue),
       matrix: matrixMap,
       serviceLineCounts: serviceLineMap,
       totalDeliveries: deliveredOrders.length,
+      totalRevenue: deliveredOrders.reduce((sum, row) => sum + parseValueToNumber(row['Value'] || row['Amount']), 0),
       memberMap
     };
   }, [deliveredOrders]);
@@ -550,7 +563,7 @@ export default function TeamDeliveryTab({ csvDataOrders }: Props) {
       }
     });
 
-    return list.sort((a, b) => b.count - a.count || b.revenue - a.revenue);
+    return list.sort((a, b) => b.revenue - a.revenue || b.count - a.count);
   }, [analyticsData, searchQuery, selectedTeamFilter, selectedServiceLine, selectedMemberFilter]);
 
   // DYNAMIC TOP PERFORMERS: Recalculate top performer and top profile based on active filters
@@ -567,7 +580,7 @@ export default function TeamDeliveryTab({ csvDataOrders }: Props) {
 
     filteredMembers.forEach(mem => {
       // Find top performer
-      if (mem.count > topPerfCount || (mem.count === topPerfCount && mem.revenue > topPerfRevenue)) {
+      if (mem.revenue > topPerfRevenue || (mem.revenue === topPerfRevenue && mem.count > topPerfCount)) {
         topPerfName = mem.name;
         topPerfCount = mem.count;
         topPerfRevenue = mem.revenue;
@@ -680,6 +693,34 @@ export default function TeamDeliveryTab({ csvDataOrders }: Props) {
     setSavedPresets(updated);
     localStorage.setItem('team_delivery_presets_v2', JSON.stringify(updated));
     toast.success('Preset deleted');
+  };
+
+  const handleExportCSV = () => {
+    if (filteredMembers.length === 0) {
+      toast.error("No standings data to export.");
+      return;
+    }
+    
+    const headers = ["Rank", "Name", "Team", "Delivered Orders", "Revenue ($)", "Service Lines"];
+    const rows = filteredMembers.map((m, idx) => [
+      idx + 1,
+      m.name,
+      m.team,
+      m.count,
+      m.revenue,
+      m.serviceLines.join("; ")
+    ]);
+    
+    const csvContent = [headers, ...rows].map(e => e.map(val => `"${String(val).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `Code_Commandos_Standings_${selectedServiceLine || 'All'}_Team_${selectedTeamFilter || 'All'}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success("CSV Standings report downloaded successfully!");
   };
 
   return (
@@ -861,6 +902,15 @@ export default function TeamDeliveryTab({ csvDataOrders }: Props) {
                 )}
               </AnimatePresence>
             </div>
+
+            {/* Export CSV Button */}
+            <button
+              onClick={handleExportCSV}
+              className="flex items-center justify-center p-2.5 rounded-xl border border-gray-800 bg-gray-900/30 text-gray-300 hover:bg-gray-800/40 hover:text-white transition-all cursor-pointer shadow-md"
+              title="Export Active standing to CSV"
+            >
+              <FileSpreadsheet className="w-4 h-4 text-emerald-400 animate-pulse" />
+            </button>
           </div>
         </div>
       </div>
@@ -868,38 +918,56 @@ export default function TeamDeliveryTab({ csvDataOrders }: Props) {
       {/* TOP PERFORMER & TOP PROFILE CARDS (Dynamic Highlight Panel) */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Dynamic Top Performer Card */}
-        <div className="p-6 rounded-2xl bg-[#080c14]/65 border border-amber-500/25 relative overflow-hidden group shadow-[0_0_20px_rgba(245,158,11,0.03)] flex flex-col justify-between min-h-[170px]">
-          <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:scale-105 transition-transform duration-500">
+        <div className="p-6 rounded-2xl bg-gradient-to-br from-[#0c0d15] to-[#16121a] border border-amber-500/20 hover:border-amber-500/50 relative overflow-hidden group shadow-lg transition-all duration-300 hover:shadow-[0_0_30px_rgba(245,158,11,0.1)] flex flex-col justify-between min-h-[185px]">
+          <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 group-hover:scale-110 transition-all duration-700">
             <Trophy className="w-36 h-36 text-amber-400" />
           </div>
+          <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/5 rounded-full blur-2xl pointer-events-none group-hover:bg-amber-500/10 transition-colors" />
           <div>
-            <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20 text-[9px] font-black uppercase tracking-wider mb-4">
-              <Trophy className="w-3 h-3 text-amber-500" /> Top Performer
-            </span>
-            <h3 className="text-3xl font-black text-white tracking-tight">{dynamicStats.topPerfName}</h3>
-            <p className="text-xs text-gray-500 font-bold mt-1 uppercase tracking-wider">{dynamicStats.topPerfCount} Elite Deliveries</p>
+            <div className="flex justify-between items-start">
+              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[9px] font-black uppercase tracking-wider mb-4 shadow-sm shadow-amber-500/5">
+                <Trophy className="w-3 h-3 text-amber-400" /> Top Performer
+              </span>
+              <Sparkles className="w-4 h-4 text-amber-500 animate-pulse" />
+            </div>
+            <h3 className="text-3xl font-black text-white tracking-tight leading-none bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">{dynamicStats.topPerfName}</h3>
+            <p className="text-[10px] text-amber-500/80 font-black mt-2 uppercase tracking-widest">{dynamicStats.topPerfCount} Elite Deliveries Handed Over</p>
           </div>
-          <div className="mt-6 pt-3 border-t border-gray-850 flex flex-col justify-end">
-            <span className="text-[9px] text-gray-500 font-bold uppercase tracking-wider">Generated Revenue</span>
-            <span className="text-2xl font-black text-amber-400 font-mono mt-0.5">${dynamicStats.topPerfRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+          <div className="mt-6 pt-3 border-t border-white/5 flex justify-between items-end">
+            <div>
+              <span className="text-[9px] text-gray-500 font-bold uppercase tracking-wider">Generated Revenue</span>
+              <span className="text-2xl font-black text-amber-400 font-mono mt-0.5 block">${dynamicStats.topPerfRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            </div>
+            <div className="px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/20 text-[9px] text-amber-400 font-black uppercase tracking-widest font-mono">
+              Tier: Elite
+            </div>
           </div>
         </div>
 
         {/* Dynamic Top Profile Card */}
-        <div className="p-6 rounded-2xl bg-[#080c14]/65 border border-blue-500/25 relative overflow-hidden group shadow-[0_0_20px_rgba(59,130,246,0.03)] flex flex-col justify-between min-h-[170px]">
-          <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:scale-105 transition-transform duration-500">
+        <div className="p-6 rounded-2xl bg-gradient-to-br from-[#0c0d15] to-[#0f172a] border border-blue-500/20 hover:border-blue-500/50 relative overflow-hidden group shadow-lg transition-all duration-300 hover:shadow-[0_0_30px_rgba(59,130,246,0.1)] flex flex-col justify-between min-h-[185px]">
+          <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 group-hover:scale-110 transition-all duration-700">
             <Award className="w-36 h-36 text-blue-400" />
           </div>
+          <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/5 rounded-full blur-2xl pointer-events-none group-hover:bg-blue-500/10 transition-colors" />
           <div>
-            <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 text-[9px] font-black uppercase tracking-wider mb-4">
-              <Award className="w-3 h-3 text-blue-400" /> Top Profile
-            </span>
-            <h3 className="text-3xl font-black text-white tracking-tight truncate pr-12" title={dynamicStats.topProfileName}>{dynamicStats.topProfileName}</h3>
-            <p className="text-xs text-gray-500 font-bold mt-1 uppercase tracking-wider">{dynamicStats.topProfileCount} Associated Projects</p>
+            <div className="flex justify-between items-start">
+              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 text-[9px] font-black uppercase tracking-wider mb-4 shadow-sm shadow-blue-500/5">
+                <Award className="w-3 h-3 text-blue-400" /> Top Profile
+              </span>
+              <div className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-ping" />
+            </div>
+            <h3 className="text-3xl font-black text-white tracking-tight truncate pr-12 leading-none bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent" title={dynamicStats.topProfileName}>{dynamicStats.topProfileName}</h3>
+            <p className="text-[10px] text-blue-400/80 font-black mt-2 uppercase tracking-widest">{dynamicStats.topProfileCount} Associated Projects</p>
           </div>
-          <div className="mt-6 pt-3 border-t border-gray-850 flex flex-col justify-end">
-            <span className="text-[9px] text-gray-500 font-bold uppercase tracking-wider">Profile Revenue</span>
-            <span className="text-2xl font-black text-blue-400 font-mono mt-0.5">${dynamicStats.topProfileRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+          <div className="mt-6 pt-3 border-t border-white/5 flex justify-between items-end">
+            <div>
+              <span className="text-[9px] text-gray-500 font-bold uppercase tracking-wider">Profile Revenue</span>
+              <span className="text-2xl font-black text-blue-400 font-mono mt-0.5 block">${dynamicStats.topProfileRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            </div>
+            <div className="px-2.5 py-1 rounded-lg bg-blue-500/10 border border-blue-500/20 text-[9px] text-blue-400 font-black uppercase tracking-widest font-mono">
+              Share: High
+            </div>
           </div>
         </div>
       </div>
@@ -918,12 +986,12 @@ export default function TeamDeliveryTab({ csvDataOrders }: Props) {
             
             <div className="flex items-center gap-3">
               <div className="px-3 py-2 rounded-xl bg-gray-950/60 border border-gray-850 flex flex-col items-start min-w-[110px]">
-                <span className="text-[9px] text-gray-500 font-bold uppercase tracking-wider">Total Handover</span>
-                <span className="text-sm font-black text-white mt-0.5 font-mono">{dynamicStats.totalHandover} Projects</span>
-              </div>
-              <div className="px-3 py-2 rounded-xl bg-gray-950/60 border border-gray-850 flex flex-col items-start min-w-[110px]">
                 <span className="text-[9px] text-gray-500 font-bold uppercase tracking-wider">Total Value</span>
                 <span className="text-sm font-black text-brand-green mt-0.5 font-mono">${dynamicStats.totalValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              </div>
+              <div className="px-3 py-2 rounded-xl bg-gray-950/60 border border-gray-850 flex flex-col items-start min-w-[110px]">
+                <span className="text-[9px] text-gray-500 font-bold uppercase tracking-wider">Total Handover</span>
+                <span className="text-sm font-black text-white mt-0.5 font-mono">{dynamicStats.totalHandover} Projects</span>
               </div>
             </div>
           </div>
@@ -935,10 +1003,10 @@ export default function TeamDeliveryTab({ csvDataOrders }: Props) {
               return (
                 <div 
                   key={member.name}
-                  className={`glass-panel p-5 rounded-2xl border transition-all duration-300 flex flex-col justify-between min-h-[350px] relative overflow-hidden bg-gray-950/20 group hover:shadow-2xl ${
+                  className={`glass-panel p-5 rounded-2xl border transition-all duration-300 flex flex-col justify-between min-h-[350px] relative overflow-hidden bg-gray-950/20 group hover:shadow-2xl hover:-translate-y-1.5 ${
                     isTop 
-                      ? 'border-amber-500/35 bg-amber-500/5 shadow-[0_0_20px_rgba(245,158,11,0.06)] hover:border-amber-500/50' 
-                      : 'border-glass-border hover:border-brand-green/30'
+                      ? 'border-amber-500/35 bg-[#120f09]/60 shadow-[0_0_20px_rgba(245,158,11,0.08)] hover:border-amber-500/60' 
+                      : 'border-glass-border hover:border-brand-green/40 hover:bg-[#0a0f1d]/50'
                   }`}
                 >
                   {/* Decorative background glow */}
@@ -968,16 +1036,16 @@ export default function TeamDeliveryTab({ csvDataOrders }: Props) {
                   {/* Card Quick Stats */}
                   <div className="grid grid-cols-2 gap-3 my-5 pt-3 pb-3 border-t border-b border-gray-850/60">
                     <div>
-                      <span className="text-[9px] text-gray-500 font-bold block uppercase tracking-wider">Delivered</span>
-                      <span className="text-lg font-black text-white font-mono mt-0.5">{member.count}</span>
-                    </div>
-                    <div>
                       <span className="text-[9px] text-gray-500 font-bold block uppercase tracking-wider">Revenue</span>
                       <span className={`text-lg font-black font-mono mt-0.5 ${
                         isTop ? 'text-amber-400' : 'text-brand-green'
                       }`}>
                         ${member.revenue.toLocaleString()}
                       </span>
+                    </div>
+                    <div>
+                      <span className="text-[9px] text-gray-500 font-bold block uppercase tracking-wider">Delivered</span>
+                      <span className="text-lg font-black text-white font-mono mt-0.5">{member.count}</span>
                     </div>
                   </div>
 
@@ -1033,7 +1101,7 @@ export default function TeamDeliveryTab({ csvDataOrders }: Props) {
                 <h3 className="text-sm font-extrabold text-purple-400 uppercase tracking-widest flex items-center gap-2">
                   <Grid className="w-4 h-4" /> Team vs Service Line Matrix
                 </h3>
-                <p className="text-xs text-gray-500 mt-1">Cross-tabulated grid plotting delivery volume. Click a cell to isolate team and service line performance.</p>
+                <p className="text-xs text-gray-500 mt-1">Cross-tabulated grid plotting revenue performance. Click a cell to isolate team and service line performance.</p>
               </div>
 
               <div className="overflow-x-auto mt-5 border border-gray-850 rounded-xl bg-black/10 max-w-full">
@@ -1054,20 +1122,20 @@ export default function TeamDeliveryTab({ csvDataOrders }: Props) {
                         <tr key={sl} className="hover:bg-gray-850/20 transition-colors">
                           <td className="px-4 py-3 font-semibold text-white">{sl}</td>
                           {masterFilterOptions.allTeams.map(team => {
-                            const count = analyticsData.matrix[sl]?.[team] || 0;
+                            const rev = analyticsData.matrix[sl]?.[team] || 0;
                             const isCellSelected = selectedMatrixCell?.serviceLine === sl && selectedMatrixCell?.team === team;
                             
-                            // Dynamic heat coloring based on delivery volume
+                            // Dynamic heat coloring based on revenue
                             let cellBg = 'bg-transparent text-gray-500';
-                            if (count > 25) {
+                            if (rev > 15000) {
                               cellBg = isCellSelected 
                                 ? 'bg-brand-green text-black font-black shadow-[0_0_10px_rgba(0,229,117,0.4)]'
                                 : 'bg-brand-green/30 border border-brand-green/20 text-brand-green font-bold hover:bg-brand-green/50';
-                            } else if (count > 10) {
+                            } else if (rev > 5000) {
                               cellBg = isCellSelected
                                 ? 'bg-indigo-500 border border-indigo-400 text-black font-black shadow-[0_0_10px_rgba(99,102,241,0.4)]'
                                 : 'bg-indigo-600/20 border border-indigo-500/10 text-indigo-300 font-bold hover:bg-indigo-600/40';
-                            } else if (count > 0) {
+                            } else if (rev > 0) {
                               cellBg = isCellSelected
                                 ? 'bg-blue-500 border border-blue-400 text-black font-black shadow-[0_0_10px_rgba(59,130,246,0.4)]'
                                 : 'bg-blue-600/10 border border-blue-500/5 text-blue-300 font-medium hover:bg-blue-600/30';
@@ -1077,14 +1145,14 @@ export default function TeamDeliveryTab({ csvDataOrders }: Props) {
                               <td key={team} className="px-3 py-2 text-center">
                                 <button
                                   onClick={() => handleMatrixCellClick(sl, team)}
-                                  className={`w-12 py-1 rounded-md text-[11px] font-mono transition-all uppercase cursor-pointer ${cellBg}`}
+                                  className={`w-16 py-1 rounded-md text-[10px] font-mono transition-all uppercase cursor-pointer ${cellBg}`}
                                 >
-                                  {count}
+                                  {formatMatrixValue(rev)}
                                 </button>
                               </td>
                             );
                           })}
-                          <td className="px-4 py-3 text-center font-mono font-black text-purple-300 bg-purple-950/10">{slTotal}</td>
+                          <td className="px-4 py-3 text-center font-mono font-black text-purple-300 bg-purple-950/10">{formatMatrixValue(slTotal)}</td>
                         </tr>
                       );
                     })}
@@ -1093,12 +1161,12 @@ export default function TeamDeliveryTab({ csvDataOrders }: Props) {
                     <tr className="bg-[#0b0f19]/80 border-t-2 border-gray-850 font-black text-white">
                       <td className="px-4 py-3 text-white font-extrabold uppercase">Team Total</td>
                       {masterFilterOptions.allTeams.map(team => {
-                        const teamTotal = analyticsData.teamStats.find(t => t.teamName === team)?.totalDeliveries || 0;
+                        const teamTotal = analyticsData.teamStats.find(t => t.teamName === team)?.totalRevenue || 0;
                         return (
-                          <td key={team} className="px-4 py-3 text-center font-mono text-white">{teamTotal}</td>
+                          <td key={team} className="px-4 py-3 text-center font-mono text-white">{formatMatrixValue(teamTotal)}</td>
                         );
                       })}
-                      <td className="px-4 py-3 text-center font-mono bg-purple-950/30 border border-purple-500/25 text-purple-400 text-xs">{analyticsData.totalDeliveries}</td>
+                      <td className="px-4 py-3 text-center font-mono bg-purple-950/30 border border-purple-500/25 text-purple-400 text-xs">{formatMatrixValue(analyticsData.totalRevenue)}</td>
                     </tr>
                   </tfoot>
                 </table>
@@ -1109,15 +1177,15 @@ export default function TeamDeliveryTab({ csvDataOrders }: Props) {
             <div className="glass-panel p-5 rounded-2xl border border-glass-border bg-[#0b0f19]/30 flex flex-col justify-between overflow-hidden">
               <div>
                 <h3 className="text-sm font-extrabold text-purple-400 uppercase tracking-widest flex items-center gap-2">
-                  <BarChart3 className="w-4 h-4" /> Team Delivery Spread
+                  <BarChart3 className="w-4 h-4" /> Team Revenue Share
                 </h3>
-                <p className="text-xs text-gray-500 mt-1 font-medium">Delivery distribution spread comparison across team modules.</p>
+                <p className="text-xs text-gray-500 mt-1 font-medium">Revenue distribution comparison across team modules.</p>
               </div>
 
               <div className="flex items-end justify-around h-48 pt-6 pb-2 px-2 select-none border border-gray-850 rounded-xl bg-black/10 mt-5 overflow-x-auto min-h-[220px]">
                 {analyticsData.teamStats.map((team, idx) => {
-                  const maxVal = Math.max(...analyticsData.teamStats.map(t => t.totalDeliveries), 1);
-                  const barPercentage = Math.max(10, (team.totalDeliveries / maxVal) * 100);
+                  const maxVal = Math.max(...analyticsData.teamStats.map(t => t.totalRevenue), 1);
+                  const barPercentage = Math.max(10, (team.totalRevenue / maxVal) * 100);
                   
                   const fillClass = idx === 0
                     ? 'bg-gradient-to-t from-brand-green/30 to-brand-green/80 shadow-[0_0_15px_rgba(0,229,117,0.35)]'
@@ -1128,7 +1196,7 @@ export default function TeamDeliveryTab({ csvDataOrders }: Props) {
                   return (
                     <div key={team.teamName} className="flex flex-col items-center flex-1 mx-1 group min-w-[2.2rem]">
                       <div className="text-[10px] font-black text-white mb-2 font-mono group-hover:text-purple-400 transition-colors">
-                        {team.totalDeliveries}
+                        {formatMatrixValue(team.totalRevenue)}
                       </div>
                       <div className="w-8 relative rounded-t-lg overflow-hidden transition-all duration-500" style={{ height: `${barPercentage * 1.1}px` }}>
                         <div className={`w-full h-full rounded-t-lg ${fillClass}`} />
@@ -1158,8 +1226,8 @@ export default function TeamDeliveryTab({ csvDataOrders }: Props) {
                     <th className="px-5 py-3 w-16 text-center">Rank</th>
                     <th className="px-5 py-3">Team Member</th>
                     <th className="px-5 py-3">Team</th>
-                    <th className="px-5 py-3 text-right">Orders</th>
                     <th className="px-5 py-3 text-right">Revenue</th>
+                    <th className="px-5 py-3 text-right">Orders</th>
                     <th className="px-5 py-3">Service Lines</th>
                   </tr>
                 </thead>
@@ -1175,8 +1243,8 @@ export default function TeamDeliveryTab({ csvDataOrders }: Props) {
                           Team {member.team}
                         </span>
                       </td>
-                      <td className="px-5 py-3.5 text-right font-black text-purple-300 font-mono">{member.count}</td>
                       <td className="px-5 py-3.5 text-right font-black text-green-400 font-mono">${member.revenue.toLocaleString()}</td>
+                      <td className="px-5 py-3.5 text-right font-black text-purple-300 font-mono">{member.count}</td>
                       <td className="px-5 py-3.5">
                         <div className="flex flex-wrap gap-1.5 max-w-xs">
                           {member.serviceLines.map(sl => (
