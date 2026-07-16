@@ -76,6 +76,11 @@ export default function MonthlyTargetTab() {
   const [isMonthModalOpen, setIsMonthModalOpen] = useState(false);
   const [newMonthName, setNewMonthName] = useState('');
   const [isCreatingMonth, setIsCreatingMonth] = useState(false);
+  
+  // Carry Over States for Month Creation
+  const [carryOverChecked, setCarryOverChecked] = useState(false);
+  const [sourceMonthSelect, setSourceMonthSelect] = useState('');
+  const [selectedTeamsChecklist, setSelectedTeamsChecklist] = useState<Record<string, boolean>>({});
 
   const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
   const [newTeamName, setNewTeamName] = useState('');
@@ -98,11 +103,25 @@ export default function MonthlyTargetTab() {
   const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
   const [activeRequestTarget, setActiveRequestTarget] = useState<any>(null);
   const [requestedAchieved, setRequestedAchieved] = useState<string>('');
+  const [requestType, setRequestType] = useState<'add' | 'override'>('add');
   const [isSubmittingRequest, setIsSubmittingRequest] = useState(false);
 
   const isAdmin = dbUser?.role === 'super_admin' || dbUser?.role === 'admin';
   const activeUid = user?.uid || dbUser?.firebaseUid;
   const lastFetchedUid = React.useRef<string | null>(null);
+
+  // Autofill mapping of Employee ID -> Name
+  const knownMembersMap = React.useMemo(() => {
+    const map: Record<string, string> = {};
+    targets.forEach(t => {
+      t.members.forEach((m: any) => {
+        if (m.employeeId && m.name) {
+          map[m.employeeId.trim().toUpperCase()] = m.name.trim();
+        }
+      });
+    });
+    return map;
+  }, [targets]);
 
   const fetchPendingChanges = async () => {
     try {
@@ -152,6 +171,32 @@ export default function MonthlyTargetTab() {
     }
   }, [selectedMonth, targets]);
 
+  // Extract unique months from targets
+  const uniqueMonths = Array.from(new Set(targets.map(t => t.monthName))).sort((a, b) => {
+    return b.localeCompare(a); // Sort descending
+  });
+
+  // Set default source month when uniqueMonths load
+  useEffect(() => {
+    if (uniqueMonths.length > 0 && !sourceMonthSelect) {
+      setSourceMonthSelect(uniqueMonths[0]);
+    }
+  }, [uniqueMonths, sourceMonthSelect]);
+
+  // Automatically select all teams of the selected source month by default
+  useEffect(() => {
+    if (sourceMonthSelect) {
+      const sourceMonthTargets = targets.filter(t => t.monthName === sourceMonthSelect);
+      const initialChecklist: Record<string, boolean> = {};
+      sourceMonthTargets.forEach(t => {
+        initialChecklist[t._id] = true;
+      });
+      setSelectedTeamsChecklist(initialChecklist);
+    } else {
+      setSelectedTeamsChecklist({});
+    }
+  }, [sourceMonthSelect, targets]);
+
   const fetchTargets = async (uidToFetch?: string) => {
     const fetchUid = uidToFetch || activeUid;
     console.log("[MonthlyTargetTab Debug] fetchTargets initiated with UID:", fetchUid);
@@ -198,20 +243,21 @@ export default function MonthlyTargetTab() {
   };
 
   const handleDecision = async (changeId: string, decision: 'approve' | 'reject') => {
+    if (!activeUid) return;
     setIsProcessingDecision(changeId);
     try {
       const res = await fetch('/api/pending/approve', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          changeId,
           firebaseUid: activeUid,
+          changeId,
           decision
         })
       });
       const data = await res.json();
       if (data.success) {
-        toast.success(decision === 'approve' ? 'Request approved and applied!' : 'Request rejected.');
+        toast.success(`Request ${decision}d successfully!`);
         fetchTargets(activeUid);
         fetchPendingChanges();
       } else {
@@ -228,10 +274,15 @@ export default function MonthlyTargetTab() {
   const handleSubmitRequest = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeRequestTarget || !activeUid) return;
-    const newVal = Number(requestedAchieved);
+    let newVal = Number(requestedAchieved);
     if (isNaN(newVal) || newVal < 0) {
       toast.error('Please enter a valid achieved score');
       return;
+    }
+
+    // Apply incremental add logic if chosen
+    if (requestType === 'add') {
+      newVal = (activeRequestTarget.oldAchieved || 0) + newVal;
     }
     
     setIsSubmittingRequest(true);
@@ -324,11 +375,6 @@ export default function MonthlyTargetTab() {
     }
   };
 
-  // Extract unique months from targets
-  const uniqueMonths = Array.from(new Set(targets.map(t => t.monthName))).sort((a, b) => {
-    return b.localeCompare(a); // Sort descending
-  });
-
   const handleCreateMonth = async (e: React.FormEvent) => {
     e.preventDefault();
     const formattedMonth = newMonthName.trim();
@@ -341,28 +387,59 @@ export default function MonthlyTargetTab() {
 
     setIsCreatingMonth(true);
     try {
-      const res = await fetch('/api/workspace/targets', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          uid: activeUid,
-          teamName: 'CC',
-          monthName: formattedMonth,
-          members: []
-        })
-      });
-      const data = await res.json();
-      if (data.success) {
-        toast.success(`Month folder "${formattedMonth}" created`);
-        setNewMonthName('');
-        setIsMonthModalOpen(false);
-        await fetchTargets();
-        setSelectedMonth(formattedMonth); 
+      const teamsToClone = targets.filter(t => t.monthName === sourceMonthSelect && selectedTeamsChecklist[t._id]);
+      
+      if (carryOverChecked && teamsToClone.length > 0) {
+        // Carry over selected team configurations
+        for (const target of teamsToClone) {
+          const res = await fetch('/api/workspace/targets', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              uid: activeUid,
+              teamName: target.teamName,
+              monthName: formattedMonth,
+              members: target.members.map((m: any) => ({
+                employeeId: m.employeeId,
+                name: m.name,
+                officialTarget: m.officialTarget || 0,
+                teamTarget: m.teamTarget || 0,
+                achieved: 0 // achieved reset to 0
+              }))
+            })
+          });
+          const data = await res.json();
+          if (!data.success) {
+            throw new Error(data.error || `Failed to clone team ${target.teamName}`);
+          }
+        }
+        toast.success(`Month folder "${formattedMonth}" created with carried over members!`);
       } else {
-        toast.error(data.error || 'Failed to create month');
+        // Create month folder with a single empty CC team target
+        const res = await fetch('/api/workspace/targets', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            uid: activeUid,
+            teamName: 'CC',
+            monthName: formattedMonth,
+            members: []
+          })
+        });
+        const data = await res.json();
+        if (!data.success) {
+          throw new Error(data.error || 'Failed to create empty folder');
+        }
+        toast.success(`Month folder "${formattedMonth}" created`);
       }
-    } catch (err) {
-      toast.error('Error creating month');
+      
+      setNewMonthName('');
+      setCarryOverChecked(false);
+      setIsMonthModalOpen(false);
+      await fetchTargets();
+      setSelectedMonth(formattedMonth); 
+    } catch (err: any) {
+      toast.error(err.message || 'Error creating month');
     } finally {
       setIsCreatingMonth(false);
     }
@@ -1728,6 +1805,72 @@ export default function MonthlyTargetTab() {
                   />
                   <p className="text-[10px] text-gray-500 font-medium">Provide Month and Year to distinguish target collections.</p>
                 </div>
+
+                {/* Carry Over Section */}
+                {uniqueMonths.length > 0 && (
+                  <div className="space-y-3 pt-3 border-t border-white/5">
+                    <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                      <input 
+                        type="checkbox" 
+                        checked={carryOverChecked}
+                        onChange={e => setCarryOverChecked(e.target.checked)}
+                        className="w-4 h-4 rounded border-gray-800 text-brand-green focus:ring-brand-green bg-black"
+                      />
+                      <span className="text-xs font-black text-white uppercase tracking-wider">Carry over member info</span>
+                    </label>
+
+                    {carryOverChecked && (
+                      <motion.div 
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        className="space-y-3 pl-6 overflow-hidden"
+                      >
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-extrabold text-gray-500 uppercase tracking-widest block">Source Month</label>
+                          <select
+                            value={sourceMonthSelect}
+                            onChange={e => setSourceMonthSelect(e.target.value)}
+                            className="w-full bg-[#111625] border border-gray-800 rounded-xl px-3 py-2 text-xs text-white focus:border-green-500 focus:outline-none cursor-pointer"
+                          >
+                            {uniqueMonths.map(m => (
+                              <option key={m} value={m}>{m}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* Checklist of Teams to copy */}
+                        <div className="space-y-2">
+                          <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-widest block">Select Teams to copy</span>
+                          <div className="bg-[#0b0f19] border border-white/5 rounded-xl p-2.5 max-h-36 overflow-y-auto space-y-2.5 custom-scrollbar">
+                            {targets.filter(t => t.monthName === sourceMonthSelect).map(t => (
+                              <label key={t._id} className="flex items-center justify-between text-xs cursor-pointer select-none">
+                                <div className="flex items-center gap-2">
+                                  <input 
+                                    type="checkbox" 
+                                    checked={!!selectedTeamsChecklist[t._id]}
+                                    onChange={e => {
+                                      setSelectedTeamsChecklist(prev => ({
+                                        ...prev,
+                                        [t._id]: e.target.checked
+                                      }));
+                                    }}
+                                    className="w-3.5 h-3.5 rounded border-gray-800 text-brand-green focus:ring-brand-green bg-black"
+                                  />
+                                  <span className="text-xs font-bold text-white">Team {t.teamName}</span>
+                                </div>
+                                <span className="text-[10px] text-gray-500 font-mono font-bold uppercase">{t.members.length} members</span>
+                              </label>
+                            ))}
+                            {targets.filter(t => t.monthName === sourceMonthSelect).length === 0 && (
+                              <span className="text-[10px] text-gray-500 italic block">No active teams found in selected month.</span>
+                            )}
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </div>
+                )}
+
                 <div className="pt-2 flex justify-end gap-3">
                   <button type="button" onClick={() => setIsMonthModalOpen(false)} className="px-4 py-2.5 text-xs font-bold text-gray-400 hover:text-white transition-colors cursor-pointer">Cancel</button>
                   <button type="submit" disabled={isCreatingMonth} className="px-5 py-2.5 text-xs font-black bg-brand-green hover:bg-brand-green-hover text-black rounded-xl uppercase tracking-wider transition-colors flex items-center gap-2 shadow-lg glow-green cursor-pointer">
@@ -1902,7 +2045,14 @@ export default function MonthlyTargetTab() {
                                 required
                                 type="text" 
                                 value={m.employeeId} 
-                                onChange={e => handleMemberFieldChange(idx, 'employeeId', e.target.value)} 
+                                onChange={e => {
+                                  const val = e.target.value;
+                                  handleMemberFieldChange(idx, 'employeeId', val);
+                                  const matchedName = knownMembersMap[val.trim().toUpperCase()];
+                                  if (matchedName) {
+                                    handleMemberFieldChange(idx, 'name', matchedName);
+                                  }
+                                }} 
                                 placeholder="ID (e.g. EMP-101)" 
                                 className="w-28 bg-black/40 border border-white/10 px-2.5 py-1.5 rounded-lg text-white font-mono focus:border-brand-green/40 focus:ring-1 focus:ring-brand-green/20 focus:outline-none transition-all" 
                               />
@@ -2141,18 +2291,69 @@ export default function MonthlyTargetTab() {
                   </div>
                 </div>
 
+                {/* Selector for request type */}
+                <div className="flex bg-black/40 border border-white/5 p-1 rounded-xl">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRequestType('add');
+                      setRequestedAchieved('');
+                    }}
+                    className={`flex-1 py-1.5 text-[9px] font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer ${
+                      requestType === 'add'
+                        ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    + Add to Current
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRequestType('override');
+                      setRequestedAchieved('');
+                    }}
+                    className={`flex-1 py-1.5 text-[9px] font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer ${
+                      requestType === 'override'
+                        ? 'bg-green-500/20 text-brand-green border border-green-500/30'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    Override Total
+                  </button>
+                </div>
+
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block">New Achieved Score ($)</label>
+                  <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block">
+                    {requestType === 'add' ? 'Value to Add ($)' : 'New Total Achieved ($)'}
+                  </label>
                   <input 
                     required 
                     autoFocus 
                     type="number" 
-                    placeholder="Enter new achieved value" 
+                    placeholder={requestType === 'add' ? "e.g. 500" : "Enter new total score"} 
                     value={requestedAchieved} 
                     onChange={e => setRequestedAchieved(e.target.value)} 
-                    className="w-full glass-input px-3.5 py-2.5 text-sm bg-black/50 border border-gray-800 rounded-xl focus:border-green-500 focus:outline-none text-white transition-colors" 
+                    className="w-full glass-input px-3.5 py-2.5 text-sm bg-black/50 border border-gray-850 focus:border-green-500 rounded-xl focus:outline-none text-white transition-colors" 
+                    min="0"
                   />
-                  <p className="text-[10px] text-gray-500 font-medium">Input your updated achievement figures. Admin approval is required to update the ledger.</p>
+                  {requestedAchieved && !isNaN(Number(requestedAchieved)) && (
+                    <div className="p-2.5 rounded-lg bg-[#0a101b] border border-white/5 text-[9px] text-gray-400 font-bold uppercase tracking-wider flex justify-between items-center">
+                      <span>Resulting Score:</span>
+                      <span className="font-mono text-white text-xs">
+                        {requestType === 'add'
+                          ? `$${activeRequestTarget.oldAchieved} + $${Number(requestedAchieved)} = $${activeRequestTarget.oldAchieved + Number(requestedAchieved)}`
+                          : `$${Number(requestedAchieved)}`
+                        }
+                      </span>
+                    </div>
+                  )}
+                  <p className="text-[10px] text-gray-500 font-medium">
+                    {requestType === 'add'
+                      ? 'The entered value will be added directly onto your current score upon approval.'
+                      : 'This value will overwrite your current score completely upon approval.'
+                    }
+                  </p>
                 </div>
 
                 <div className="pt-2 flex justify-end gap-3">
