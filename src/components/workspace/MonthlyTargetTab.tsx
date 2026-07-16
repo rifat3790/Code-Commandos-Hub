@@ -1932,7 +1932,7 @@ export default function MonthlyTargetTab() {
               initial={{ opacity: 0, scale: 0.96, y: 15 }} 
               animate={{ opacity: 1, scale: 1, y: 0 }} 
               exit={{ opacity: 0, scale: 0.96, y: 15 }} 
-              className="relative w-full max-w-4xl bg-gradient-to-b from-[#0d111c] to-[#080a10] border border-brand-green/20 rounded-2xl shadow-[0_0_50px_rgba(0,201,80,0.08)] overflow-hidden z-10 flex flex-col max-h-[85vh] transition-all duration-300"
+              className="relative w-full max-w-6xl bg-gradient-to-b from-[#0d111c] to-[#080a10] border border-brand-green/20 rounded-2xl shadow-[0_0_55px_rgba(0,201,80,0.1)] overflow-hidden z-10 flex flex-col max-h-[85vh] transition-all duration-300"
             >
               <div className="p-5 border-b border-white/5 flex justify-between items-center bg-black/60 backdrop-blur-md">
                 <div>
@@ -2025,7 +2025,7 @@ export default function MonthlyTargetTab() {
                     )}
                   </AnimatePresence>
 
-                  <div className="overflow-x-auto border border-white/5 rounded-xl">
+                  <div className="overflow-x-hidden border border-white/5 rounded-xl">
                     <table className="w-full text-left text-xs whitespace-nowrap">
                       <thead className="bg-[#0b0f19] text-gray-400 font-bold uppercase tracking-wider border-b border-white/5">
                         <tr>
@@ -2053,8 +2053,8 @@ export default function MonthlyTargetTab() {
                                     handleMemberFieldChange(idx, 'name', matchedName);
                                   }
                                 }} 
-                                placeholder="ID (e.g. EMP-101)" 
-                                className="w-28 bg-black/40 border border-white/10 px-2.5 py-1.5 rounded-lg text-white font-mono focus:border-brand-green/40 focus:ring-1 focus:ring-brand-green/20 focus:outline-none transition-all" 
+                                placeholder="e.g. 16573" 
+                                className="w-36 bg-black/40 border border-white/10 px-2.5 py-1.5 rounded-lg text-white font-mono focus:border-brand-green/40 focus:ring-1 focus:ring-brand-green/20 focus:outline-none transition-all" 
                               />
                             </td>
                             <td className="px-3 py-2">
@@ -2063,8 +2063,8 @@ export default function MonthlyTargetTab() {
                                 type="text" 
                                 value={m.name} 
                                 onChange={e => handleMemberFieldChange(idx, 'name', e.target.value)} 
-                                placeholder="Employee Name" 
-                                className="w-44 bg-black/40 border border-white/10 px-2.5 py-1.5 rounded-lg text-white font-semibold focus:border-brand-green/40 focus:ring-1 focus:ring-brand-green/20 focus:outline-none transition-all" 
+                                placeholder="Employee Name (e.g. Rifat)" 
+                                className="w-64 bg-black/40 border border-white/10 px-2.5 py-1.5 rounded-lg text-white font-semibold focus:border-brand-green/40 focus:ring-1 focus:ring-brand-green/20 focus:outline-none transition-all" 
                               />
                             </td>
                             <td className="px-3 py-2 text-right">
@@ -2072,7 +2072,7 @@ export default function MonthlyTargetTab() {
                                 type="number" 
                                 value={m.officialTarget} 
                                 onChange={e => handleMemberFieldChange(idx, 'officialTarget', Math.max(0, Number(e.target.value)))} 
-                                className="w-24 bg-black/40 border border-white/10 px-2.5 py-1.5 rounded-lg text-white text-right font-mono focus:border-brand-green/40 focus:ring-1 focus:ring-brand-green/20 focus:outline-none transition-all" 
+                                className="w-32 bg-black/40 border border-white/10 px-2.5 py-1.5 rounded-lg text-white text-right font-mono focus:border-brand-green/40 focus:ring-1 focus:ring-brand-green/20 focus:outline-none transition-all" 
                                 min="0"
                               />
                             </td>
@@ -2081,7 +2081,7 @@ export default function MonthlyTargetTab() {
                                 type="number" 
                                 value={m.teamTarget} 
                                 onChange={e => handleMemberFieldChange(idx, 'teamTarget', Math.max(0, Number(e.target.value)))} 
-                                className="w-24 bg-black/40 border border-white/10 px-2.5 py-1.5 rounded-lg text-white text-right font-semibold font-mono focus:border-brand-green/40 focus:ring-1 focus:ring-brand-green/20 focus:outline-none transition-all" 
+                                className="w-32 bg-black/40 border border-white/10 px-2.5 py-1.5 rounded-lg text-white text-right font-semibold font-mono focus:border-brand-green/40 focus:ring-1 focus:ring-brand-green/20 focus:outline-none transition-all" 
                                 min="0"
                               />
                             </td>
@@ -2091,7 +2091,7 @@ export default function MonthlyTargetTab() {
                                   type="number" 
                                   value={m.achieved} 
                                   onChange={e => handleMemberFieldChange(idx, 'achieved', Math.max(0, Number(e.target.value)))} 
-                                  className="w-20 bg-black/40 border border-green-500/20 px-2 py-1.5 rounded-lg text-brand-green text-right font-bold font-mono focus:border-brand-green focus:ring-1 focus:ring-brand-green/20 focus:outline-none transition-all text-xs" 
+                                  className="w-28 bg-black/40 border border-green-500/20 px-2 py-1.5 rounded-lg text-brand-green text-right font-bold font-mono focus:border-brand-green/20 focus:outline-none text-xs" 
                                   min="0"
                                   title="Directly edit total achieved"
                                 />
@@ -2100,7 +2100,7 @@ export default function MonthlyTargetTab() {
                                     type="number" 
                                     placeholder="+ Add"
                                     id={`add-val-${idx}`}
-                                    className="w-12 bg-transparent px-1.5 py-1 text-blue-400 text-right font-semibold font-mono focus:outline-none text-[10px] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
+                                    className="w-16 bg-transparent px-1.5 py-1 text-blue-400 text-right font-semibold font-mono focus:outline-none text-[10px] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
                                     min="0"
                                     onKeyDown={(e) => {
                                       if (e.key === 'Enter') {
