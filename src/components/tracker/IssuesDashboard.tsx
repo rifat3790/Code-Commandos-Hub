@@ -334,6 +334,14 @@ export default function IssuesDashboard({ csvData, activeLayout }: { csvData: st
       header: true,
       skipEmptyLines: true,
       complete: (results) => {
+        // Map empty key "" to "Assign Name" if it exists in parsed row objects
+        results.data.forEach((row: any) => {
+          if (row[''] !== undefined) {
+            row['Assign Name'] = row[''];
+            delete row[''];
+          }
+        });
+
         let extractedColumns: string[] = [];
         if (results.data.length > 0) {
           extractedColumns = Object.keys(results.data[0] as Record<string, unknown>).filter(k => k && k.trim() !== '' && !k.startsWith('_'));
@@ -435,11 +443,15 @@ export default function IssuesDashboard({ csvData, activeLayout }: { csvData: st
         const at = d['Assign Name'];
         if (!at || typeof at !== 'string') return false;
 
-        const parts = at.split('/').map(s => s.trim().toLowerCase()).filter(Boolean);
+        const parts = at.split('/').map(s => s.trim()).filter(Boolean);
         if (parts.length === 0) return false;
 
-        const rowTeams = parts.filter(p => p.length <= 3 && p.toUpperCase() === p || p.length <= 2);
-        const rowNames = parts.filter(p => !(p.length <= 3 && p.toUpperCase() === p || p.length <= 2));
+        const rowTeams = parts
+          .filter(p => (p.length <= 3 && p.toUpperCase() === p) || p.length <= 2)
+          .map(p => p.toLowerCase());
+        const rowNames = parts
+          .filter(p => !((p.length <= 3 && p.toUpperCase() === p) || p.length <= 2))
+          .map(p => p.toLowerCase());
 
         const teamMatch = assignTeamFilter.length === 0 || assignTeamFilter.some(f => rowTeams.includes(f.toLowerCase()));
         const nameMatch = nameFilter.length === 0 || nameFilter.some(f => rowNames.includes(f.toLowerCase()));
