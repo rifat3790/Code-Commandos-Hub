@@ -67,7 +67,177 @@ export default function AuditSuitePage() {
   
   // Shared URL input across tabs
   const [targetUrl, setTargetUrl] = useState('fitestore-2.myshopify.com');
-  const [activeTab, setActiveTab] = useState<'inspect' | 'speed' | 'seo'>('inspect');
+  const [activeTab, setActiveTab] = useState<'inspect' | 'speed' | 'seo' | 'transfer'>('inspect');
+
+  // Migration Tab State
+  const [migrationSourceUrl, setMigrationSourceUrl] = useState('');
+  const [fetchedWpProducts, setFetchedWpProducts] = useState<any[]>([]);
+  const [selectedProductIds, setSelectedProductIds] = useState<Record<string, boolean>>({});
+  const [isFetchingWp, setIsFetchingWp] = useState(false);
+  const [isMigrating, setIsMigrating] = useState(false);
+  const [migrationLogs, setMigrationLogs] = useState<string[]>([]);
+  const [downloadedCSV, setDownloadedCSV] = useState(false);
+
+  const handleDownloadShopifyCSV = () => {
+    const selectedList = fetchedWpProducts.filter(p => selectedProductIds[p.id]);
+    if (selectedList.length === 0) {
+      alert('Please select at least one product to export.');
+      return;
+    }
+
+    const headers = [
+      'Handle', 'Title', 'Body (HTML)', 'Vendor', 'Type', 'Tags', 'Published',
+      'Option1 Name', 'Option1 Value', 'Option2 Name', 'Option2 Value', 'Option3 Name', 'Option3 Value',
+      'Variant SKU', 'Variant Grams', 'Variant Inventory Tracker', 'Variant Inventory Qty', 'Variant Inventory Policy',
+      'Variant Fulfillment Service', 'Variant Price', 'Variant Compare At Price', 'Variant Requires Shipping', 'Variant Taxable',
+      'Variant Barcode', 'Image Src', 'Image Position', 'Image Alt Text', 'Gift Card', 'SEO Title', 'SEO Description',
+      'Google Shopping / Google Product Category', 'Google Shopping / Gender', 'Google Shopping / Age Group', 'Google Shopping / MPN',
+      'Google Shopping / AdWords Grouping', 'Google Shopping / AdWords Labels', 'Google Shopping / Condition', 'Google Shopping / Custom Product',
+      'Google Shopping / Custom Label 0', 'Google Shopping / Custom Label 1', 'Google Shopping / Custom Label 2', 'Google Shopping / Custom Label 3',
+      'Google Shopping / Custom Label 4', 'Variant Image', 'Variant Weight Unit', 'Variant Tax Code', 'Cost per item', 'Status', 'Collection'
+    ];
+
+    const escapeCSVCell = (val: any) => {
+      if (val === null || val === undefined) return '""';
+      const str = String(val);
+      return `"${str.replace(/"/g, '""')}"`;
+    };
+
+    const csvRows: string[] = [];
+    csvRows.push(headers.join(','));
+
+    selectedList.forEach(p => {
+      // Create clean handle
+      const handle = p.title
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)/g, '');
+
+      const variants = p.variants || [];
+      const images = p.images || [];
+      const maxRows = Math.max(variants.length, images.length, 1);
+
+      const option1Name = p.options?.[0]?.name || (variants.length > 1 ? 'Title' : '');
+      const option2Name = p.options?.[1]?.name || '';
+      const option3Name = p.options?.[2]?.name || '';
+
+      const collectionName = p.categories && p.categories.length > 0
+        ? p.categories.join(', ')
+        : (p.product_type || 'General');
+
+      for (let i = 0; i < maxRows; i++) {
+        const rowData: Record<string, string> = {};
+
+        // Group rows under same handle
+        rowData['Handle'] = handle;
+
+        if (i === 0) {
+          rowData['Title'] = p.title;
+          rowData['Body (HTML)'] = p.body_html || '';
+          rowData['Vendor'] = p.vendor || 'WooCommerce Import';
+          rowData['Type'] = p.product_type || 'General';
+          rowData['Tags'] = p.tags || '';
+          rowData['Published'] = 'TRUE';
+          rowData['Status'] = 'active';
+          rowData['Gift Card'] = 'FALSE';
+          rowData['Option1 Name'] = option1Name;
+          rowData['Option2 Name'] = option2Name;
+          rowData['Option3 Name'] = option3Name;
+          rowData['Collection'] = collectionName;
+        }
+
+        if (i < variants.length) {
+          const v = variants[i];
+          rowData['Option1 Value'] = v.option1 || (variants.length > 1 ? v.title : 'Default Title');
+          rowData['Option2 Value'] = v.option2 || '';
+          rowData['Option3 Value'] = v.option3 || '';
+          rowData['Variant SKU'] = v.sku || '';
+          rowData['Variant Price'] = v.price || '0.00';
+          rowData['Variant Compare At Price'] = v.compare_at_price || '';
+          rowData['Variant Grams'] = '0';
+          rowData['Variant Inventory Tracker'] = 'shopify';
+          rowData['Variant Inventory Qty'] = '100';
+          rowData['Variant Inventory Policy'] = 'deny';
+          rowData['Variant Fulfillment Service'] = 'manual';
+          rowData['Variant Requires Shipping'] = 'TRUE';
+          rowData['Variant Taxable'] = 'TRUE';
+          rowData['Variant Weight Unit'] = 'g';
+        }
+
+        if (i < images.length) {
+          rowData['Image Src'] = images[i].src || '';
+          rowData['Image Position'] = String(i + 1);
+          rowData['Image Alt Text'] = images[i].alt || p.title;
+        }
+
+        const row = headers.map(h => escapeCSVCell(rowData[h] || ''));
+        csvRows.push(row.join(','));
+      }
+    });
+
+    // Create a blob and download it
+    const csvContent = "\ufeff" + csvRows.join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `shopify_import_${Date.now()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    setDownloadedCSV(true);
+    setTimeout(() => setDownloadedCSV(false), 2000);
+    addMigrationLog(`Successfully compiled and downloaded Shopify CSV with ${selectedList.length} products!`, 'success');
+  };
+
+  const addMigrationLog = (message: string, type: 'info' | 'success' | 'error' = 'info') => {
+    const timestamp = new Date().toLocaleTimeString();
+    const prefix = type === 'success' ? '✔ [SUCCESS]' : type === 'error' ? '✖ [ERROR]' : 'ℹ [INFO]';
+    setMigrationLogs(prev => [...prev, `[${timestamp}] ${prefix} ${message}`]);
+  };
+
+  const handleFetchWpProducts = async () => {
+    if (!migrationSourceUrl.trim()) {
+      alert('Please enter a WooCommerce website URL.');
+      return;
+    }
+    setIsFetchingWp(true);
+    setFetchedWpProducts([]);
+    setSelectedProductIds({});
+    
+    const timestamp = new Date().toLocaleTimeString();
+    setMigrationLogs([`[${timestamp}] ℹ [INFO] Connecting to WooCommerce Store: ${migrationSourceUrl}`]);
+    
+    try {
+      addMigrationLog('Querying store API for products catalog...');
+      const cleanUrl = migrationSourceUrl.trim();
+      const res = await fetch(`/api/analyze-site/products?domain=${encodeURIComponent(cleanUrl)}&page=1&limit=100&platform=WooCommerce`);
+      const data = await res.json();
+      
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to fetch catalog.');
+      }
+      
+      const products = data.products || [];
+      setFetchedWpProducts(products);
+      
+      // Auto select all products
+      const initialSelected: Record<string, boolean> = {};
+      products.forEach((p: any) => {
+        initialSelected[p.id] = true;
+      });
+      setSelectedProductIds(initialSelected);
+      
+      addMigrationLog(`Success! Discovered ${products.length} products with variation models. Ready for direct Shopify transfer.`, 'success');
+    } catch (err: any) {
+      addMigrationLog(`Failed: ${err.message}`, 'error');
+    } finally {
+      setIsFetchingWp(false);
+    }
+  };
+
+
   
   // Global Layout Styling Hook
   const activeLayout = store.settings?.globalLayout || 'default';
@@ -113,7 +283,7 @@ export default function AuditSuitePage() {
     isShopify: boolean; 
     domain: string; 
     theme?: {name: string, id: string, role: string, originalName?: string}; 
-    apps?: string[]; 
+    apps?: { name: string; link?: string }[]; 
     pixels?: string[]; 
     socials?: string[]; 
     emails?: string[];
@@ -497,31 +667,32 @@ Report generated on Code Commandos Speed Audit Suite.`;
           setIsLoadingLighthouse(false);
         });
 
-      if (detectData.theme?.originalName) addLog(`Original Theme Match: ${detectData.theme.originalName}`, 'success');
-      if (detectData.theme?.name) addLog(`Theme renamed to: ${detectData.theme.name}`, 'info');
-      if (detectData.apps?.length > 0) addLog(`Detected ${detectData.apps.length} Shopify apps`, 'success');
-      if (detectData.pixels?.length > 0) addLog(`Detected ${detectData.pixels.length} marketing pixels`, 'success');
+      if (detectData.theme?.originalName) addLog(`Original Theme/Template: ${detectData.theme.originalName}`, 'success');
+      if (detectData.theme?.name && detectData.theme.name !== detectData.theme.originalName) addLog(`Theme/Template name in settings: ${detectData.theme.name}`, 'info');
+      if (detectData.apps?.length > 0) {
+        const platformLabel = detectData.isShopify ? 'Shopify apps' : 'active apps & integrations';
+        addLog(`Detected ${detectData.apps.length} ${platformLabel}`, 'success');
+      }
+      if (detectData.pixels?.length > 0) addLog(`Detected ${detectData.pixels.length} marketing pixels/trackers`, 'success');
 
       addLog(`Resolved domain: ${detectData.domain}`, 'success');
       addLog(`Platform detected: ${detectData.technology}`, 'success');
 
       store.logActivity('Website Scanned', 'note', `Scanned: ${detectData.domain} (${detectData.technology})`);
 
-      if (!detectData.isShopify) {
-        addLog('Non-Shopify website detected. Product inspection and theme clone are only available for Shopify stores.', 'info');
-        setScanStatus('completed');
-        return;
+      const initialCollections = detectData.isShopify ? (detectData.collections || []) : [];
+      if (detectData.isShopify) {
+        // Load collections
+        setCollections(initialCollections.map((c: any) => ({
+          ...c,
+          productCount: 0,
+          products: [],
+          isLoading: false
+        })));
+        addLog(`Discovered ${initialCollections.length} public collections from collection manifests`, 'success');
+      } else {
+        addLog(`Non-Shopify site (${detectData.technology}) detected. Launching catalog product scanner...`, 'info');
       }
-
-      // Load collections
-      const initialCollections = detectData.collections || [];
-      setCollections(initialCollections.map((c: any) => ({
-        ...c,
-        productCount: 0,
-        products: [],
-        isLoading: false
-      })));
-      addLog(`Discovered ${initialCollections.length} public collections from collection manifests`, 'success');
 
       // Fetch products
       setScanStatus('fetching_products');
@@ -533,7 +704,7 @@ Report generated on Code Commandos Speed Audit Suite.`;
 
       while (hasMore) {
         addLog(`Scraping products manifest page ${page}...`);
-        const prodRes = await fetch(`/api/analyze-site/products?domain=${detectData.domain}&page=${page}&limit=250&storePassword=${encodeURIComponent(storePassword)}&sessionCookie=${encodeURIComponent(detectData.sessionCookie || '')}`);
+        const prodRes = await fetch(`/api/analyze-site/products?domain=${detectData.domain}&page=${page}&limit=250&storePassword=${encodeURIComponent(storePassword)}&sessionCookie=${encodeURIComponent(detectData.sessionCookie || '')}&platform=${encodeURIComponent(detectData.technology)}`);
         if (!prodRes.ok) {
           addLog(`Error fetching products page ${page}. Stopping crawl.`, 'error');
           break;
@@ -575,7 +746,7 @@ Report generated on Code Commandos Speed Audit Suite.`;
           let collProducts: any[] = [];
 
           while (collHasMore) {
-            const collProdRes = await fetch(`/api/analyze-site/products?domain=${detectData.domain}&collection=${collection.handle}&page=${collPage}&limit=250&storePassword=${encodeURIComponent(storePassword)}&sessionCookie=${encodeURIComponent(detectData.sessionCookie || '')}`);
+            const collProdRes = await fetch(`/api/analyze-site/products?domain=${detectData.domain}&collection=${collection.handle}&page=${collPage}&limit=250&storePassword=${encodeURIComponent(storePassword)}&sessionCookie=${encodeURIComponent(detectData.sessionCookie || '')}&platform=${encodeURIComponent(detectData.technology)}`);
             if (!collProdRes.ok) {
               addLog(`Error fetching products for collection "${collection.title}".`, 'error');
               break;
@@ -1039,7 +1210,8 @@ Report generated on Code Commandos Speed Audit Suite.`;
         {[
           { id: 'inspect', name: 'Intelligence Inspector', icon: Globe },
           { id: 'speed', name: 'Speed Optimizer', icon: Gauge },
-          { id: 'seo', name: 'SEO & Schema Auditor', icon: FileSearch }
+          { id: 'seo', name: 'SEO & Schema Auditor', icon: FileSearch },
+          { id: 'transfer', name: 'WordPress to Shopify Transfer', icon: FolderSync }
         ].map((tab) => {
           const isActive = activeTab === tab.id;
           const Icon = tab.icon;
@@ -1252,48 +1424,52 @@ Report generated on Code Commandos Speed Audit Suite.`;
                     </div>
 
                     {techInfo.theme && (
-                      <div className="p-4 bg-black/40 border border-glass-border rounded-lg flex flex-col relative overflow-hidden space-y-3">
+                      <div className="p-4 bg-black/40 border border-glass-border rounded-lg flex flex-col relative overflow-hidden space-y-3 text-left">
                         <div className="absolute top-0 right-0 w-24 h-24 bg-brand-green/10 blur-3xl rounded-full pointer-events-none" />
                         
                         <div className="flex justify-between items-center">
                           <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider flex items-center gap-1">
-                            <Code className="w-3 h-3 text-brand-green" /> Theme Architecture
+                            <Code className="w-3 h-3 text-brand-green" /> {techInfo.isShopify ? 'Theme Architecture' : 'Template/Layout'}
                           </span>
                           
-                          <div className="flex bg-black/45 border border-glass-border rounded p-0.5 text-[9px] font-bold">
-                            <button
-                              onClick={() => setExportMethod('public')}
-                              className={`px-1.5 py-0.5 rounded transition-all ${exportMethod === 'public' ? 'bg-brand-green text-black' : 'text-gray-400 hover:text-white'}`}
-                            >
-                              Clone
-                            </button>
-                            <button
-                              onClick={() => setExportMethod('admin')}
-                              className={`px-1.5 py-0.5 rounded transition-all ${exportMethod === 'admin' ? 'bg-yellow-500 text-black' : 'text-gray-400 hover:text-white'}`}
-                            >
-                              API Token
-                            </button>
-                            <button
-                              onClick={() => setExportMethod('extension')}
-                              className={`px-1.5 py-0.5 rounded transition-all ${exportMethod === 'extension' ? 'bg-purple-500 text-white' : 'text-gray-400 hover:text-white'}`}
-                            >
-                              Ext
-                            </button>
-                          </div>
+                          {techInfo.isShopify && (
+                            <div className="flex bg-black/45 border border-glass-border rounded p-0.5 text-[9px] font-bold">
+                              <button
+                                onClick={() => setExportMethod('public')}
+                                className={`px-1.5 py-0.5 rounded transition-all ${exportMethod === 'public' ? 'bg-brand-green text-black' : 'text-gray-400 hover:text-white'}`}
+                              >
+                                Clone
+                              </button>
+                              <button
+                                onClick={() => setExportMethod('admin')}
+                                className={`px-1.5 py-0.5 rounded transition-all ${exportMethod === 'admin' ? 'bg-yellow-500 text-black' : 'text-gray-400 hover:text-white'}`}
+                              >
+                                API Token
+                              </button>
+                              <button
+                                onClick={() => setExportMethod('extension')}
+                                className={`px-1.5 py-0.5 rounded transition-all ${exportMethod === 'extension' ? 'bg-purple-500 text-white' : 'text-gray-400 hover:text-white'}`}
+                              >
+                                Ext
+                              </button>
+                            </div>
+                          )}
                         </div>
                         
                         <div className="flex justify-between items-end">
                           <div>
-                            <span className="text-xs text-gray-400 block mb-0.5">Original Theme</span>
+                            <span className="text-xs text-gray-400 block mb-0.5">{techInfo.isShopify ? 'Original Theme' : 'Original Template'}</span>
                             <span className="text-base font-black text-white">{techInfo.theme.originalName || 'Unknown'}</span>
                           </div>
-                          <div className="text-right">
-                            <span className="text-[10px] text-gray-500 block mb-0.5">Active/Renamed As</span>
-                            <span className="text-xs font-bold text-gray-300">{techInfo.theme.name}</span>
-                          </div>
+                          {techInfo.theme.name !== techInfo.theme.originalName && (
+                            <div className="text-right">
+                              <span className="text-[10px] text-gray-500 block mb-0.5">Active/Renamed As</span>
+                              <span className="text-xs font-bold text-gray-300">{techInfo.theme.name}</span>
+                            </div>
+                          )}
                         </div>
 
-                        {exportMethod === 'admin' && (
+                        {techInfo.isShopify && exportMethod === 'admin' && (
                           <div className="space-y-2 p-3 rounded bg-yellow-500/5 border border-yellow-500/20 text-[10px]">
                             <label className="text-yellow-500 font-bold block">Shopify Admin API Token</label>
                             <input
@@ -1306,7 +1482,7 @@ Report generated on Code Commandos Speed Audit Suite.`;
                           </div>
                         )}
 
-                        {exportMethod === 'extension' && (
+                        {techInfo.isShopify && exportMethod === 'extension' && (
                           <div className="space-y-2 p-3 rounded bg-purple-500/5 border border-purple-500/20 text-[10px]">
                             {isExtensionInstalled ? (
                               <>
@@ -1339,36 +1515,54 @@ Report generated on Code Commandos Speed Audit Suite.`;
                         <div className="pt-2 border-t border-glass-border/50 flex justify-between items-center text-[10px] text-gray-500 font-mono">
                           <div className="flex flex-col gap-0.5">
                             <span>ID: {techInfo.theme.id}</span>
-                            <span>Role: {techInfo.theme.role}</span>
+                            {techInfo.theme.role && <span>Role: {techInfo.theme.role}</span>}
                           </div>
                           
-                          <button
-                            onClick={handleExportTheme}
-                            disabled={isExportingTheme}
-                            className={`px-2.5 py-1 font-extrabold text-[10px] uppercase tracking-wider rounded transition-all flex items-center gap-1 disabled:opacity-50 ${exportMethod === 'admin' ? 'bg-yellow-500 hover:bg-yellow-600 text-black' : exportMethod === 'extension' ? 'bg-purple-500 hover:bg-purple-600 text-white' : 'bg-brand-green hover:bg-brand-green-hover text-black'}`}
-                          >
-                            {isExportingTheme ? (
-                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            ) : (
-                              <Download className="w-3.5 h-3.5" />
-                            )}
-                            <span>{exportMethod === 'admin' || exportMethod === 'extension' ? 'Export Original' : 'Export Clone'}</span>
-                          </button>
+                          {techInfo.isShopify && (
+                            <button
+                              onClick={handleExportTheme}
+                              disabled={isExportingTheme}
+                              className={`px-2.5 py-1 font-extrabold text-[10px] uppercase tracking-wider rounded transition-all flex items-center gap-1 disabled:opacity-50 ${exportMethod === 'admin' ? 'bg-yellow-500 hover:bg-yellow-600 text-black' : exportMethod === 'extension' ? 'bg-purple-500 hover:bg-purple-600 text-white' : 'bg-brand-green hover:bg-brand-green-hover text-black'}`}
+                            >
+                              {isExportingTheme ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <Download className="w-3.5 h-3.5" />
+                              )}
+                              <span>{exportMethod === 'admin' || exportMethod === 'extension' ? 'Export Original' : 'Export Clone'}</span>
+                            </button>
+                          )}
                         </div>
                       </div>
                     )}
 
                     {techInfo.apps && techInfo.apps.length > 0 && (
-                      <div className="space-y-2 pt-1">
-                        <span className="text-[10px] text-gray-500 font-bold block uppercase tracking-wider flex items-center gap-1">
-                          <Zap className="w-3 h-3 text-brand-green" /> Detected App Stack
+                      <div className="space-y-2 pt-1 animate-in fade-in duration-500">
+                        <span className="text-[10px] text-gray-550 font-extrabold block uppercase tracking-wider flex items-center gap-1.5">
+                          <Zap className="w-3 h-3 text-brand-green animate-pulse" /> 
+                          <span>Detected App & Plugin Stack</span>
                         </span>
                         <div className="flex flex-wrap gap-2">
-                          {techInfo.apps.map(app => (
-                            <span key={app} className="px-2 py-1 bg-white/5 border border-white/10 rounded text-[10px] font-bold text-gray-300 hover:text-white transition-all">
-                              {app}
-                            </span>
-                          ))}
+                          {techInfo.apps.map(app => {
+                            const name = typeof app === 'string' ? app : app.name;
+                            const link = typeof app === 'string' ? '' : app.link;
+                            return link ? (
+                              <a
+                                key={name}
+                                href={link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="px-2.5 py-1 bg-green-500/5 border border-green-500/20 hover:border-green-400 hover:bg-green-500/10 rounded text-[10px] font-extrabold text-green-400 hover:text-green-300 transition-all duration-300 flex items-center gap-1 shadow-[0_0_8px_rgba(34,197,94,0.02)] hover:shadow-[0_0_12px_rgba(34,197,94,0.15)] transform hover:-translate-y-0.5"
+                              >
+                                <span>{name}</span>
+                                <svg className="w-2.5 h-2.5 opacity-60 group-hover:opacity-100 transition-opacity" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3"/></svg>
+                              </a>
+                            ) : (
+                              <span key={name} className="px-2 py-1 bg-white/5 border border-white/10 rounded text-[10px] font-bold text-gray-300 transition-all duration-300">
+                                {name}
+                              </span>
+                            );
+                          })}
                         </div>
                       </div>
                     )}
@@ -1388,22 +1582,22 @@ Report generated on Code Commandos Speed Audit Suite.`;
                       </div>
                     )}
 
-                    {techInfo.isShopify && (
+                    {allProducts.length > 0 && (
                       <div className="space-y-3 pt-2 border-t border-glass-border">
-                        <div className="flex justify-between items-center text-xs">
-                          <span className="text-gray-400">Public Collections</span>
-                          <span className="font-bold text-white">{collections.length}</span>
-                        </div>
-
-                        {allProducts.length > 0 && (
-                          <button
-                            onClick={() => handleExportCSV(allProducts, `${techInfo.domain}-all-products`)}
-                            className="w-full flex items-center justify-center gap-2 bg-brand-green hover:bg-brand-green-hover text-black font-extrabold text-xs uppercase tracking-wider py-2.5 px-4 rounded-lg transition-all shadow-lg glow-green"
-                          >
-                            <Download className="w-4 h-4 stroke-[3]" />
-                            <span>Export All Products (Shopify CSV)</span>
-                          </button>
+                        {techInfo.isShopify && (
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="text-gray-400">Public Collections</span>
+                            <span className="font-bold text-white">{collections.length}</span>
+                          </div>
                         )}
+
+                        <button
+                          onClick={() => handleExportCSV(allProducts, `${techInfo.domain}-all-products`)}
+                          className="w-full flex items-center justify-center gap-2 bg-brand-green hover:bg-brand-green-hover text-black font-extrabold text-xs uppercase tracking-wider py-2.5 px-4 rounded-lg transition-all shadow-lg glow-green cursor-pointer"
+                        >
+                          <Download className="w-4 h-4 stroke-[3]" />
+                          <span>Export All Products (CSV)</span>
+                        </button>
                       </div>
                     )}
                   </div>
@@ -1415,10 +1609,10 @@ Report generated on Code Commandos Speed Audit Suite.`;
               </div>
 
               {/* Collections Breakdowns */}
-              {techInfo?.isShopify && collections.length > 0 && (
+              {collections.length > 0 && (
                 <div className={auditStyles.cardContainer}>
                   <span className="text-[10px] text-gray-500 font-extrabold uppercase tracking-wider flex items-center justify-between border-b border-glass-border pb-1.5">
-                    <span>Collections Breakdown</span>
+                    <span>{techInfo?.isShopify ? 'Collections Breakdown' : 'Product Categories'}</span>
                     <span className="text-green-400">{collections.length} items</span>
                   </span>
 
@@ -1443,7 +1637,7 @@ Report generated on Code Commandos Speed Audit Suite.`;
                           )}
 
                           <button
-                            onClick={() => handleExportCSV(coll.products, `${techInfo.domain}-${coll.handle}`)}
+                            onClick={() => handleExportCSV(coll.products, `${techInfo?.domain || 'store'}-${coll.handle}`)}
                             disabled={coll.isLoading || !coll.products || coll.products.length === 0}
                             className="p-1.5 rounded bg-glass-hover text-gray-400 hover:text-white disabled:opacity-30 disabled:pointer-events-none transition-all"
                             title={`Export collection: ${coll.title}`}
@@ -1639,7 +1833,7 @@ Report generated on Code Commandos Speed Audit Suite.`;
               </div>
             </div>
           </motion.div>
-        ) : (
+        ) : activeTab === 'seo' ? (
           <motion.div
             key="seo-panel"
             initial={{ opacity: 0, y: 10 }}
@@ -1800,6 +1994,196 @@ Report generated on Code Commandos Speed Audit Suite.`;
                   )}
                 </div>
               )}
+            </div>
+          </motion.div>
+        ) : (
+          // Migration/Transfer tab panel
+          <motion.div
+            key="transfer-panel"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="space-y-6 text-left"
+          >
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              {/* Left Column: Settings */}
+              <div className="lg:col-span-5 space-y-6">
+                {/* WooCommerce Source */}
+                <div className={auditStyles.cardContainer}>
+                  <h3 className="text-xs uppercase font-extrabold text-white tracking-wider flex items-center gap-2">
+                    <Globe className="w-4 h-4 text-green-400" />
+                    1. WooCommerce Source Store
+                  </h3>
+                  <p className="text-[11px] text-gray-400">
+                    Enter the WooCommerce shop URL to fetch products catalog from public REST APIs.
+                  </p>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={migrationSourceUrl}
+                      onChange={(e) => setMigrationSourceUrl(e.target.value)}
+                      placeholder="https://woocommerce-store.com"
+                      className={auditStyles.inputField}
+                    />
+                    <button
+                      onClick={handleFetchWpProducts}
+                      disabled={isFetchingWp || isMigrating}
+                      className={auditStyles.btnPrimary + " shrink-0 flex items-center gap-1.5 cursor-pointer"}
+                    >
+                      {isFetchingWp ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                      <span>Fetch</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className={auditStyles.cardContainer}>
+                  <h3 className="text-xs uppercase font-extrabold text-white tracking-wider flex items-center gap-2">
+                    <Download className="w-4 h-4 text-green-400" />
+                    2. Shopify Product CSV Export
+                  </h3>
+                  <p className="text-[11px] text-gray-400">
+                    Selected products will be formatted to match Shopify's official product migration CSV format.
+                  </p>
+
+                  <div className="space-y-4 pt-1">
+                    <div className="p-3 bg-black/40 border border-glass-border rounded-xl flex items-center justify-between text-xs">
+                      <span className="text-gray-400 font-bold">Selected Products</span>
+                      <span className="font-extrabold text-green-400 font-mono">
+                        {fetchedWpProducts.filter(p => selectedProductIds[p.id]).length} / {fetchedWpProducts.length}
+                      </span>
+                    </div>
+
+                    <button
+                      onClick={handleDownloadShopifyCSV}
+                      disabled={isFetchingWp || fetchedWpProducts.filter(p => selectedProductIds[p.id]).length === 0}
+                      className={`w-full flex items-center justify-center gap-2 font-extrabold text-xs uppercase tracking-wider py-3.5 px-4 rounded-xl transition-all shadow-lg cursor-pointer ${
+                        downloadedCSV
+                          ? 'bg-green-500/30 text-green-300 border border-green-400 scale-102 shadow-[0_0_15px_rgba(34,197,94,0.4)]'
+                          : 'bg-brand-green hover:bg-brand-green-hover text-black glow-green disabled:opacity-50 disabled:cursor-not-allowed'
+                      }`}
+                    >
+                      {downloadedCSV ? (
+                        <>
+                          <Check className="w-4 h-4 stroke-[3] animate-pulse" />
+                          <span>Shopify CSV Downloaded!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Download className="w-4 h-4 stroke-[3]" />
+                          <span>Download Shopify CSV</span>
+                        </>
+                      )}
+                    </button>
+
+                    <div className="text-[11px] text-gray-400 space-y-2 border-t border-glass-border/30 pt-3 text-left leading-relaxed">
+                      <span className="text-[10px] uppercase font-bold text-gray-500 tracking-wider block">Importing into Shopify:</span>
+                      <div className="flex gap-2">
+                        <span className="text-green-400 font-bold">Step 1:</span>
+                        <span>Open your target Shopify Admin dashboard (e.g. <code>https://admin.shopify.com/</code>).</span>
+                      </div>
+                      <div className="flex gap-2">
+                        <span className="text-green-400 font-bold">Step 2:</span>
+                        <span>Navigate to <strong>Products</strong> on the left navigation.</span>
+                      </div>
+                      <div className="flex gap-2">
+                        <span className="text-green-400 font-bold">Step 3:</span>
+                        <span>Click the <strong>Import</strong> button at the top right.</span>
+                      </div>
+                      <div className="flex gap-2">
+                        <span className="text-green-400 font-bold">Step 4:</span>
+                        <span>Upload the downloaded CSV and click **Upload and preview**.</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="lg:col-span-7 space-y-6">
+                <div className={auditStyles.cardContainer}>
+                  <div className="flex justify-between items-center border-b border-glass-border pb-2">
+                    <h3 className="text-xs uppercase font-extrabold text-white tracking-wider flex items-center gap-2">
+                      <Database className="w-4 h-4 text-green-400" />
+                      Fetched Catalog ({fetchedWpProducts.length} Items)
+                    </h3>
+                    {fetchedWpProducts.length > 0 && (
+                      <button
+                        onClick={() => {
+                          const allSelected = fetchedWpProducts.every(p => selectedProductIds[p.id]);
+                          const updated: Record<string, boolean> = {};
+                          fetchedWpProducts.forEach(p => {
+                            updated[p.id] = !allSelected;
+                          });
+                          setSelectedProductIds(updated);
+                        }}
+                        className="text-[10px] text-green-400 hover:text-green-300 font-bold uppercase cursor-pointer"
+                      >
+                        {fetchedWpProducts.every(p => selectedProductIds[p.id]) ? 'Deselect All' : 'Select All'}
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="max-h-[350px] overflow-y-auto space-y-2.5 pr-1">
+                    {fetchedWpProducts.length > 0 ? (
+                      fetchedWpProducts.map((prod) => {
+                        const isChecked = !!selectedProductIds[prod.id];
+                        return (
+                          <div 
+                            key={prod.id}
+                            className="p-3 bg-black/40 border border-glass-border hover:border-glass-border/30 rounded-lg flex items-center justify-between gap-3 text-xs"
+                          >
+                            <div className="flex items-center gap-3">
+                              <input 
+                                type="checkbox" 
+                                checked={isChecked}
+                                onChange={() => {
+                                  setSelectedProductIds(prev => ({
+                                    ...prev,
+                                    [prod.id]: !prev[prod.id]
+                                  }));
+                                }}
+                                className="w-4 h-4 accent-green-500 rounded border-glass-border bg-black cursor-pointer"
+                              />
+                              {prod.images?.[0]?.src ? (
+                                <img src={prod.images[0].src} alt="" className="w-10 h-10 object-cover rounded-lg border border-glass-border" />
+                              ) : (
+                                <div className="w-10 h-10 rounded-lg border border-glass-border bg-white/5 flex items-center justify-center text-[9px] text-gray-600">No Image</div>
+                              )}
+                              <div className="space-y-0.5 text-left">
+                                <span className="font-bold text-white block line-clamp-1">{prod.title}</span>
+                                <span className="text-[10px] text-gray-500 block">{prod.product_type} • {prod.variants?.length || 1} Variant(s)</span>
+                              </div>
+                            </div>
+                            <div className="text-right font-mono font-bold text-green-400">
+                              ${prod.variants?.[0]?.price || '0.00'}
+                            </div>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div className="text-center py-12 text-gray-500 text-xs italic">
+                        No products fetched yet. Enter a WooCommerce URL on the left and fetch products.
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Console Log */}
+                <div className={auditStyles.cardContainer}>
+                  <span className="text-[10px] text-gray-400 font-extrabold uppercase tracking-wider flex items-center gap-1.5">
+                    <Terminal className="w-3.5 h-3.5 text-green-400" />
+                    Migration Console output
+                  </span>
+                  <div className={auditStyles.consoleBox + " h-[160px]"}>
+                    {migrationLogs.length > 0 ? (
+                      migrationLogs.map((log, idx) => (
+                        <div key={idx} className="leading-normal">{log}</div>
+                      ))
+                    ) : (
+                      <div className="text-gray-600 italic">Logs will appear here once migration begins...</div>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
           </motion.div>
         )}
