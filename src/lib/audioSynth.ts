@@ -239,3 +239,175 @@ export const stopSynthesizedHum = () => {
   humFilter = null;
   humGain = null;
 };
+
+// Cosmic Space Drone Synthesizer: slow LFO-modulated bandpass sweep
+let cosmicNode: AudioWorkletNode | ScriptProcessorNode | null = null;
+let cosmicGain: GainNode | null = null;
+let cosmicLfo: OscillatorNode | null = null;
+
+export const startSynthesizedCosmic = (volume: number) => {
+  const ctx = getAudioContext();
+  if (!ctx) return;
+
+  if (cosmicNode) stopSynthesizedCosmic();
+
+  const bufferSize = 2 * ctx.sampleRate;
+  const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+  const output = noiseBuffer.getChannelData(0);
+  for (let i = 0; i < bufferSize; i++) {
+    output[i] = Math.random() * 2 - 1;
+  }
+
+  const whiteNoise = ctx.createBufferSource();
+  whiteNoise.buffer = noiseBuffer;
+  whiteNoise.loop = true;
+
+  const filter = ctx.createBiquadFilter();
+  filter.type = 'bandpass';
+  filter.frequency.value = 350;
+  filter.Q.value = 2.0;
+
+  cosmicLfo = ctx.createOscillator();
+  cosmicLfo.type = 'sine';
+  cosmicLfo.frequency.value = 0.08; 
+  
+  const lfoGain = ctx.createGain();
+  lfoGain.gain.value = 180;
+
+  cosmicGain = ctx.createGain();
+  cosmicGain.gain.setValueAtTime(volume * 0.12, ctx.currentTime);
+
+  cosmicLfo.connect(lfoGain);
+  lfoGain.connect(filter.frequency);
+
+  whiteNoise.connect(filter);
+  filter.connect(cosmicGain);
+  cosmicGain.connect(ctx.destination);
+
+  whiteNoise.start(0);
+  cosmicLfo.start(0);
+
+  cosmicNode = whiteNoise as any;
+};
+
+export const updateCosmicVolume = (volume: number) => {
+  const ctx = getAudioContext();
+  if (ctx && cosmicGain) {
+    cosmicGain.gain.linearRampToValueAtTime(volume * 0.12, ctx.currentTime + 0.1);
+  }
+};
+
+export const stopSynthesizedCosmic = () => {
+  if (cosmicNode) {
+    try {
+      (cosmicNode as any).stop();
+    } catch (e) {}
+    cosmicNode = null;
+  }
+  if (cosmicLfo) {
+    try {
+      cosmicLfo.stop();
+    } catch (e) {}
+    cosmicLfo = null;
+  }
+  cosmicGain = null;
+};
+
+// 1. Typewriter Bell (Chime) Synth
+export const playTypewriterBell = (volume: number = 0.5) => {
+  const ctx = getAudioContext();
+  if (!ctx) return;
+  const now = ctx.currentTime;
+  const osc1 = ctx.createOscillator();
+  const osc2 = ctx.createOscillator();
+  const gainNode = ctx.createGain();
+  
+  osc1.type = 'sine';
+  osc1.frequency.setValueAtTime(2500, now);
+  
+  osc2.type = 'sine';
+  osc2.frequency.setValueAtTime(3200, now);
+  
+  gainNode.gain.setValueAtTime(volume * 0.25, now);
+  gainNode.gain.exponentialRampToValueAtTime(0.0001, now + 0.8);
+  
+  osc1.connect(gainNode);
+  osc2.connect(gainNode);
+  gainNode.connect(ctx.destination);
+  
+  osc1.start(now);
+  osc2.start(now);
+  osc1.stop(now + 0.85);
+  osc2.stop(now + 0.85);
+};
+
+// 2. Deep Zen Chime Synth
+export const playDeepZenChime = (volume: number = 0.5) => {
+  const ctx = getAudioContext();
+  if (!ctx) return;
+  const now = ctx.currentTime;
+  const osc = ctx.createOscillator();
+  const filter = ctx.createBiquadFilter();
+  const gainNode = ctx.createGain();
+  
+  osc.type = 'triangle';
+  osc.frequency.setValueAtTime(110, now); // A2 note
+  osc.frequency.linearRampToValueAtTime(55, now + 1.5);
+  
+  filter.type = 'lowpass';
+  filter.frequency.setValueAtTime(200, now);
+  
+  gainNode.gain.setValueAtTime(volume * 0.55, now);
+  gainNode.gain.exponentialRampToValueAtTime(0.0001, now + 2.0);
+  
+  osc.connect(filter);
+  filter.connect(gainNode);
+  gainNode.connect(ctx.destination);
+  
+  osc.start(now);
+  osc.stop(now + 2.1);
+};
+
+// 3. Space Warp Sweep Synth
+export const playSpaceWarp = (volume: number = 0.5) => {
+  const ctx = getAudioContext();
+  if (!ctx) return;
+  const now = ctx.currentTime;
+  const osc = ctx.createOscillator();
+  const gainNode = ctx.createGain();
+  
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(150, now);
+  osc.frequency.exponentialRampToValueAtTime(1200, now + 0.4);
+  
+  gainNode.gain.setValueAtTime(volume * 0.2, now);
+  gainNode.gain.exponentialRampToValueAtTime(0.0001, now + 0.45);
+  
+  osc.connect(gainNode);
+  gainNode.connect(ctx.destination);
+  
+  osc.start(now);
+  osc.stop(now + 0.5);
+};
+
+// 4. Laser Pop Synth
+export const playLaserPop = (volume: number = 0.5) => {
+  const ctx = getAudioContext();
+  if (!ctx) return;
+  const now = ctx.currentTime;
+  const osc = ctx.createOscillator();
+  const gainNode = ctx.createGain();
+  
+  osc.type = 'sawtooth';
+  osc.frequency.setValueAtTime(800, now);
+  osc.frequency.exponentialRampToValueAtTime(150, now + 0.12);
+  
+  gainNode.gain.setValueAtTime(volume * 0.15, now);
+  gainNode.gain.exponentialRampToValueAtTime(0.0001, now + 0.15);
+  
+  osc.connect(gainNode);
+  gainNode.connect(ctx.destination);
+  
+  osc.start(now);
+  osc.stop(now + 0.18);
+};

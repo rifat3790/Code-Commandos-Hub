@@ -24,7 +24,7 @@ export async function GET(req: Request) {
     const activeUsers = await User.find({
       lastActiveAt: { $gte: threshold },
       role: { $ne: 'banned' }
-    }).select('name email role photoURL firebaseUid');
+    }).select('name email role photoURL firebaseUid lastActiveAt');
 
     return NextResponse.json({
       success: true,

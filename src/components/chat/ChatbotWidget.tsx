@@ -82,7 +82,16 @@ export default function ChatbotWidget() {
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+
+    const handleToggleWidget = () => {
+      setIsOpen(prev => !prev);
+    };
+    window.addEventListener("toggle_chatbot_widget", handleToggleWidget);
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      window.removeEventListener("toggle_chatbot_widget", handleToggleWidget);
+    };
   }, []);
 
   useEffect(() => {

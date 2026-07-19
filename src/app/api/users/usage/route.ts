@@ -28,17 +28,21 @@ export async function POST(req: Request) {
       todayEntryIndex = -1;
     }
 
+    const pathWithTime = `${path}|${new Date().toISOString()}`;
+
     if (todayEntryIndex === -1 || todayEntryIndex === undefined) {
       // Create a new entry for today
       user.usageHistory.push({
         date: todayStr,
-        pages: [path]
+        pages: [pathWithTime]
       });
     } else {
       // Entry exists, check if path is already the last one (to prevent spamming on reload)
       const pages = user.usageHistory[todayEntryIndex].pages;
-      if (pages.length === 0 || pages[pages.length - 1] !== path) {
-        pages.push(path);
+      const lastPageWithTime = pages[pages.length - 1] || "";
+      const lastPageName = lastPageWithTime.split('|')[0];
+      if (pages.length === 0 || lastPageName !== path) {
+        pages.push(pathWithTime);
       }
     }
 

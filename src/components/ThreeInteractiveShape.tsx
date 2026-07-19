@@ -80,13 +80,13 @@ export default function ThreeInteractiveShape({ layout = 'default' }: ThreeInter
 
     window.addEventListener('mousemove', handleMouseMove);
 
-    // 7. Animation Loop
+    // 7. Animation Loop with Visibility & Intersection Optimization
     let lastTime = 0;
     let isIntersecting = true;
 
     const animate = (time: number) => {
       if (!isIntersecting || document.hidden) {
-        animationFrameIdRef.current = requestAnimationFrame(animate);
+        animationFrameIdRef.current = null;
         return;
       }
 
@@ -120,11 +120,27 @@ export default function ThreeInteractiveShape({ layout = 'default' }: ThreeInter
       animationFrameIdRef.current = requestAnimationFrame(animate);
     };
 
+    const handleVisibilityChange = () => {
+      if (!document.hidden && isIntersecting) {
+        if (!animationFrameIdRef.current) {
+          lastTime = performance.now();
+          animationFrameIdRef.current = requestAnimationFrame(animate);
+        }
+      } else {
+        if (animationFrameIdRef.current) {
+          cancelAnimationFrame(animationFrameIdRef.current);
+          animationFrameIdRef.current = null;
+        }
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
     // 8. Observer to pause when scrolled out of view
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
           isIntersecting = entry.isIntersecting;
+          handleVisibilityChange();
         });
       },
       { threshold: 0.1 }
@@ -137,9 +153,11 @@ export default function ThreeInteractiveShape({ layout = 'default' }: ThreeInter
     // 9. Cleanup
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       observer.disconnect();
       if (animationFrameIdRef.current) {
         cancelAnimationFrame(animationFrameIdRef.current);
+        animationFrameIdRef.current = null;
       }
 
       // Dispose resources

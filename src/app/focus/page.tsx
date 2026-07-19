@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import toast from 'react-hot-toast';
 import { 
   Headphones, 
   Volume2, 
@@ -24,6 +25,61 @@ const YoutubeIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <path d="M23.498 6.163a3.003 3.003 0 0 0-2.11-2.11C19.517 3.545 12 3.545 12 3.545s-7.517 0-9.388.508a3.003 3.003 0 0 0-2.11 2.11C0 8.033 0 12 0 12s0 3.967.502 5.837a3.003 3.003 0 0 0 2.11 2.11c1.871.508 9.388.508 9.388.508s7.517 0 9.388-.508a3.003 3.003 0 0 0 2.11-2.11C24 15.967 24 12 24 12s0-3.967-.502-5.837zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
   </svg>
 );
+
+interface MatrixRainCanvasProps {
+  wpm: number;
+}
+
+function MatrixRainCanvas({ wpm }: MatrixRainCanvasProps) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const width = canvas.parentElement ? canvas.parentElement.clientWidth : 300;
+    canvas.width = width > 0 ? width : 300;
+    canvas.height = 100;
+
+    const columns = Math.floor(canvas.width / 10);
+    const rainDrops = Array(columns).fill(1);
+    const alphabet = "0101101001010110011010110010110101010100101";
+
+    const draw = () => {
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.16)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.font = '9px monospace';
+
+      for (let i = 0; i < rainDrops.length; i++) {
+        const text = alphabet.charAt(Math.floor(Math.random() * alphabet.length));
+        
+        if (wpm > 45) {
+          ctx.fillStyle = '#39FF14'; 
+        } else if (wpm > 0) {
+          ctx.fillStyle = '#00FF66';
+        } else {
+          ctx.fillStyle = '#0d6f2c';
+        }
+
+        ctx.fillText(text, i * 10, rainDrops[i] * 9);
+
+        const speedMultiplier = wpm > 0 ? (0.65 + (wpm / 80)) : 0.65;
+        if (rainDrops[i] * 9 > canvas.height && Math.random() > 0.975) {
+          rainDrops[i] = 0;
+        }
+        rainDrops[i] += speedMultiplier;
+      }
+    };
+
+    const interval = setInterval(draw, 33);
+    return () => clearInterval(interval);
+  }, [wpm]);
+
+  return <canvas ref={canvasRef} className="w-full h-full rounded-xl bg-black/60" />;
+}
+
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   playKeyboardClick, 
@@ -31,6 +87,13 @@ import {
   stopSynthesizedRain, 
   startSynthesizedHum, 
   stopSynthesizedHum, 
+  startSynthesizedCosmic,
+  stopSynthesizedCosmic,
+  updateCosmicVolume,
+  playTypewriterBell,
+  playDeepZenChime,
+  playSpaceWarp,
+  playLaserPop,
   KeyboardSwitchType
 } from '@/lib/audioSynth';
 
@@ -52,11 +115,28 @@ export default function FocusPage() {
   // Custom switch types
   const [switchType, setSwitchType] = useState<KeyboardSwitchType>('brown');
   const [isGlobalClicks, setIsGlobalClicks] = useState(false);
+  const [visualizerMode, setVisualizerMode] = useState<'bars' | 'matrix'>('bars');
+
+  // Custom Focus Profiles
+  interface FocusProfile {
+    id: string;
+    name: string;
+    switchType: KeyboardSwitchType;
+    clicksVol: number;
+    rainVol: number;
+    humVol: number;
+    cosmicVol: number;
+    streamIdx: number;
+  }
+  const [customProfiles, setCustomProfiles] = useState<FocusProfile[]>([]);
+  const [profileNameInput, setProfileNameInput] = useState('');
+  const [showSaveProfileForm, setShowSaveProfileForm] = useState(false);
   
   // Audio state
   const [volumeClicks, setVolumeClicks] = useState(50);
   const [volumeRain, setVolumeRain] = useState(0);
   const [volumeHum, setVolumeHum] = useState(0);
+  const [volumeCosmic, setVolumeCosmic] = useState(0);
   
   // Music player states
   const [isMusicPlaying, setIsMusicPlaying] = useState(false);
@@ -109,8 +189,53 @@ export default function FocusPage() {
         setYtVideoId(savedYt);
         setYoutubeInput(`https://www.youtube.com/watch?v=${savedYt}`);
       }
+
+      const savedProfiles = localStorage.getItem('focus_custom_profiles');
+      if (savedProfiles) setCustomProfiles(JSON.parse(savedProfiles));
     }
   }, []);
+
+  const handleSaveProfile = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!profileNameInput.trim()) return;
+
+    const newProfile: FocusProfile = {
+      id: Date.now().toString(),
+      name: profileNameInput.trim(),
+      switchType,
+      clicksVol: volumeClicks,
+      rainVol: volumeRain,
+      humVol: volumeHum,
+      cosmicVol: volumeCosmic,
+      streamIdx: activeStreamIndex
+    };
+
+    const updated = [...customProfiles, newProfile];
+    setCustomProfiles(updated);
+    localStorage.setItem('focus_custom_profiles', JSON.stringify(updated));
+    setProfileNameInput('');
+    setShowSaveProfileForm(false);
+    toast.success(`Focus Profile "${newProfile.name}" Saved!`);
+  };
+
+  const handleDeleteProfile = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const updated = customProfiles.filter(p => p.id !== id);
+    setCustomProfiles(updated);
+    localStorage.setItem('focus_custom_profiles', JSON.stringify(updated));
+    toast.success("Focus Profile Deleted");
+  };
+
+  const applyCustomProfile = (profile: FocusProfile) => {
+    setSwitchType(profile.switchType);
+    setVolumeClicks(profile.clicksVol);
+    setVolumeRain(profile.rainVol);
+    setVolumeHum(profile.humVol);
+    setVolumeCosmic(profile.cosmicVol);
+    setActiveStreamIndex(profile.streamIdx);
+    setIsMusicPlaying(true);
+    toast.success(`Loaded Profile: ${profile.name}`);
+  };
 
   // Update clock every second
   useEffect(() => {
@@ -155,6 +280,17 @@ export default function FocusPage() {
     }
     return () => stopSynthesizedHum();
   }, [volumeHum, isClient]);
+
+  // Handle ambient Cosmic generator changes
+  useEffect(() => {
+    if (!isClient) return;
+    if (volumeCosmic > 0) {
+      startSynthesizedCosmic(volumeCosmic / 100);
+    } else {
+      stopSynthesizedCosmic();
+    }
+    return () => stopSynthesizedCosmic();
+  }, [volumeCosmic, isClient]);
 
   // Handle HTML5 stream audio player changes
   useEffect(() => {
@@ -340,31 +476,87 @@ export default function FocusPage() {
         <div className="lg:col-span-2 space-y-6">
           
           {/* Preset Buttons Panel (Master controller) */}
-          <div className="glass-panel rounded-2xl p-4 flex flex-col md:flex-row items-center justify-between gap-4 relative overflow-hidden shadow-xl border border-green-500/10">
-            <div className="flex items-center gap-2">
-              <Zap className="w-4 h-4 text-green-400 animate-pulse" />
-              <span className="text-xs font-bold font-mono text-white uppercase tracking-wider">Quick Sound Presets</span>
+          <div className="glass-panel rounded-2xl p-5 flex flex-col gap-4 relative overflow-hidden shadow-xl border border-green-500/10">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              <div className="flex items-center gap-2">
+                <Zap className="w-4 h-4 text-green-400 animate-pulse" />
+                <span className="text-xs font-bold font-mono text-white uppercase tracking-wider">Quick Sound Presets</span>
+              </div>
+              <div className="flex flex-wrap gap-2.5 w-full md:w-auto">
+                <button 
+                  onClick={() => applyPreset('cyberpunk')}
+                  className="flex-1 md:flex-initial px-3.5 py-2 rounded-xl bg-[#0a0f1d] border border-purple-500/20 text-[10px] font-bold font-mono text-purple-400 hover:bg-purple-950/20 transition-all uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  🌌 Cyberpunk Hack
+                </button>
+                <button 
+                  onClick={() => applyPreset('cafe')}
+                  className="flex-1 md:flex-initial px-3.5 py-2 rounded-xl bg-[#0a0f1d] border border-blue-500/20 text-[10px] font-bold font-mono text-blue-400 hover:bg-blue-950/20 transition-all uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  🌧️ Rainy Cafe
+                </button>
+                <button 
+                  onClick={() => applyPreset('focus')}
+                  className="flex-1 md:flex-initial px-3.5 py-2 rounded-xl bg-[#0a0f1d] border border-green-500/20 text-[10px] font-bold font-mono text-green-400 hover:bg-green-950/20 transition-all uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  🚀 Deep Focus
+                </button>
+                <button 
+                  onClick={() => setShowSaveProfileForm(!showSaveProfileForm)}
+                  className="flex-1 md:flex-initial px-3.5 py-2 rounded-xl bg-green-500/10 border border-green-500/30 text-[10px] font-bold font-mono text-green-400 hover:bg-green-500/20 transition-all uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  ✨ Save Profile
+                </button>
+              </div>
             </div>
-            <div className="flex flex-wrap gap-2.5 w-full md:w-auto">
-              <button 
-                onClick={() => applyPreset('cyberpunk')}
-                className="flex-1 md:flex-initial px-4 py-2 rounded-xl bg-[#0a0f1d] border border-purple-500/20 text-[10px] font-bold font-mono text-purple-400 hover:bg-purple-950/20 transition-all uppercase tracking-wider flex items-center justify-center gap-1.5"
-              >
-                🌌 Cyberpunk Hack
-              </button>
-              <button 
-                onClick={() => applyPreset('cafe')}
-                className="flex-1 md:flex-initial px-4 py-2 rounded-xl bg-[#0a0f1d] border border-blue-500/20 text-[10px] font-bold font-mono text-blue-400 hover:bg-blue-950/20 transition-all uppercase tracking-wider flex items-center justify-center gap-1.5"
-              >
-                🌧️ Rainy Cafe
-              </button>
-              <button 
-                onClick={() => applyPreset('focus')}
-                className="flex-1 md:flex-initial px-4 py-2 rounded-xl bg-[#0a0f1d] border border-green-500/20 text-[10px] font-bold font-mono text-green-400 hover:bg-green-950/20 transition-all uppercase tracking-wider flex items-center justify-center gap-1.5"
-              >
-                🚀 Deep Focus
-              </button>
-            </div>
+
+            {/* Inline Save Form */}
+            {showSaveProfileForm && (
+              <form onSubmit={handleSaveProfile} className="flex flex-col sm:flex-row gap-2 bg-black/40 p-3 rounded-xl border border-glass-border">
+                <input
+                  type="text"
+                  value={profileNameInput}
+                  onChange={(e) => setProfileNameInput(e.target.value)}
+                  placeholder="Profile name (e.g. Rainy Midnight, Office Mode)..."
+                  className="flex-1 bg-[#0a0f1d] border border-glass-border px-3 py-1.5 rounded-lg text-xs text-white focus:outline-none focus:border-green-500 placeholder:text-gray-655"
+                  required
+                />
+                <div className="flex gap-2 shrink-0">
+                  <button type="submit" className="flex-1 sm:flex-none bg-green-600 hover:bg-green-500 text-black font-extrabold px-4 py-1.5 rounded-lg text-xs uppercase tracking-wider transition-colors cursor-pointer">
+                    Save
+                  </button>
+                  <button type="button" onClick={() => setShowSaveProfileForm(false)} className="flex-1 sm:flex-none bg-gray-800 hover:bg-gray-700 text-gray-400 px-4 py-1.5 rounded-lg text-xs uppercase tracking-wider transition-colors cursor-pointer">
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* Custom Profiles list */}
+            {customProfiles.length > 0 && (
+              <div className="flex flex-wrap gap-2 border-t border-white/5 pt-3 w-full">
+                <span className="text-[9px] font-mono text-gray-500 uppercase flex items-center w-full mb-1">Your Saved Profiles:</span>
+                {customProfiles.map((p) => (
+                  <div 
+                    key={p.id}
+                    onClick={() => applyCustomProfile(p)}
+                    className="group/btn px-3 py-1.5 bg-black/40 border border-glass-border hover:border-green-500/30 rounded-lg text-[10px] font-bold font-mono text-gray-300 hover:text-white flex items-center gap-2 cursor-pointer transition-all hover:shadow-[0_0_12px_rgba(34,197,94,0.1)] relative select-none"
+                    title={`Clicks: ${p.clicksVol}% | Rain: ${p.rainVol}% | Cosmic: ${p.cosmicVol}%`}
+                  >
+                    <span>✨ {p.name}</span>
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteProfile(p.id, e);
+                      }}
+                      className="text-gray-500 hover:text-red-500 opacity-0 group-hover/btn:opacity-100 transition-opacity ml-1.5"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Section 1: Keyboard Switch Select */}
@@ -468,7 +660,7 @@ export default function FocusPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               
               {/* Rain Sound Synthesizer Slider */}
               <div className="bg-black/25 border border-glass-border rounded-xl p-4 flex flex-col justify-between gap-4">
@@ -541,6 +733,31 @@ export default function FocusPage() {
                       className="w-full accent-purple-400 cursor-pointer h-1 bg-gray-800 rounded-lg appearance-none"
                     />
                     <span className="text-[10px] text-gray-400 font-mono w-8 text-right">{volumeMusic}%</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Cosmic Space Drone Slider */}
+              <div className="bg-black/25 border border-glass-border rounded-xl p-4 flex flex-col justify-between gap-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-indigo-400" />
+                    <span className="text-xs font-bold text-white font-mono">Cosmic Wind</span>
+                  </div>
+                  {volumeCosmic > 0 && <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />}
+                </div>
+                <div>
+                  <span className="text-[10px] text-gray-500 block mb-1">LFO Modulated Sweep</span>
+                  <div className="flex items-center gap-2.5">
+                    <input 
+                      type="range" 
+                      min="0" 
+                      max="100"
+                      value={volumeCosmic}
+                      onChange={(e) => setVolumeCosmic(Number(e.target.value))}
+                      className="w-full accent-indigo-400 cursor-pointer h-1 bg-gray-800 rounded-lg appearance-none"
+                    />
+                    <span className="text-[10px] text-gray-400 font-mono w-8 text-right">{volumeCosmic}%</span>
                   </div>
                 </div>
               </div>
@@ -647,6 +864,51 @@ export default function FocusPage() {
               )}
             </div>
 
+            {/* Zen Soundboard Launchpad Matrix */}
+            <div className="mt-6 border-t border-glass-border pt-5">
+              <div className="flex items-center gap-2 mb-3">
+                <Sparkles className="w-4 h-4 text-purple-400" />
+                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest font-mono">Zen Soundboard Sound-Matrix</h4>
+              </div>
+              <p className="text-[10px] text-gray-500 mb-4 font-sans leading-normal">
+                Trigger real-time synthesized focal frequencies and sound feedback clicks. Perfect for keyboard transitions and focus reset.
+              </p>
+              
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <button
+                  onClick={() => playTypewriterBell(0.6)}
+                  className="p-4 bg-[#0a0f1d]/30 border border-glass-border hover:border-purple-500/40 hover:bg-purple-950/5 rounded-2xl transition-all cursor-pointer text-center group active:scale-95 flex flex-col items-center justify-center gap-2"
+                >
+                  <span className="text-2xl group-hover:scale-110 transition-transform">🔔</span>
+                  <span className="text-[10px] font-bold text-gray-300 font-mono group-hover:text-purple-400">Typewriter Bell</span>
+                </button>
+                
+                <button
+                  onClick={() => playDeepZenChime(0.6)}
+                  className="p-4 bg-[#0a0f1d]/30 border border-glass-border hover:border-indigo-500/40 hover:bg-indigo-950/5 rounded-2xl transition-all cursor-pointer text-center group active:scale-95 flex flex-col items-center justify-center gap-2"
+                >
+                  <span className="text-2xl group-hover:scale-110 transition-transform">🧘</span>
+                  <span className="text-[10px] font-bold text-gray-300 font-mono group-hover:text-indigo-400">Zen Chime</span>
+                </button>
+                
+                <button
+                  onClick={() => playSpaceWarp(0.6)}
+                  className="p-4 bg-[#0a0f1d]/30 border border-glass-border hover:border-blue-500/40 hover:bg-blue-950/5 rounded-2xl transition-all cursor-pointer text-center group active:scale-95 flex flex-col items-center justify-center gap-2"
+                >
+                  <span className="text-2xl group-hover:scale-110 transition-transform">🚀</span>
+                  <span className="text-[10px] font-bold text-gray-300 font-mono group-hover:text-blue-400">Space Warp</span>
+                </button>
+                
+                <button
+                  onClick={() => playLaserPop(0.6)}
+                  className="p-4 bg-[#0a0f1d]/30 border border-glass-border hover:border-green-500/40 hover:bg-green-950/5 rounded-2xl transition-all cursor-pointer text-center group active:scale-95 flex flex-col items-center justify-center gap-2"
+                >
+                  <span className="text-2xl group-hover:scale-110 transition-transform">⚡</span>
+                  <span className="text-[10px] font-bold text-gray-300 font-mono group-hover:text-green-400">Laser Pop</span>
+                </button>
+              </div>
+            </div>
+
           </div>
 
           {/* Section 3: Keyboard Click Sandbox & Typing Tracker */}
@@ -706,53 +968,73 @@ export default function FocusPage() {
           {/* CSS Beats Visualizer */}
           <div className="glass-panel rounded-2xl p-6 relative overflow-hidden shadow-2xl flex flex-col justify-between h-44">
             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-purple-500" />
-            <span className="text-xs font-mono text-gray-400 tracking-widest uppercase flex items-center gap-2">
-              <Sparkles className="w-3.5 h-3.5 text-blue-400 animate-spin-slow" />
-              Audio Visualizer HUD
-            </span>
             
-            {/* Visualizer bars bouncing dynamically if music is playing */}
-            <div className="flex justify-center items-end h-20 gap-1.5 px-4">
-              {[...Array(24)].map((_, idx) => {
-                const heights = [
-                  [12, 45, 12], [8, 30, 8], [24, 70, 24], [18, 55, 18],
-                  [32, 85, 32], [28, 65, 28], [14, 40, 14], [6, 20, 6],
-                  [10, 50, 10], [16, 60, 16], [22, 75, 22], [30, 90, 30],
-                  [26, 80, 26], [20, 65, 20], [12, 45, 12], [8, 30, 8],
-                  [24, 70, 24], [18, 55, 18], [32, 85, 32], [28, 65, 28],
-                  [14, 40, 14], [6, 20, 6], [10, 50, 10], [16, 60, 16]
-                ];
-                const animDuration = [
-                  0.7, 0.9, 1.2, 0.8,
-                  1.4, 1.1, 0.9, 0.6,
-                  1.0, 1.3, 0.8, 1.5,
-                  1.2, 1.0, 0.7, 0.9,
-                  1.2, 0.8, 1.4, 1.1,
-                  0.9, 0.6, 1.0, 1.3
-                ];
-                return (
-                  <motion.div 
-                    key={idx}
-                    animate={(isMusicPlaying || !!ytVideoId) ? { height: heights[idx] } : { height: 6 }}
-                    transition={{
-                      repeat: Infinity,
-                      duration: animDuration[idx],
-                      ease: "easeInOut"
-                    }}
-                    className={`w-1 rounded-t bg-gradient-to-t ${
-                      idx < 8 
-                        ? 'from-blue-600 to-indigo-500 shadow-[0_0_8px_rgba(59,130,246,0.3)]' 
-                        : idx < 16 
-                          ? 'from-indigo-500 to-purple-500 shadow-[0_0_8px_rgba(168,85,247,0.3)]' 
-                          : 'from-purple-500 to-green-400 shadow-[0_0_8px_rgba(34,197,94,0.3)]'
-                    }`}
-                  />
-                );
-              })}
+            <div className="flex items-center justify-between shrink-0">
+              <span className="text-xs font-mono text-gray-400 tracking-widest uppercase flex items-center gap-2">
+                <Sparkles className="w-3.5 h-3.5 text-blue-400 animate-spin-slow" />
+                Visualizer HUD
+              </span>
+              <button
+                onClick={() => setVisualizerMode(prev => prev === 'bars' ? 'matrix' : 'bars')}
+                className="text-[9px] bg-white/5 border border-glass-border hover:bg-white/10 hover:border-blue-500/30 text-gray-400 hover:text-white px-2 py-0.5 rounded font-mono transition-all cursor-pointer uppercase select-none"
+              >
+                {visualizerMode === 'bars' ? 'Matrix Rain' : 'Soundwave Bars'}
+              </button>
             </div>
             
-            <p className="text-[9px] text-gray-500 font-mono text-center tracking-wider">
-              {(isMusicPlaying || !!ytVideoId) ? 'SYNCHRONIZING DIGITAL CARRIER WAVE...' : 'STANDBY - WAITING FOR CARRIER...'}
+            {/* Conditional visuals */}
+            <div className="flex-1 flex items-center justify-center overflow-hidden my-3">
+              {visualizerMode === 'matrix' ? (
+                <div className="w-full h-full">
+                  <MatrixRainCanvas wpm={typingStats.wpm} />
+                </div>
+              ) : (
+                /* Visualizer bars bouncing dynamically if music is playing */
+                <div className="flex justify-center items-end h-20 gap-1.5 px-4 w-full">
+                  {[...Array(24)].map((_, idx) => {
+                    const heights = [
+                      [12, 45, 12], [8, 30, 8], [24, 70, 24], [18, 55, 18],
+                      [32, 85, 32], [28, 65, 28], [14, 40, 14], [6, 20, 6],
+                      [10, 50, 10], [16, 60, 16], [22, 75, 22], [30, 90, 30],
+                      [26, 80, 26], [20, 65, 20], [12, 45, 12], [8, 30, 8],
+                      [24, 70, 24], [18, 55, 18], [32, 85, 32], [28, 65, 28],
+                      [14, 40, 14], [6, 20, 6], [10, 50, 10], [16, 60, 16]
+                    ];
+                    const animDuration = [
+                      0.7, 0.9, 1.2, 0.8,
+                      1.4, 1.1, 0.9, 0.6,
+                      1.0, 1.3, 0.8, 1.5,
+                      1.2, 1.0, 0.7, 0.9,
+                      1.2, 0.8, 1.4, 1.1,
+                      0.9, 0.6, 1.0, 1.3
+                    ];
+                    return (
+                      <motion.div 
+                        key={idx}
+                        animate={(isMusicPlaying || !!ytVideoId) ? { height: heights[idx] } : { height: 6 }}
+                        transition={{
+                          repeat: Infinity,
+                          duration: animDuration[idx],
+                          ease: "easeInOut"
+                        }}
+                        className={`w-1 rounded-t bg-gradient-to-t ${
+                          idx < 8 
+                            ? 'from-blue-600 to-indigo-500 shadow-[0_0_8px_rgba(59,130,246,0.3)]' 
+                            : idx < 16 
+                              ? 'from-indigo-500 to-purple-500 shadow-[0_0_8px_rgba(168,85,247,0.3)]' 
+                              : 'from-purple-500 to-green-400 shadow-[0_0_8px_rgba(34,197,94,0.3)]'
+                        }`}
+                      />
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+            
+            <p className="text-[9px] text-gray-500 font-mono text-center tracking-wider shrink-0 select-none">
+              {visualizerMode === 'matrix' 
+                ? (typingStats.wpm > 0 ? `CYBER STREAM SPEED BOOSTED: ${typingStats.wpm} WPM` : 'MATRIX CHANNELS ON STANDBY FLOW...')
+                : ((isMusicPlaying || !!ytVideoId) ? 'SYNCHRONIZING DIGITAL CARRIER WAVE...' : 'STANDBY - WAITING FOR CARRIER...')}
             </p>
           </div>
 

@@ -155,6 +155,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       if (snapshot.exists()) {
         const data = snapshot.data();
         setGroupCallParticipants(data.activeParticipants || []);
+        setScreenSharerUid(data.screenSharerUid || null);
       }
     });
     return () => unsubscribe();
@@ -647,9 +648,29 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
           audio: true, 
           video: type === 'video' 
         });
+        if (type === 'audio') {
+          const dummyTrack = createDummyVideoTrack();
+          if (dummyTrack) {
+            stream.addTrack(dummyTrack);
+          }
+        }
         setLocalStream(stream);
       } catch (err) {
-        console.warn("Media access failed:", err);
+        console.warn("Media access failed, trying fallback:", err);
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ 
+            audio: true, 
+            video: false 
+          });
+          const dummyTrack = createDummyVideoTrack();
+          if (dummyTrack) {
+            stream.addTrack(dummyTrack);
+          }
+          setLocalStream(stream);
+          setIsVideoMuted(true);
+        } catch (err2) {
+          console.error("All media devices access failed in start group call:", err2);
+        }
       }
 
       const session = {
@@ -1012,6 +1033,10 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
           audio: true, 
           video: false 
         });
+        const dummyTrack = createDummyVideoTrack();
+        if (dummyTrack) {
+          stream.addTrack(dummyTrack);
+        }
         setLocalStream(stream);
         setIsVideoMuted(true);
       } catch (err2) {
@@ -1071,9 +1096,11 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       const pc = meshConnectionsRef.current[peerUid];
       try {
         const transceivers = pc.getTransceivers();
-        const transceiver = transceivers.find(t => t.receiver.track.kind === kind);
+        const transceiver = transceivers.find(t => 
+          (t.sender.track?.kind === kind) || (t.receiver.track?.kind === kind)
+        );
         const sender = transceiver?.sender;
-        if (sender && newTrack) {
+        if (sender) {
           await sender.replaceTrack(newTrack);
         }
       } catch (err) {
@@ -1269,6 +1296,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     setRemoteHasVideo(false);
     setScreenSharerUid(null);
     setIsCallMinimized(false);
+    setAllowScreenShare(true);
     
     if (!isGroup && (finalState === 'ended' || finalState === 'declined')) {
       setTimeout(() => {
@@ -1439,70 +1467,152 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
               {/* Video Grid Viewport */}
               <div ref={videoGridRef} className="flex-1 bg-black relative flex items-center justify-center overflow-hidden">
                 {activeCall?.isGroupCall ? (
-                  <div className="flex w-full h-full">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1 h-full p-4 bg-gray-950 overflow-y-auto pointer-events-auto">
-                      {/* Local Video Stream */}
-                      <div className="relative bg-gray-900 border border-purple-500/20 rounded-2xl overflow-hidden shadow-xl aspect-video flex items-center justify-center">
-                        <video
-                          ref={setLocalVideoEl}
-                          autoPlay
-                          playsInline
-                          muted
-                          className={`w-full h-full object-cover ${isScreenSharing ? '' : 'scale-x-[-1]'}`}
-                        />
-                        {isVideoMuted && (
-                          <div className="absolute inset-0 bg-gray-950 flex flex-col items-center justify-center gap-1.5 z-10">
-                            <VideoOff className="w-8 h-8 text-gray-600 animate-pulse" />
-                            <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Camera Disabled</span>
+                  <div className="flex w-full h-full flex-col md:flex-row">
+                    {screenSharerUid ? (
+                      /* Screen Share Split Layout */
+                      <div className="flex flex-col md:flex-row flex-1 h-full min-w-0">
+                        {/* Main Screen Share Viewport */}
+                        <div className="flex-1 bg-black relative flex items-center justify-center p-2 min-h-0 min-w-0 border-r border-glass-border">
+                          <video
+                            ref={el => {
+                              if (el) {
+                                const sharerUid = screenSharerUid;
+                                const isMe = sharerUid === (isAdminOrSuperAdmin ? 'admin' : user?.uid);
+                                el.srcObject = isMe ? screenStreamRef.current : meshRemoteStreams[sharerUid];
+                              }
+                            }}
+                            autoPlay
+                            playsInline
+                            className="w-full h-full object-contain rounded-2xl bg-gray-900"
+                          />
+                          <div className="absolute bottom-4 left-4 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-lg border border-glass-border z-20">
+                            <span className="text-xs font-bold text-purple-400">
+                              {screenSharerUid === (isAdminOrSuperAdmin ? 'admin' : user?.uid)
+                                ? "You are presenting"
+                                : `${activeMeetingParticipants.find(p => p.uid === screenSharerUid)?.name || 'Someone'} is presenting`}
+                            </span>
                           </div>
-                        )}
-                        <div className="absolute bottom-3 left-3 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-lg border border-glass-border">
-                          <span className="text-[10px] font-bold text-white">You (Local)</span>
                         </div>
-                      </div>
 
-                      {/* Other group participants */}
-                      {groupCallParticipants.filter(uid => uid !== user?.uid).map(uid => {
-                        const participantDoc = activeMeetingParticipants.find(p => p.uid === uid);
-                        const name = participantDoc?.name || 'Developer';
-                        const stream = meshRemoteStreams[uid];
-                        return (
-                          <div key={uid} className="relative bg-gray-900 border border-glass-border rounded-2xl overflow-hidden shadow-xl aspect-video flex items-center justify-center">
-                            {stream ? (
-                              <video
-                                ref={el => {
-                                  if (el) el.srcObject = stream;
-                                }}
-                                autoPlay
-                                playsInline
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              <div className="flex flex-col items-center justify-center gap-3">
-                                <div className="w-16 h-16 rounded-full bg-purple-500/10 border-2 border-purple-500/50 flex items-center justify-center text-purple-400 font-bold text-xl animate-pulse shadow-[0_0_15px_rgba(168,85,247,0.3)]">
-                                  {name.charAt(0).toUpperCase()}
-                                </div>
-                                <span className="text-xs font-bold text-gray-300">{name}</span>
+                        {/* Sidebar with participants thumbnails */}
+                        <div className="w-full md:w-[240px] bg-gray-950 p-3 flex flex-row md:flex-col gap-3 overflow-auto shrink-0 md:h-full">
+                          {/* Local video thumbnail */}
+                          <div className="relative bg-gray-900 border border-purple-500/20 rounded-xl overflow-hidden aspect-video flex items-center justify-center shrink-0 w-[160px] md:w-full">
+                            <video
+                              ref={setLocalVideoEl}
+                              autoPlay
+                              playsInline
+                              muted
+                              className={`w-full h-full object-cover ${isScreenSharing ? '' : 'scale-x-[-1]'}`}
+                            />
+                            {isVideoMuted && (
+                              <div className="absolute inset-0 bg-gray-950 flex flex-col items-center justify-center gap-1 z-10">
+                                <VideoOff className="w-5 h-5 text-gray-600" />
+                                <span className="text-[8px] text-gray-500 font-bold uppercase">Camera Off</span>
                               </div>
                             )}
-                            
-                            <div className="absolute bottom-3 left-3 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-lg border border-glass-border z-20">
-                              <span className="text-[10px] font-bold text-green-400">Connected</span>
+                            <div className="absolute bottom-1.5 left-1.5 bg-black/60 backdrop-blur-md px-1.5 py-0.5 rounded border border-glass-border z-15">
+                              <span className="text-[9px] font-bold text-white">You</span>
                             </div>
                           </div>
-                        );
-                      })}
-                      
-                      {/* If alone in the call, show waiting placeholder */}
-                      {groupCallParticipants.length <= 1 && (
-                        <div className="relative bg-gray-900 border border-glass-border rounded-2xl overflow-hidden shadow-xl aspect-video flex items-center justify-center border-dashed">
-                          <div className="flex flex-col items-center justify-center gap-2">
-                            <span className="text-xs text-gray-500 italic">Waiting for others to join...</span>
-                            <span className="text-[10px] text-purple-400 font-mono">Room ID: {activeCall.id}</span>
+
+                          {/* Other participants thumbnails */}
+                          {groupCallParticipants.filter(uid => uid !== user?.uid).map(uid => {
+                            const participantDoc = activeMeetingParticipants.find(p => p.uid === uid);
+                            const name = participantDoc?.name || 'Developer';
+                            const stream = meshRemoteStreams[uid];
+                            return (
+                              <div key={uid} className="relative bg-gray-900 border border-glass-border rounded-xl overflow-hidden aspect-video flex items-center justify-center shrink-0 w-[160px] md:w-full">
+                                {stream ? (
+                                  <video
+                                    ref={el => {
+                                      if (el) el.srcObject = stream;
+                                    }}
+                                    autoPlay
+                                    playsInline
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="flex flex-col items-center justify-center gap-1.5">
+                                    <div className="w-8 h-8 rounded-full bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-purple-400 font-bold text-xs">
+                                      {name.charAt(0).toUpperCase()}
+                                    </div>
+                                    <span className="text-[8px] font-bold text-gray-400 truncate max-w-[80px]">{name}</span>
+                                  </div>
+                                )}
+                                <div className="absolute bottom-1.5 left-1.5 bg-black/60 backdrop-blur-md px-1.5 py-0.5 rounded border border-glass-border z-15">
+                                  <span className="text-[9px] font-bold text-white truncate max-w-[80px]">{name}</span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : (
+                      /* Regular Grid Layout */
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1 h-full p-4 bg-gray-950 overflow-y-auto pointer-events-auto">
+                        {/* Local Video Stream */}
+                        <div className="relative bg-gray-900 border border-purple-500/20 rounded-2xl overflow-hidden shadow-xl aspect-video flex items-center justify-center">
+                          <video
+                            ref={setLocalVideoEl}
+                            autoPlay
+                            playsInline
+                            muted
+                            className={`w-full h-full object-cover ${isScreenSharing ? '' : 'scale-x-[-1]'}`}
+                          />
+                          {isVideoMuted && (
+                            <div className="absolute inset-0 bg-gray-950 flex flex-col items-center justify-center gap-1.5 z-10">
+                              <VideoOff className="w-8 h-8 text-gray-600 animate-pulse" />
+                              <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Camera Disabled</span>
+                            </div>
+                          )}
+                          <div className="absolute bottom-3 left-3 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-lg border border-glass-border">
+                            <span className="text-[10px] font-bold text-white">You (Local)</span>
                           </div>
                         </div>
-                      )}
-                    </div>
+
+                        {/* Other group participants */}
+                        {groupCallParticipants.filter(uid => uid !== user?.uid).map(uid => {
+                          const participantDoc = activeMeetingParticipants.find(p => p.uid === uid);
+                          const name = participantDoc?.name || 'Developer';
+                          const stream = meshRemoteStreams[uid];
+                          return (
+                            <div key={uid} className="relative bg-gray-900 border border-glass-border rounded-2xl overflow-hidden shadow-xl aspect-video flex items-center justify-center">
+                              {stream ? (
+                                <video
+                                  ref={el => {
+                                    if (el) el.srcObject = stream;
+                                  }}
+                                  autoPlay
+                                  playsInline
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <div className="flex flex-col items-center justify-center gap-3">
+                                  <div className="w-16 h-16 rounded-full bg-purple-500/10 border-2 border-purple-500/50 flex items-center justify-center text-purple-400 font-bold text-xl animate-pulse shadow-[0_0_15px_rgba(168,85,247,0.3)]">
+                                    {name.charAt(0).toUpperCase()}
+                                  </div>
+                                  <span className="text-xs font-bold text-gray-300">{name}</span>
+                                </div>
+                              )}
+                              <div className="absolute bottom-3 left-3 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-lg border border-glass-border z-20">
+                                <span className="text-[10px] font-bold text-green-400">Connected</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                        
+                        {/* If alone in the call, show waiting placeholder */}
+                        {groupCallParticipants.length <= 1 && (
+                          <div className="relative bg-gray-900 border border-glass-border rounded-2xl overflow-hidden shadow-xl aspect-video flex items-center justify-center border-dashed">
+                            <div className="flex flex-col items-center justify-center gap-2">
+                              <span className="text-xs text-gray-500 italic">Waiting for others to join...</span>
+                              <span className="text-[10px] text-purple-400 font-mono">Room ID: {activeCall.id}</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     {/* Right-Side Participants Management Panel */}
                     {showParticipantsPanel && (

@@ -1,16 +1,17 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import Sidebar from './Sidebar';
 
 const ThreeBackground = dynamic(() => import('./ThreeBackground'), {
   ssr: false
 });
-import { Menu, Terminal, ShieldAlert } from 'lucide-react';
+import { Menu, Terminal, ShieldAlert, Sparkles, X } from 'lucide-react';
 import Link from 'next/link';
 import { CallProvider } from '@/context/CallContext';
 import { playKeyboardClick } from '@/lib/audioSynth';
+import toast from 'react-hot-toast';
 
 // Intercept hydration warnings in development to prevent browser-extension-induced overlay crashes
 if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
@@ -43,6 +44,8 @@ import MeetingInvitePopup from './MeetingInvitePopup';
 import CommandMenu from './CommandMenu';
 import FocusTimer from './FocusTimer';
 import NotificationBell from './NotificationBell';
+import ZenAmbianceCenter from './ZenAmbianceCenter';
+import CommandersDock from './CommandersDock';
 
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -179,16 +182,124 @@ function WorkspaceHydrator() {
   useEffect(() => {
     if (user?.uid) {
       hydrate(user.uid);
+      
+      // Poll settings/data every 12 seconds to propagate admin banners and permission updates live!
+      const interval = setInterval(() => {
+        hydrate(user.uid);
+      }, 12000);
+      return () => clearInterval(interval);
     }
   }, [user?.uid, hydrate]);
 
   return null;
 }
 
+// Procedurally synthesized notification chime
+function playNotificationChime() {
+  if (typeof window === 'undefined') return;
+  try {
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    const ctx = new AudioContextClass();
+    const now = ctx.currentTime;
+    
+    const osc1 = ctx.createOscillator();
+    const gain1 = ctx.createGain();
+    osc1.type = 'sine';
+    osc1.frequency.setValueAtTime(659.25, now); // E5
+    
+    const osc2 = ctx.createOscillator();
+    const gain2 = ctx.createGain();
+    osc2.type = 'sine';
+    osc2.frequency.setValueAtTime(880.00, now); // A5
+    
+    gain1.gain.setValueAtTime(0.08, now);
+    gain1.gain.exponentialRampToValueAtTime(0.0001, now + 1.2);
+    
+    gain2.gain.setValueAtTime(0.08, now);
+    gain2.gain.exponentialRampToValueAtTime(0.0001, now + 1.2);
+    
+    osc1.connect(gain1);
+    gain1.connect(ctx.destination);
+    
+    osc2.connect(gain2);
+    gain2.connect(ctx.destination);
+    
+    osc1.start(now);
+    osc2.start(now + 0.08);
+    
+    osc1.stop(now + 1.3);
+    osc2.stop(now + 1.3);
+  } catch (e) {
+    console.error("Audio chime failed to play", e);
+  }
+}
+
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const pathname = usePathname();
   const storeSettings = useWorkspaceStore(state => state.settings);
+  const lastBannerRef = useRef<string | undefined>(undefined);
+
+  // Monitor announcement changes to trigger native chimes and desktop system notifications
+  useEffect(() => {
+    if (!storeSettings?.systemBanner) {
+      lastBannerRef.current = "";
+      return;
+    }
+
+    // First load hydration check
+    if (lastBannerRef.current === undefined) {
+      lastBannerRef.current = storeSettings.systemBanner;
+      return;
+    }
+
+    if (storeSettings.systemBanner && storeSettings.systemBanner !== lastBannerRef.current) {
+      const msg = storeSettings.systemBanner;
+      lastBannerRef.current = msg;
+
+      // 1. HTML5 System Desktop notification (Minimized, another tab, outside browser)
+      if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+        try {
+          new Notification("Code Commandos Hub Broadcast", {
+            body: msg,
+            icon: "/logo.png"
+          });
+        } catch (e) {
+          console.error("Failed to trigger desktop notification", e);
+        }
+      }
+
+      // 2. Soothing procedural dual chime
+      playNotificationChime();
+
+      // 3. Luxurious in-app popup toast
+      toast.custom((t) => (
+        <div className={`${t.visible ? 'animate-[slideDown_0.25s_ease-out]' : 'animate-[fadeOut_0.25s_ease-in]'} max-w-md w-full bg-slate-950/95 border border-purple-500/30 shadow-[0_0_22px_rgba(168,85,247,0.22)] rounded-2xl pointer-events-auto flex p-4 backdrop-blur-md`}>
+          <div className="flex-1 w-0">
+            <div className="flex items-start">
+              <div className="flex-shrink-0 pt-0.5">
+                <div className="w-10 h-10 rounded-full bg-purple-500/10 flex items-center justify-center border border-purple-500/20">
+                  <Sparkles className="h-5 w-5 text-yellow-400 animate-pulse" />
+                </div>
+              </div>
+              <div className="ml-3 flex-1">
+                <p className="text-xs font-bold text-white uppercase tracking-widest font-mono">Broadcast Announcement</p>
+                <p className="mt-1 text-xs text-gray-300 font-mono leading-relaxed">{msg}</p>
+              </div>
+            </div>
+          </div>
+          <div className="ml-4 flex-shrink-0 flex">
+            <button
+              onClick={() => toast.dismiss(t.id)}
+              className="bg-transparent rounded-md inline-flex text-gray-500 hover:text-gray-450 cursor-pointer"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      ), { duration: 8000 });
+    }
+  }, [storeSettings?.systemBanner]);
 
   let currentMenuName = '';
   if (ROUTE_TO_MENU_MAP[pathname]) {
@@ -388,6 +499,12 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
                 
                 {/* Main Content container */}
                 <div className="flex-1 flex flex-col h-full overflow-hidden relative">
+                  {storeSettings?.systemBanner && (
+                     <div className="w-full bg-gradient-to-r from-purple-700/85 via-indigo-750/85 to-purple-800/85 text-white text-center py-1.5 px-4 text-[10px] md:text-xs font-bold tracking-widest flex items-center justify-center gap-2 shadow-md relative z-30 border-b border-purple-500/20 backdrop-blur-md select-none">
+                       <Sparkles className="w-3.5 h-3.5 text-yellow-300 animate-[spin_3s_infinite_linear]" />
+                       <span>{storeSettings.systemBanner}</span>
+                     </div>
+                   )}
                   {/* Unified Header Bar */}
                   <header className="flex items-center justify-between px-4 md:px-6 py-3 bg-[#030712]/45 border-b border-glass-border select-none shrink-0 z-30 backdrop-blur-md">
                     <div className="flex items-center gap-3">
@@ -415,6 +532,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
 
                     <div className="flex items-center gap-3">
                       <NotificationBell />
+                      <ZenAmbianceCenter />
                       <FocusTimer />
                     </div>
                   </header>
@@ -435,6 +553,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
               <GlobalPendingModal />
               <ChatbotWidget />
               <MeetingInvitePopup />
+              <CommandersDock />
             </>
           )}
         </CallProvider>

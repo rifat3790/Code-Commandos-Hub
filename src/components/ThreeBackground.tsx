@@ -279,7 +279,7 @@ export default function ThreeBackground({
 
     const animate = (time: number) => {
       if (!isIntersecting || document.hidden) {
-        animationFrameIdRef.current = requestAnimationFrame(animate);
+        animationFrameIdRef.current = null;
         return;
       }
 
@@ -444,11 +444,27 @@ export default function ThreeBackground({
       animationFrameIdRef.current = requestAnimationFrame(animate);
     };
 
-    // 9. Intersection Observer (pause rendering if offscreen)
+    // 9. Visibility change & intersection observer optimization
+    const handleVisibilityChange = () => {
+      if (!document.hidden && isIntersecting) {
+        if (!animationFrameIdRef.current) {
+          lastTime = performance.now();
+          animationFrameIdRef.current = requestAnimationFrame(animate);
+        }
+      } else {
+        if (animationFrameIdRef.current) {
+          cancelAnimationFrame(animationFrameIdRef.current);
+          animationFrameIdRef.current = null;
+        }
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
           isIntersecting = entry.isIntersecting;
+          handleVisibilityChange();
         });
       },
       { threshold: 0.1 }
@@ -472,9 +488,11 @@ export default function ThreeBackground({
     // 11. Cleanup
     return () => {
       window.removeEventListener('resize', handleResize);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       observer.disconnect();
       if (animationFrameIdRef.current) {
         cancelAnimationFrame(animationFrameIdRef.current);
+        animationFrameIdRef.current = null;
       }
       
       // Dispose Geometries and Materials

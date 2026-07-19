@@ -14,6 +14,8 @@ export interface ISettings extends Document {
   borderRadius: string;
   globalLayout: string;
   global3DStyle: string;
+  allowCommandersDock: boolean;
+  systemBanner: string;
 }
 
 const SettingsSchema: Schema = new Schema({
@@ -29,7 +31,9 @@ const SettingsSchema: Schema = new Schema({
   fontFamily: { type: String, default: 'sans' },
   borderRadius: { type: String, default: 'xl' },
   globalLayout: { type: String, default: 'default' },
-  global3DStyle: { type: String, default: 'default' }
+  global3DStyle: { type: String, default: 'default' },
+  allowCommandersDock: { type: Boolean, default: false },
+  systemBanner: { type: String, default: "" }
 });
 
 if (mongoose.models.Settings) {
