@@ -14,7 +14,18 @@ import {
   HelpCircle,
   ArrowRight,
   RefreshCw,
-  Palette
+  Palette,
+  Languages,
+  Globe,
+  Zap,
+  CheckCircle2,
+  BookOpen,
+  MessageSquare,
+  ShieldCheck,
+  Split,
+  Smile,
+  Clock,
+  ExternalLink
 } from 'lucide-react';
 import { useWorkspaceStore } from '@/store/workspaceStore';
 import { useAuth } from '@/context/AuthContext';
@@ -57,7 +68,6 @@ const getDynamicReplacement = (word: string): string => {
     return list[randomIndex];
   }
   
-  // Dynamic fallback generator if no variations predefined
   if (word.length > 2) {
     const mid = Math.floor(word.length / 2);
     return word.slice(0, mid) + '-' + word.slice(mid);
@@ -65,53 +75,8 @@ const getDynamicReplacement = (word: string): string => {
   return word;
 };
 
-// Helper for multi-level stealth bypass obfuscation modes
-const getObfuscatedWord = (word: string, level: 'low' | 'medium' | 'high' | 'homoglyph'): string => {
-  const clean = word.toLowerCase();
-  
-  const homoglyphs: Record<string, string> = {
-    'a': 'а', // Cyrillic small letter a
-    'c': 'с', // Cyrillic small letter es
-    'e': 'е', // Cyrillic small letter ie
-    'i': 'і', // Ukrainian/Belarusian i
-    'o': 'о', // Cyrillic small letter o
-    'p': 'р', // Cyrillic small letter er
-    's': 'ѕ', // Macedonian dze
-    'x': 'х', // Cyrillic small letter ha
-    'y': 'у', // Cyrillic small letter u
-  };
-
-  if (level === 'homoglyph') {
-    return word.split('').map(char => {
-      const lowerChar = char.toLowerCase();
-      if (homoglyphs[lowerChar]) {
-        const repl = homoglyphs[lowerChar];
-        return char === lowerChar ? repl : repl.toUpperCase();
-      }
-      return char;
-    }).join('');
-  }
-
-  if (level === 'high') {
-    // Zero-width space injection (\u200B)
-    return word.split('').join('\u200B');
-  }
-
-  if (level === 'medium') {
-    // Randomized symbols insertion
-    const separators = ['_', '-', ' '];
-    return word.split('').map((char, index) => {
-      if (index < word.length - 1) {
-        if (Math.random() < 0.45) {
-          const sep = separators[Math.floor(Math.random() * separators.length)];
-          return char + sep;
-        }
-      }
-      return char;
-    }).join('');
-  }
-
-  // Low/default level (uses standard preloaded variations)
+// Helper for obfuscation (Defaulted to Low Stealth)
+const getObfuscatedWord = (word: string, level: 'low' | 'medium' | 'high' | 'homoglyph' = 'low'): string => {
   return getDynamicReplacement(word);
 };
 
@@ -172,7 +137,7 @@ const RESTRICTED_WORDS_MAP: { pattern: RegExp, word: string, getReplacement: () 
   { pattern: /\b5\s+stars\b/gi, word: '5 stars', getReplacement: () => getDynamicReplacement('5 stars'), professional: 'feedback' },
   { pattern: /\b5\s+star\s+review\b/gi, word: '5 star review', getReplacement: () => getDynamicReplacement('5 star review'), professional: 'feedback' },
   { pattern: /\brating\b/gi, word: 'rating', getReplacement: () => getDynamicReplacement('rating'), professional: 'feedback' },
-  { pattern: /\ bratings\b/gi, word: 'ratings', getReplacement: () => getDynamicReplacement('ratings'), professional: 'feedback' },
+  { pattern: /\bratings\b/gi, word: 'ratings', getReplacement: () => getDynamicReplacement('ratings'), professional: 'feedback' },
   { pattern: /\bpositive\s+review\b/gi, word: 'positive review', getReplacement: () => getDynamicReplacement('positive review'), professional: 'feedback' },
   { pattern: /\bgood\s+rating\b/gi, word: 'good rating', getReplacement: () => getDynamicReplacement('good rating'), professional: 'feedback' },
   { pattern: /\bleave\s+a\s+review\b/gi, word: 'leave a review', getReplacement: () => getDynamicReplacement('leave a review'), professional: 'feedback' },
@@ -211,7 +176,6 @@ export default function MessageHelperPage() {
   const { dbUser } = useAuth();
   const [inputText, setInputText] = useState('');
   const [detectedWords, setDetectedWords] = useState<string[]>([]);
-  const [stealthLevel, setStealthLevel] = useState<'low' | 'medium' | 'high' | 'homoglyph'>('low');
   const [activeTab, setActiveTab] = useState<'original' | 'professional' | 'short' | 'formal' | 'friendly' | 'grammar' | 'clean'>('clean');
   const [compareMode, setCompareMode] = useState(false);
   const [saveModalOpen, setSaveModalOpen] = useState(false);
@@ -219,31 +183,24 @@ export default function MessageHelperPage() {
   const [newTemplateDesc, setNewTemplateDesc] = useState('');
   const [historyList, setHistoryList] = useState<{ id: string; text: string; date: string }[]>([]);
   const [copied, setCopied] = useState(false);
+  const [copiedType, setCopiedType] = useState<string | null>(null);
+  const [dualView, setDualView] = useState(true);
+
+  // Dynamic AI Translation State
+  const [banglaTranslation, setBanglaTranslation] = useState<string>('');
+  const [isTranslating, setIsTranslating] = useState<boolean>(false);
 
   const activeMessageHelperLayout = store.settings?.globalLayout || 'default';
-  const isSuperAdmin = dbUser?.role === 'super_admin';
-
-  const messageHelperLayouts = [
-    { id: 'default', name: 'Layout 1: Neon Glassmorphic' },
-    { id: 'slate', name: 'Layout 2: Clean Slate & Platinum' },
-    { id: 'aurora', name: 'Layout 3: Aurora Gradient' },
-    { id: 'cyber', name: 'Layout 4: Cyber-Chrono (Green)' },
-    { id: 'gold', name: 'Layout 5: Royal Gold & Onyx' }
-  ];
 
   const helperStyles = useMemo(() => {
     switch(activeMessageHelperLayout) {
-      case 'slate': // Layout 2: Clean Slate & Platinum
+      case 'slate':
         return {
           wrapper: "space-y-6 pb-12 relative font-sans",
           headerTitle: "text-2xl lg:text-3xl font-bold tracking-tight text-white",
           headerDesc: "text-gray-400 text-sm",
           editorCard: "p-5 rounded-none border border-gray-800 bg-gray-900 space-y-4",
           textarea: "w-full p-4 rounded-none bg-gray-950 border border-gray-800 text-white font-medium text-sm leading-relaxed focus:border-gray-600 outline-none",
-          controlPanel: "p-4 rounded-none border border-gray-850 bg-gray-955 space-y-3 text-left",
-          controlBtnActive: "p-2.5 rounded-none border border-white/40 bg-gray-800 text-white flex flex-col justify-between transition-all text-left",
-          controlBtnInactive: "p-2.5 rounded-none border border-gray-800 bg-gray-950/20 text-gray-400 hover:text-white hover:bg-gray-800 text-left",
-          visualizerBox: "p-4 rounded-none bg-gray-955 border border-gray-850 space-y-2 text-left",
           actionBtnCorrect: "px-5 py-2.5 rounded-none bg-white hover:bg-gray-250 text-black font-bold text-xs uppercase tracking-wider transition-colors flex items-center gap-1.5",
           actionBtnSec: "px-4 py-2.5 rounded-none bg-gray-900 border border-gray-800 hover:bg-gray-800 text-white font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-1.5",
           actionBtnClear: "px-4 py-2.5 rounded-none bg-gray-955 hover:bg-gray-900 border border-gray-800 text-gray-400 hover:text-white font-bold text-xs uppercase tracking-wider transition-all ml-auto flex items-center gap-1.5",
@@ -252,19 +209,15 @@ export default function MessageHelperPage() {
           toneBtnInactive: "px-3 py-1.5 rounded-none text-gray-400 hover:text-white hover:bg-gray-800 text-xs font-semibold uppercase tracking-wider transition-all",
           sidebarCard: "p-5 rounded-none border border-gray-800 bg-gray-900 space-y-4 text-left",
           sidebarBtn: "w-full p-3 rounded-none bg-gray-955 border border-gray-850 hover:bg-gray-850 hover:border-gray-650 transition-all text-left space-y-1 block",
-          outputPreBox: "p-4 rounded-none bg-gray-955 border border-gray-850 font-mono text-xs leading-relaxed space-y-2 max-h-[300px] overflow-y-auto relative text-left"
+          outputPreBox: "p-4 rounded-none bg-gray-955 border border-gray-850 font-mono text-xs leading-relaxed space-y-2 max-h-[350px] overflow-y-auto relative text-left"
         };
-      case 'aurora': // Layout 3: Aurora Gradient & Mesh Flow
+      case 'aurora':
         return {
           wrapper: "space-y-6 pb-12 relative font-sans",
           headerTitle: "text-2xl lg:text-3xl font-extrabold tracking-tight text-white",
           headerDesc: "text-indigo-200/80 text-sm",
           editorCard: "p-5 rounded-2xl border border-indigo-500/10 bg-indigo-950/5 space-y-4 shadow-[0_8px_32px_rgba(99,102,241,0.05)]",
           textarea: "w-full p-4 rounded-2xl bg-indigo-950/40 border border-indigo-500/20 text-white font-medium text-sm leading-relaxed focus:ring-2 focus:ring-indigo-500/50 outline-none",
-          controlPanel: "p-4 rounded-2xl border border-indigo-500/15 bg-indigo-950/20 space-y-3 text-left",
-          controlBtnActive: "p-2.5 rounded-xl border border-indigo-500 bg-indigo-500/20 text-indigo-300 flex flex-col justify-between transition-all text-left",
-          controlBtnInactive: "p-2.5 rounded-xl border border-indigo-500/10 bg-indigo-950/10 text-indigo-300/60 hover:text-white hover:bg-indigo-950/30 text-left",
-          visualizerBox: "p-4 rounded-2xl bg-indigo-950/30 border border-indigo-500/10 space-y-2 text-left",
           actionBtnCorrect: "px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-xs uppercase tracking-wider transition-colors flex items-center gap-1.5 shadow-md",
           actionBtnSec: "px-4 py-2.5 rounded-xl bg-indigo-950/40 border border-indigo-500/20 hover:bg-indigo-900/60 text-white font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-1.5",
           actionBtnClear: "px-4 py-2.5 rounded-xl bg-transparent hover:bg-red-500/10 border border-red-500/20 hover:border-red-500/40 text-red-300 font-bold text-xs uppercase tracking-wider transition-all ml-auto flex items-center gap-1.5",
@@ -273,19 +226,15 @@ export default function MessageHelperPage() {
           toneBtnInactive: "px-3 py-1.5 rounded-xl text-indigo-200/50 hover:text-white hover:bg-indigo-950/40 text-xs font-semibold uppercase tracking-wider transition-all",
           sidebarCard: "p-5 rounded-2xl border border-indigo-500/10 bg-indigo-950/5 space-y-4 text-left shadow-[0_8px_32px_rgba(99,102,241,0.05)]",
           sidebarBtn: "w-full p-3 rounded-xl bg-indigo-950/20 border border-indigo-500/10 hover:bg-indigo-950/40 hover:border-indigo-500/30 transition-all text-left space-y-1 block",
-          outputPreBox: "p-4 rounded-2xl bg-indigo-950/30 border border-indigo-500/10 font-mono text-xs leading-relaxed space-y-2 max-h-[300px] overflow-y-auto relative text-left"
+          outputPreBox: "p-4 rounded-2xl bg-indigo-950/30 border border-indigo-500/10 font-mono text-xs leading-relaxed space-y-2 max-h-[350px] overflow-y-auto relative text-left"
         };
-      case 'cyber': // Layout 4: Cyberpunk Matrix Tech
+      case 'cyber':
         return {
           wrapper: "space-y-6 pb-12 relative font-mono",
           headerTitle: "text-2xl lg:text-3xl font-black tracking-tight text-white uppercase",
           headerDesc: "text-emerald-500/80 text-xs",
           editorCard: "p-5 rounded-none border border-emerald-500/30 bg-black space-y-4 shadow-[0_0_15px_rgba(16,185,129,0.05)]",
           textarea: "w-full p-4 rounded-none bg-black border border-emerald-500/40 text-emerald-450 font-medium text-sm leading-relaxed focus:border-emerald-500 outline-none",
-          controlPanel: "p-4 rounded-none border border-emerald-500/20 bg-black space-y-3 text-left",
-          controlBtnActive: "p-2.5 rounded-none border border-emerald-500 bg-emerald-950/30 text-emerald-400 flex flex-col justify-between transition-all text-left",
-          controlBtnInactive: "p-2.5 rounded-none border border-emerald-500/10 bg-black text-emerald-600 hover:text-emerald-400 hover:bg-emerald-950/20 text-left",
-          visualizerBox: "p-4 rounded-none bg-black border border-emerald-500/20 space-y-2 text-left",
           actionBtnCorrect: "px-5 py-2.5 rounded-none bg-black border-2 border-dashed border-emerald-500 hover:bg-emerald-950/30 text-emerald-400 font-bold text-xs uppercase tracking-wider transition-colors flex items-center gap-1.5",
           actionBtnSec: "px-4 py-2.5 rounded-none bg-black border border-emerald-500/35 hover:bg-emerald-950/20 text-white font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-1.5",
           actionBtnClear: "px-4 py-2.5 rounded-none bg-black border border-red-500/30 hover:bg-red-950/20 text-red-400 font-bold text-xs uppercase tracking-wider transition-all ml-auto flex items-center gap-1.5",
@@ -294,19 +243,15 @@ export default function MessageHelperPage() {
           toneBtnInactive: "px-3 py-1.5 rounded-none text-emerald-600 hover:text-emerald-400 hover:bg-emerald-950/20 text-xs font-semibold uppercase tracking-wider transition-all",
           sidebarCard: "p-5 rounded-none border border-emerald-500/30 bg-black space-y-4 text-left",
           sidebarBtn: "w-full p-3 rounded-none bg-black border border-emerald-500/20 hover:bg-emerald-950/10 hover:border-emerald-500/40 transition-all text-left space-y-1 block",
-          outputPreBox: "p-4 rounded-none bg-black border border-emerald-500/20 font-mono text-xs leading-relaxed space-y-2 max-h-[300px] overflow-y-auto relative text-left"
+          outputPreBox: "p-4 rounded-none bg-black border border-emerald-500/20 font-mono text-xs leading-relaxed space-y-2 max-h-[350px] overflow-y-auto relative text-left"
         };
-      case 'gold': // Layout 5: Royal Gold & Onyx
+      case 'gold':
         return {
           wrapper: "space-y-6 pb-12 relative font-sans",
           headerTitle: "text-2xl lg:text-3xl font-black tracking-tight text-white uppercase tracking-wider",
           headerDesc: "text-amber-250/70 text-sm",
           editorCard: "p-5 rounded-2xl border border-amber-500/25 bg-[#0b0b0b] space-y-4 shadow-lg",
           textarea: "w-full p-4 rounded-2xl bg-black border border-amber-500/20 text-white font-medium text-sm leading-relaxed focus:ring-1 focus:ring-amber-500/40 outline-none",
-          controlPanel: "p-4 rounded-2xl border border-amber-500/15 bg-black space-y-3 text-left",
-          controlBtnActive: "p-2.5 rounded-xl border border-amber-500 bg-amber-500/10 text-amber-300 flex flex-col justify-between transition-all text-left",
-          controlBtnInactive: "p-2.5 rounded-xl border border-amber-500/10 bg-black text-amber-200/50 hover:text-white hover:bg-[#151515] text-left",
-          visualizerBox: "p-4 rounded-2xl bg-black border border-amber-500/15 space-y-2 text-left",
           actionBtnCorrect: "px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-black font-bold text-xs uppercase tracking-wider transition-colors flex items-center gap-1.5 shadow-sm",
           actionBtnSec: "px-4 py-2.5 rounded-xl bg-[#121212] border border-amber-500/20 hover:bg-[#1a1a1a] text-white font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-1.5",
           actionBtnClear: "px-4 py-2.5 rounded-xl bg-transparent hover:bg-red-500/15 border border-red-500/20 hover:border-red-500/40 text-red-400 font-bold text-xs uppercase tracking-wider transition-all ml-auto flex items-center gap-1.5",
@@ -315,19 +260,15 @@ export default function MessageHelperPage() {
           toneBtnInactive: "px-3 py-1.5 rounded-xl text-amber-200/50 hover:text-white hover:bg-[#151515] text-xs font-semibold uppercase tracking-wider transition-all",
           sidebarCard: "p-5 rounded-2xl border border-amber-500/25 bg-[#0b0b0b] space-y-4 text-left shadow-md",
           sidebarBtn: "w-full p-3 rounded-xl bg-black border border-amber-500/15 hover:bg-[#121212] hover:border-amber-500/35 transition-all text-left space-y-1 block",
-          outputPreBox: "p-4 rounded-2xl bg-black border border-amber-500/15 font-mono text-xs leading-relaxed space-y-2 max-h-[300px] overflow-y-auto relative text-left"
+          outputPreBox: "p-4 rounded-2xl bg-black border border-amber-500/15 font-mono text-xs leading-relaxed space-y-2 max-h-[350px] overflow-y-auto relative text-left"
         };
-      default: // Neon Glassmorphic (Default)
+      default:
         return {
           wrapper: "space-y-6 pb-12 relative",
           headerTitle: "text-2xl lg:text-3xl font-extrabold tracking-tight text-white",
           headerDesc: "text-gray-400 text-sm",
-          editorCard: "p-5 rounded-xl border border-glass-border bg-gray-950/20 space-y-4",
+          editorCard: "p-5 rounded-xl border border-glass-border bg-gray-955/20 space-y-4",
           textarea: "w-full p-4 rounded-xl glass-input font-medium text-sm leading-relaxed",
-          controlPanel: "p-4 rounded-xl border border-glass-border bg-gray-955/40 space-y-3 text-left",
-          controlBtnActive: "p-2.5 rounded-lg border border-green-500 bg-green-500/10 text-green-400 shadow-[0_0_15px_rgba(34,197,94,0.15)] flex flex-col justify-between transition-all text-left",
-          controlBtnInactive: "p-2.5 rounded-lg border border-glass-border bg-gray-955/20 text-gray-400 hover:text-white hover:bg-glass-hover text-left",
-          visualizerBox: "p-4 rounded-xl bg-gray-955/60 border border-glass-border space-y-2 text-left",
           actionBtnCorrect: "px-5 py-2.5 rounded-lg bg-green-500 hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed text-black font-bold text-xs uppercase tracking-wider transition-colors flex items-center gap-1.5 glow-green",
           actionBtnSec: "px-4 py-2.5 rounded-lg bg-gray-900 border border-glass-border hover:bg-glass-hover text-white font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-1.5",
           actionBtnClear: "px-4 py-2.5 rounded-lg bg-gray-955 hover:bg-red-950/20 border border-red-500/10 hover:border-red-500/30 text-gray-400 hover:text-red-400 font-bold text-xs uppercase tracking-wider transition-all ml-auto flex items-center gap-1.5",
@@ -336,14 +277,13 @@ export default function MessageHelperPage() {
           toneBtnInactive: "px-3 py-1.5 rounded-md text-xs font-semibold uppercase tracking-wider transition-all text-gray-400 hover:text-white hover:bg-glass-hover",
           sidebarCard: "p-5 rounded-xl border border-glass-border bg-gray-955/20 space-y-4 text-left",
           sidebarBtn: "w-full p-3 rounded-lg bg-gray-955/60 border border-glass-border hover:bg-glass-hover hover:border-white/10 transition-all text-left space-y-1 block",
-          outputPreBox: "p-4 rounded-xl bg-gray-955/60 border border-glass-border font-mono text-xs leading-relaxed space-y-2 max-h-[300px] overflow-y-auto relative text-left"
+          outputPreBox: "p-4 rounded-xl bg-gray-955/60 border border-glass-border font-mono text-xs leading-relaxed space-y-2 max-h-[350px] overflow-y-auto relative text-left"
         };
     }
   }, [activeMessageHelperLayout]);
 
   useEffect(() => {
     store.hydrate();
-    // Load local analyzer history
     const stored = localStorage.getItem('cc_analyzer_history');
     if (stored) {
       setHistoryList(JSON.parse(stored));
@@ -365,15 +305,12 @@ export default function MessageHelperPage() {
 
   const handleCorrect = () => {
     if (!inputText) return;
-    
-    // Get corrected text based on current active tab, default to clean if original is selected
     const targetTab = activeTab === 'original' ? 'clean' : activeTab;
     const corrected = rewrites[targetTab as keyof typeof rewrites] || rewrites.clean;
     
     setInputText(corrected);
     setActiveTab(targetTab);
     
-    // Save to local analyzer history
     const newHist = {
       id: Math.random().toString(36).substring(2),
       text: corrected.slice(0, 100) + (corrected.length > 100 ? '...' : ''),
@@ -382,62 +319,63 @@ export default function MessageHelperPage() {
     const updatedHist = [newHist, ...historyList.slice(0, 9)];
     setHistoryList(updatedHist);
     localStorage.setItem('cc_analyzer_history', JSON.stringify(updatedHist));
-    store.logActivity('Message Corrected', 'chat', `Fiverr message corrected with stealth bypass (${stealthLevel}).`);
+    store.logActivity('Message Corrected', 'chat', 'Fiverr message corrected with stealth bypass (low).');
   };
 
   const handleClear = () => {
     setInputText('');
     setDetectedWords([]);
     setActiveTab('clean');
+    setBanglaTranslation('');
   };
 
-  const handleCopy = (text: string) => {
+  const handleCopy = (text: string, type: string = 'english') => {
     if (!text) return;
     navigator.clipboard.writeText(text);
-    store.logActivity('Message Copied', 'chat', 'Copy to clipboard.');
+    store.logActivity('Message Copied', 'chat', `Copy ${type} to clipboard.`);
+    setCopiedType(type);
     setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    setTimeout(() => {
+      setCopied(false);
+      setCopiedType(null);
+    }, 2000);
   };
 
-  // Tone Rewrite Generators (Static formulas matching requested templates style rules)
+  const handleCopyBoth = (enText: string, bnText: string) => {
+    if (!enText) return;
+    const combined = `--- ENGLISH MESSAGE ---\n${enText}\n\n--- বাংলা অনুবাদ (BANGLA TRANSLATION) ---\n${bnText}`;
+    navigator.clipboard.writeText(combined);
+    store.logActivity('Message Copied', 'chat', 'Copy English and Bangla to clipboard.');
+    setCopiedType('both');
+    setCopied(true);
+    setTimeout(() => {
+      setCopied(false);
+      setCopiedType(null);
+    }, 2000);
+  };
+
+  // Tone Rewrite Generators
   const getRewrites = () => {
     if (!inputText) return { professional: '', short: '', formal: '', friendly: '', grammar: '', clean: '' };
     
-    // Compute clean text on the fly matching current stealth level
     let cleanText = inputText;
     let profRewrite = inputText;
 
     RESTRICTED_WORDS_MAP.forEach(item => {
-      // 1. Clean / Stealth Obfuscation
       item.pattern.lastIndex = 0;
       cleanText = cleanText.replace(item.pattern, (match) => {
-        // Ensure we only add ONE symbol for medium level to prevent p_y-me-nt
-        if (stealthLevel === 'medium' && match.length > 2) {
-          const separators = ['_', '-', ' '];
-          const sep = separators[Math.floor(Math.random() * separators.length)];
-          const insertPos = 1; // Always insert exactly after the first character
-          return match.slice(0, insertPos) + sep + match.slice(insertPos);
-        }
-        return getObfuscatedWord(match, stealthLevel);
+        return getObfuscatedWord(match, 'low');
       });
 
-      // 2. Professional Replacement
       item.pattern.lastIndex = 0;
       profRewrite = profRewrite.replace(item.pattern, (match) => {
         return item.professional;
       });
     });
 
-    // Formal template
     const formalRewrite = `Dear Client,\n\nI hope this correspondence finds you well.\n\n${profRewrite}\n\nShould you require any further adjustments, please let me know. I look forward to working together.\n\nBest regards,\n${store.memberProfile.name}`;
-
-    // Friendly template
     const friendlyRewrite = `Hi there! 😊\n\nHope you're having an awesome day.\n\nJust wanted to share: ${profRewrite.replace(/i am/gi, "I'm").replace(/would need/gi, "need")}\n\nLet me know what you think, and I'd be super happy to adjust anything if needed! Thanks a bunch!`;
-
-    // Short version
     const shortRewrite = `${profRewrite.slice(0, 200)}${profRewrite.length > 200 ? '...' : ''}\n\nLet me know if this looks good. Thanks!`;
-
-    // Grammar fix simulation (basic cleanup)
     const grammarRewrite = profRewrite
       .replace(/\bi\b/g, 'I')
       .replace(/\bshopify store main login\b/gi, 'Shopify store access details')
@@ -455,6 +393,86 @@ export default function MessageHelperPage() {
   };
 
   const rewrites = getRewrites();
+  const activeText = activeTab === 'original' ? inputText : rewrites[activeTab as keyof typeof rewrites];
+
+  // Dynamic Real-time AI Translation API hook
+  useEffect(() => {
+    if (!activeText || !activeText.trim()) {
+      setBanglaTranslation('');
+      setIsTranslating(false);
+      return;
+    }
+
+    setIsTranslating(true);
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch('/api/translate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: activeText, targetLang: 'bn' })
+        });
+        const data = await res.json();
+        if (data && data.translation) {
+          setBanglaTranslation(data.translation);
+        } else {
+          setBanglaTranslation(activeText);
+        }
+      } catch (err) {
+        console.error('Translation fetch error:', err);
+      } finally {
+        setIsTranslating(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [activeText]);
+
+  // Contextual intent & policy tips
+  const banglaInfo = useMemo(() => {
+    if (!activeText || !activeText.trim()) return { meaning: '', tips: '' };
+    const lower = activeText.toLowerCase();
+
+    let meaning = "সাধারণ ক্লায়েন্ট বার্তা (General Client Communication)";
+    let tips = "বার্তাটিতে কোনো ক্ষতিকর ফাইবার পলিসি ভায়োলেশন পাওয়া যায়নি।";
+
+    if (lower.includes('pay') || lower.includes('bank') || lower.includes('paypal') || lower.includes('stripe') || lower.includes('charge') || lower.includes('cost')) {
+      meaning = "পেমেন্ট গেটওয়ে, বাজেট বা অতিরিক্ত মূল্য পরিশোধ সংক্রান্ত বার্তা";
+      tips = "সতর্কতা: ফাইভারে সরাসরি পেমেন্ট শব্দ লিখলে ডাইরেক্ট অটো বটের নজরে পড়তে পারেন। অল্টারনেটিভ শব্দ (order setups) বা বাইপাস টেক্সট ব্যবহার করুন।";
+    } else if (lower.includes('login') || lower.includes('password') || lower.includes('access') || lower.includes('credential')) {
+      meaning = "স্টোর অ্যাডমিন প্যানেল বা লগইন অ্যাক্সেস চাওয়া সংক্রান্ত বার্তা";
+      tips = "পাসওয়ার্ডের চেয়ে কাস্টমার সাপোর্ট/অফিসিয়াল স্টাফ অ্যাক্সেস ইনভাইটেশন পাঠানো নিরাপদ।";
+    } else if (lower.includes('contact') || lower.includes('email') || lower.includes('whatsapp') || lower.includes('phone') || lower.includes('skype') || lower.includes('zoom')) {
+      meaning = "বাহ্যিক যোগাযোগের তথ্য বা আউটসাইড চ্যানেল সংক্রান্ত আলোচনা";
+      tips = "ফাইবার আউটসাইড কন্টাক্ট শেয়ার করা সম্পূর্ণ নিষিদ্ধ। অর্ডারের সকল আলোচনা ফাইবারেই রাখুন।";
+    } else if (lower.includes('review') || lower.includes('rating') || lower.includes('feedback') || lower.includes('5 star')) {
+      meaning = "ফিডব্যাক, রেটিং বা রিভিউ চাওয়া সম্পর্কিত কথা";
+      tips = "ফাইভারে ৫-স্টার রিভিউ চাওয়া পলিসি লঙ্ঘন। সবসময় 'share your honest experience' বা 'feedback' ব্যবহার করুন।";
+    } else if (lower.includes('deliver') || lower.includes('complete') || lower.includes('revision') || lower.includes('finish') || lower.includes('solution') || lower.includes('button') || lower.includes('magsafe')) {
+      meaning = "প্রজেক্টের ফিচার, ডেভেলপমেন্ট কাজ বা কাস্টম সমাধানের প্রস্তাবনা";
+      tips = "অতিরিক্ত কাজের বাজেট আলোচনার সময় কাস্টম অফার পাঠানোর প্রস্তাব দিন।";
+    }
+
+    return { meaning, tips };
+  }, [activeText]);
+
+  const stats = useMemo(() => {
+    const wordCount = inputText.trim() ? inputText.trim().split(/\s+/).length : 0;
+    const charCount = inputText.length;
+    const readingTimeSec = Math.max(1, Math.ceil(wordCount / 3.5));
+    
+    let politenessScore = 100;
+    if (detectedWords.length > 0) politenessScore -= Math.min(40, detectedWords.length * 10);
+    if (inputText.toLowerCase().includes('must') || inputText.toLowerCase().includes('urgent')) politenessScore -= 5;
+    if (inputText.toLowerCase().includes('please') || inputText.toLowerCase().includes('thank')) politenessScore += 5;
+    politenessScore = Math.max(50, Math.min(100, politenessScore));
+
+    return {
+      wordCount,
+      charCount,
+      readingTimeSec,
+      politenessScore
+    };
+  }, [inputText, detectedWords]);
 
   const handleSaveAsTemplate = () => {
     if (!newTemplateTitle.trim()) return;
@@ -480,15 +498,12 @@ export default function MessageHelperPage() {
   const renderHighlightedText = (text: string) => {
     if (!text) return <span className="text-gray-550 italic">Analysis visualization output will display here...</span>;
     
-    // Split text by spaces (including formatting)
     const words = text.split(/(\s+)/);
     return words.map((chunk, idx) => {
       if (/^\s+$/.test(chunk)) return chunk;
 
-      // Clean word check
       const cleanChunk = chunk.toLowerCase().replace(/[.,/#!$%^&*;:{}=\-_`~()]/g, '');
       
-      // Check if it's a restricted word (raw)
       const isRestricted = RESTRICTED_WORDS_MAP.some(item => {
         item.pattern.lastIndex = 0;
         return item.pattern.test(cleanChunk);
@@ -502,41 +517,20 @@ export default function MessageHelperPage() {
         );
       }
       
-      // Check if it's an obfuscated word (contains zero-width spaces, homoglyphs, or symbols)
-      const isZeroWidth = chunk.includes('\u200B');
-      const isHomoglyph = /[\u0400-\u04FF]/.test(chunk);
       const hasDelimiters = /[-_]/.test(cleanChunk);
-      
       const strippedDelimiter = cleanChunk.replace(/[-_]/g, '');
-      const strippedZeroWidth = cleanChunk.replace(/\u200B/g, '');
-      
-      // Cyrillic mapping to Latin check
-      const cyrillicToLatinMap: Record<string, string> = {
-        'а': 'a', 'с': 'c', 'е': 'e', 'і': 'i', 'о': 'o', 'р': 'p', 'ѕ': 's', 'х': 'x', 'у': 'y',
-        'А': 'A', 'С': 'C', 'Е': 'E', 'І': 'I', 'О': 'O', 'Р': 'P', 'Ѕ': 'S', 'Х': 'X', 'У': 'Y'
-      };
-      const latinizedChunk = cleanChunk.split('').map(c => cyrillicToLatinMap[c] || c).join('');
       
       const matchesRestrictedBase = RESTRICTED_WORDS_MAP.some(item => {
         item.pattern.lastIndex = 0;
-        return item.pattern.test(strippedDelimiter) || 
-               item.pattern.test(strippedZeroWidth) || 
-               item.pattern.test(latinizedChunk);
+        return item.pattern.test(strippedDelimiter);
       });
 
-      const isObfuscated = (isZeroWidth || isHomoglyph || hasDelimiters) && matchesRestrictedBase;
+      const isObfuscated = hasDelimiters && matchesRestrictedBase;
 
       if (isObfuscated) {
-        let visibleRepresentation = chunk;
-        if (isZeroWidth) {
-          visibleRepresentation = chunk.replace(/\u200B/g, '·');
-        } else if (isHomoglyph) {
-          visibleRepresentation = chunk + ' [AI]';
-        }
-
         return (
           <span key={idx} className="bg-emerald-500/20 text-emerald-350 border border-emerald-500/30 px-1 rounded text-sm font-bold" title="Stealth bypass active">
-            {visibleRepresentation}
+            {chunk}
           </span>
         );
       }
@@ -545,7 +539,6 @@ export default function MessageHelperPage() {
     });
   };
 
-  // Diff Compare Renderer (simple compare original with rewritten tab)
   const renderDiffCompare = () => {
     const originalWords = inputText.split(/\s+/);
     const targetWords = (rewrites[activeTab as keyof typeof rewrites] || '').split(/\s+/);
@@ -575,8 +568,6 @@ export default function MessageHelperPage() {
       </div>
     );
   };
-
-  const activeText = activeTab === 'original' ? inputText : rewrites[activeTab as keyof typeof rewrites];
 
   const getRiskScore = () => {
     if (detectedWords.length === 0) {
@@ -624,26 +615,37 @@ export default function MessageHelperPage() {
 
    return (
     <div className={helperStyles.wrapper}>
+      {/* Toast Notification */}
       <AnimatePresence>
         {copied && (
           <motion.div
             initial={{ opacity: 0, y: -50 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -50 }}
-            className="fixed top-8 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-2 bg-green-950/90 border border-green-500/30 text-green-400 px-6 py-3 rounded-full shadow-2xl backdrop-blur-md"
+            className="fixed top-8 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-2 bg-emerald-950/90 border border-emerald-500/30 text-emerald-400 px-6 py-3 rounded-full shadow-2xl backdrop-blur-md font-sans"
           >
-            <Check className="w-5 h-5" />
-            <span className="text-sm font-bold tracking-wider uppercase">Copied to clipboard</span>
+            <Check className="w-5 h-5 text-emerald-400" />
+            <span className="text-xs font-bold tracking-wider uppercase">
+              {copiedType === 'bangla' ? 'বাংলা অনুবাদ অনুলিপি করা হয়েছে!' : 
+               copiedType === 'both' ? 'ইংরেজি + বাংলা অনুবাদ অনুলিপি করা হয়েছে!' : 
+               'Copied to clipboard'}
+            </span>
           </motion.div>
         )}
       </AnimatePresence>
 
-
-
       {/* Header */}
-      <div>
-        <h1 className={helperStyles.headerTitle}>MESSAGE HELPER</h1>
-        <p className={helperStyles.headerDesc}>Fiverr & Upwork communications advisor. Review word policies and adjust tone scales.</p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2.5">
+            <h1 className={helperStyles.headerTitle}>MESSAGE HELPER</h1>
+            <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[10px] font-bold tracking-wide uppercase flex items-center gap-1">
+              <Languages className="w-3 h-3 text-emerald-400" />
+              <span>Real-time AI Translator</span>
+            </span>
+          </div>
+          <p className={helperStyles.headerDesc}>Fiverr & Upwork communications advisor with instant AI English-to-Bangla translation & policy advisor.</p>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
@@ -651,9 +653,26 @@ export default function MessageHelperPage() {
         {/* Core Editor Panel */}
         <div className="xl:col-span-3 space-y-6">
           <div className={helperStyles.editorCard}>
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-gray-500">PASTE YOUR MESSAGE HERE IT AUTOMATICALLY CHECKS YOUR WORDS.</span>
-              <span className="text-xs text-gray-400 font-medium">{inputText.length}/2500 Characters</span>
+            
+            {/* Input Header Stats */}
+            <div className="flex flex-wrap items-center justify-between gap-2 pb-1">
+              <span className="text-xs text-gray-400 font-mono tracking-wide uppercase">Paste or type your client message draft:</span>
+              <div className="flex items-center gap-3 text-[10px] text-gray-400 font-mono">
+                <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold">Stealth Policy Active</span>
+                <span>•</span>
+                <span>{stats.wordCount} Words</span>
+                <span>•</span>
+                <span>{inputText.length}/2500 Chars</span>
+                {stats.wordCount > 0 && (
+                  <>
+                    <span>•</span>
+                    <span className="text-emerald-400 flex items-center gap-1">
+                      <Clock className="w-3 h-3" />
+                      {stats.readingTimeSec}s read
+                    </span>
+                  </>
+                )}
+              </div>
             </div>
 
             <textarea
@@ -662,35 +681,10 @@ export default function MessageHelperPage() {
                 setInputText(e.target.value);
                 soundSynth.playClick();
               }}
-              placeholder="Paste or type your developer update draft here..."
+              placeholder="Paste or type your client message draft here..."
               rows={8}
               className={helperStyles.textarea}
             />
-
-            {/* Premium Stealth Bypass Engine Control Panel */}
-            <div className={helperStyles.controlPanel}>
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Stealth Bypass Engine Control</span>
-                <span className="text-[9px] px-1.5 py-0.5 rounded bg-green-500/10 text-green-400 border border-green-500/25 font-bold font-mono">Stealth Active</span>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
-                {[
-                  { id: 'low', name: 'Low Stealth', desc: 'Standard replacements (e.g. p_ayment)' },
-                  { id: 'medium', name: 'Medium Stealth', desc: 'Randomized delimiters (e.g. p_ay-ment)' },
-                  { id: 'high', name: 'High Stealth', desc: 'Zero-Width spaces (100% invisible bypass)' },
-                  { id: 'homoglyph', name: 'AI Homoglyph', desc: 'Cyrillic lookalikes (advanced AI bypass)' }
-                ].map((level) => (
-                  <button
-                    key={level.id}
-                    onClick={() => setStealthLevel(level.id as any)}
-                    className={stealthLevel === level.id ? helperStyles.controlBtnActive : helperStyles.controlBtnInactive}
-                  >
-                    <span className="text-xs font-extrabold">{level.name}</span>
-                    <span className="text-[9px] leading-tight text-gray-500 mt-1">{level.desc}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
 
             {/* Restricted words panel status */}
             <div className="flex flex-wrap items-center gap-3">
@@ -703,7 +697,7 @@ export default function MessageHelperPage() {
                 inputText.length > 0 && (
                   <div className="flex items-center gap-2 text-xs text-emerald-400 bg-emerald-950/20 border border-emerald-500/25 px-3 py-1.5 rounded-lg">
                     <Check className="w-4 h-4 shrink-0" />
-                    <span>No restricted words or phrases detected!</span>
+                    <span>No restricted words or phrases detected! Safe for platform policy.</span>
                   </div>
                 )
               )}
@@ -720,7 +714,7 @@ export default function MessageHelperPage() {
             )}
 
             {/* Base Action deck */}
-            <div className="flex flex-wrap gap-3 pt-2">
+            <div className="flex flex-wrap gap-2.5 pt-2">
               <button
                 onClick={handleCorrect}
                 disabled={!inputText}
@@ -731,12 +725,30 @@ export default function MessageHelperPage() {
               </button>
 
               <button
-                onClick={() => handleCopy(activeText)}
+                onClick={() => handleCopy(activeText, 'english')}
                 disabled={!activeText}
                 className={helperStyles.actionBtnSec}
               >
-                {copied ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
-                <span className={copied ? "text-green-400" : ""}>{copied ? 'Copied' : 'Copy'}</span>
+                {copied && copiedType === 'english' ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4 text-emerald-400" />}
+                <span className={copied && copiedType === 'english' ? "text-green-400" : ""}>Copy English</span>
+              </button>
+
+              <button
+                onClick={() => handleCopy(banglaTranslation, 'bangla')}
+                disabled={!banglaTranslation || isTranslating}
+                className={helperStyles.actionBtnSec}
+              >
+                {copied && copiedType === 'bangla' ? <Check className="w-4 h-4 text-green-400" /> : <Languages className="w-4 h-4 text-blue-400" />}
+                <span className={copied && copiedType === 'bangla' ? "text-green-400" : ""}>বাংলা কপি</span>
+              </button>
+
+              <button
+                onClick={() => handleCopyBoth(activeText, banglaTranslation)}
+                disabled={!activeText || isTranslating}
+                className={helperStyles.actionBtnSec}
+              >
+                {copied && copiedType === 'both' ? <Check className="w-4 h-4 text-green-400" /> : <Split className="w-4 h-4 text-amber-400" />}
+                <span className={copied && copiedType === 'both' ? "text-green-400" : ""}>Copy Both (EN+BN)</span>
               </button>
 
               <button
@@ -759,11 +771,12 @@ export default function MessageHelperPage() {
             </div>
           </div>
 
-          {/* Tone Rewrite Deck (Only display when text exists) */}
+          {/* Tone Rewrite & Bangla Translation Output Deck */}
           {inputText && (
             <div className={helperStyles.toneWrapper}>
               <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-glass-border pb-3 gap-3">
-                <div className="flex gap-2 overflow-x-auto whitespace-nowrap scrollbar-none flex-nowrap shrink-0 max-w-full pb-1">
+                <div className="flex items-center gap-2 overflow-x-auto whitespace-nowrap scrollbar-none flex-nowrap shrink-0 max-w-full pb-1">
+                  <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider pr-1">Tone Scale:</span>
                   {(['original', 'professional', 'short', 'formal', 'friendly', 'grammar', 'clean'] as const).map((tab) => (
                     <button
                       key={tab}
@@ -775,41 +788,152 @@ export default function MessageHelperPage() {
                   ))}
                 </div>
 
-                <button
-                  onClick={() => setCompareMode(!compareMode)}
-                  className={`px-3 py-1 text-xs rounded border transition-colors ${
-                    compareMode 
-                      ? 'bg-blue-500/10 border-blue-500/30 text-blue-400' 
-                      : 'border-glass-border text-gray-500 hover:text-white'
-                  }`}
-                >
-                  Diff Compare
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setDualView(!dualView)}
+                    className={`px-2.5 py-1 text-xs rounded border transition-colors flex items-center gap-1.5 font-medium ${
+                      dualView 
+                        ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' 
+                        : 'border-glass-border text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    <Split className="w-3.5 h-3.5" />
+                    <span>Dual View (EN + BN)</span>
+                  </button>
+
+                  <button
+                    onClick={() => setCompareMode(!compareMode)}
+                    className={`px-2.5 py-1 text-xs rounded border transition-colors ${
+                      compareMode 
+                        ? 'bg-blue-500/10 border-blue-500/30 text-blue-400' 
+                        : 'border-glass-border text-gray-500 hover:text-white'
+                    }`}
+                  >
+                    Diff Compare
+                  </button>
+                </div>
               </div>
 
               {compareMode ? (
                 renderDiffCompare()
+              ) : dualView ? (
+                /* Dual View Side-by-Side (English Output + Dynamic Bangla AI Translation Card) */
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pt-1">
+                  
+                  {/* English Output Box */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider flex items-center gap-1.5">
+                        <Globe className="w-3.5 h-3.5" />
+                        <span>ENGLISH MESSAGE ({activeTab.toUpperCase()})</span>
+                      </span>
+                      <button 
+                        onClick={() => handleCopy(activeText, 'english')}
+                        className="text-[10px] text-gray-400 hover:text-white flex items-center gap-1 px-2 py-0.5 rounded bg-gray-900 border border-gray-800 hover:border-gray-700 transition-all"
+                      >
+                        <Copy className="w-3 h-3 text-emerald-400" />
+                        <span>Copy EN</span>
+                      </button>
+                    </div>
+                    <div className={helperStyles.outputPreBox}>
+                      <pre className="whitespace-pre-wrap font-sans text-sm text-gray-200">{activeText}</pre>
+                    </div>
+                  </div>
+
+                  {/* Bangla Translation & Explanation Box */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-blue-400 font-bold uppercase tracking-wider flex items-center gap-1.5">
+                        <Languages className="w-3.5 h-3.5 text-blue-400" />
+                        <span>বাংলা অনুবাদ ও তাৎপর্য (REAL-TIME AI TRANSLATION)</span>
+                      </span>
+                      <div className="flex items-center gap-2">
+                        {isTranslating && (
+                          <span className="text-[10px] text-blue-400 flex items-center gap-1 font-medium animate-pulse font-mono">
+                            <RefreshCw className="w-3 h-3 animate-spin" />
+                            <span>অনুবাদ হচ্ছে...</span>
+                          </span>
+                        )}
+                        <button 
+                          onClick={() => handleCopy(banglaTranslation, 'bangla')}
+                          disabled={!banglaTranslation || isTranslating}
+                          className="text-[10px] text-gray-400 hover:text-white flex items-center gap-1 px-2 py-0.5 rounded bg-gray-900 border border-gray-800 hover:border-gray-700 transition-all disabled:opacity-50"
+                        >
+                          <Copy className="w-3 h-3 text-blue-400" />
+                          <span>বাংলা কপি</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="p-4 rounded-xl bg-gray-950/70 border border-blue-500/20 font-sans text-xs leading-relaxed space-y-3 max-h-[350px] overflow-y-auto relative text-left">
+                      {/* Context summary */}
+                      <div className="bg-blue-950/30 border border-blue-500/20 rounded-lg p-2.5 space-y-1">
+                        <span className="text-[9px] text-blue-400 font-bold uppercase tracking-wider block">মূল তাৎপর্য (Context Intent):</span>
+                        <p className="text-xs font-semibold text-gray-200">{banglaInfo.meaning}</p>
+                      </div>
+
+                      {/* Bangla Translated Message */}
+                      <div className="space-y-1 pt-1">
+                        <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider block">বাংলা অনুবাদ:</span>
+                        {isTranslating && !banglaTranslation ? (
+                          <div className="py-6 text-center text-xs text-blue-400 flex items-center justify-center gap-2">
+                            <RefreshCw className="w-4 h-4 animate-spin text-blue-400" />
+                            <span>অনুবাদ তৈরি হচ্ছে, অনুগ্রহ করে অপেক্ষা করুন...</span>
+                          </div>
+                        ) : (
+                          <pre className="whitespace-pre-wrap font-sans text-sm text-gray-200 leading-relaxed">{banglaTranslation || 'অনুবাদ প্রক্রিয়াজাতকরণ সম্পূর্ণ হতে পারেনি।'}</pre>
+                        )}
+                      </div>
+
+                      {/* Policy Guidance Tip in Bangla */}
+                      {banglaInfo.tips && (
+                        <div className="bg-amber-950/20 border border-amber-500/20 rounded-lg p-2.5 flex items-start gap-2 text-[11px] text-amber-300">
+                          <ShieldAlert className="w-4 h-4 shrink-0 text-amber-400 mt-0.5" />
+                          <span>{banglaInfo.tips}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                </div>
               ) : (
+                /* Single Output Box */
                 <div className="space-y-3">
                   <div className={helperStyles.outputPreBox}>
                     <button 
-                      onClick={() => handleCopy(activeText)}
+                      onClick={() => handleCopy(activeText, 'english')}
                       className="absolute top-3 right-3 p-1.5 rounded hover:bg-glass-hover text-gray-400 hover:text-white transition-colors"
                     >
                       {copied ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
                     </button>
                     <pre className="whitespace-pre-wrap font-sans text-sm text-gray-300 pr-8">{activeText}</pre>
                   </div>
-                  {activeTab === 'clean' && (
-                    <div className="text-[11px] text-green-400 bg-green-950/20 border border-green-500/20 px-3 py-2 rounded-lg flex items-center gap-2 select-none">
-                      <Sparkles className="w-4 h-4 shrink-0 text-green-400 animate-pulse" />
-                      <span>
-                        {stealthLevel === 'high' ? 'High Stealth: Zero-width space bypasses are invisibly loaded. Ready to paste directly to Fiverr.' :
-                         stealthLevel === 'homoglyph' ? 'Homoglyph: Lookalike letters have been swapped in to confuse automated AI regex.' :
-                         'Low/Medium Stealth: Hyphens or underscores have been inserted to break bot keyword matching.'}
+                  
+                  {/* Bangla Translation Drawer Card for Single Mode */}
+                  <div className="p-3.5 rounded-xl bg-blue-950/20 border border-blue-500/20 space-y-2 text-left">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-blue-400 font-bold uppercase tracking-wider flex items-center gap-1.5">
+                        <Languages className="w-3.5 h-3.5" />
+                        <span>বাংলা অনুবাদ (Bangla Translation)</span>
                       </span>
+                      <button 
+                        onClick={() => handleCopy(banglaTranslation, 'bangla')}
+                        disabled={!banglaTranslation || isTranslating}
+                        className="text-[10px] text-blue-400 hover:underline flex items-center gap-1 disabled:opacity-50"
+                      >
+                        <Copy className="w-3 h-3" />
+                        <span>কপি করুন</span>
+                      </button>
                     </div>
-                  )}
+                    {isTranslating && !banglaTranslation ? (
+                      <div className="py-3 text-center text-xs text-blue-400 flex items-center justify-center gap-2">
+                        <RefreshCw className="w-4 h-4 animate-spin text-blue-400" />
+                        <span>অনুবাদ তৈরি হচ্ছে...</span>
+                      </div>
+                    ) : (
+                      <pre className="whitespace-pre-wrap font-sans text-xs text-gray-300 leading-relaxed">{banglaTranslation}</pre>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
@@ -817,16 +941,55 @@ export default function MessageHelperPage() {
 
         </div>
 
-        {/* Sidebar History Column */}
+        {/* Sidebar Column */}
         <div className="space-y-6">
           
+          {/* Bangla Helper & Tone Analytics Card */}
+          <div className={helperStyles.sidebarCard}>
+            <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+              <Languages className="w-4 h-4 text-blue-400" />
+              <span>বাংলা অনুবাদক (Real-time AI Translator)</span>
+            </h3>
+            
+            <div className="space-y-3 text-xs text-gray-300 leading-relaxed">
+              <div className="p-3 rounded-lg bg-gray-950/50 border border-glass-border space-y-2">
+                <div className="flex items-center justify-between text-[10px] text-gray-400 uppercase font-mono">
+                  <span>সৌজন্যতা মিটার (Politeness)</span>
+                  <span className="font-bold text-emerald-400">{stats.politenessScore}%</span>
+                </div>
+                <div className="w-full bg-gray-900 rounded-full h-1.5 overflow-hidden">
+                  <div 
+                    className="bg-emerald-500 h-full rounded-full transition-all duration-300"
+                    style={{ width: `${stats.politenessScore}%` }}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2 text-[11px] text-gray-400">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <span>যেকোনো কাস্টম ইংরেজি মেসেজ দিলে তা গুগল এআই ট্রান্সলেশনের মাধ্যমে অবিকল নিখুঁত বাংলায় অনুবাদ হবে।</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                  <span>"বাংলা কপি" দিয়ে সহজেই ক্লায়েন্ট মেসেজের বাংলা অনুবাদ অনুলিপি করতে পারবেন।</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                  <span>ফাইবার পলিসি ভায়োলেশন শব্দসমূহ অটোমেটিক বাইপাস টেক্সটে পরিণত হবে।</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* History Sidebar */}
           <div className={helperStyles.sidebarCard}>
             <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
               <History className="w-4 h-4 text-green-400" />
               <span>Scan History</span>
             </h3>
             
-            <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1">
+            <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
               {historyList.length > 0 ? (
                 historyList.map((hist) => (
                   <button
@@ -834,7 +997,7 @@ export default function MessageHelperPage() {
                     onClick={() => setInputText(hist.text)}
                     className={helperStyles.sidebarBtn}
                   >
-                    <div className="flex items-center justify-between text-[10px] text-gray-500">
+                    <div className="flex items-center justify-between text-[10px] text-gray-500 font-mono">
                       <span>Analyzed Code</span>
                       <span>{hist.date}</span>
                     </div>
