@@ -10,11 +10,14 @@ export async function GET(request: Request) {
     const month = searchParams.get('month');
     const profileName = searchParams.get('profileName');
 
+    const status = searchParams.get('status');
+
     // Build dynamic query
     const query: any = {};
     if (uid) query.firebaseUid = uid;
     if (month) query.month = month;
     if (profileName) query.profileName = profileName;
+    if (status) query.status = status;
 
     const projects = await PersonalProject.find(query).sort({ createdAt: -1 });
 
@@ -41,6 +44,11 @@ export async function PUT(request: Request) {
     const body = await request.json();
     const { _id, ...updateData } = body;
     
+    updateData.updatedAt = new Date();
+    if (updateData.status === 'delivered' && !updateData.deliveredAt) {
+      updateData.deliveredAt = new Date();
+    }
+
     const updatedProject = await PersonalProject.findByIdAndUpdate(
       _id,
       updateData,

@@ -209,7 +209,8 @@ export default function MessageHelperPage() {
           toneBtnInactive: "px-3 py-1.5 rounded-none text-gray-400 hover:text-white hover:bg-gray-800 text-xs font-semibold uppercase tracking-wider transition-all",
           sidebarCard: "p-5 rounded-none border border-gray-800 bg-gray-900 space-y-4 text-left",
           sidebarBtn: "w-full p-3 rounded-none bg-gray-955 border border-gray-850 hover:bg-gray-850 hover:border-gray-650 transition-all text-left space-y-1 block",
-          outputPreBox: "p-4 rounded-none bg-gray-955 border border-gray-850 font-mono text-xs leading-relaxed space-y-2 max-h-[350px] overflow-y-auto relative text-left"
+          outputPreBox: "p-4 rounded-none bg-gray-955 border border-gray-850 font-mono text-xs leading-relaxed space-y-2 max-h-[350px] overflow-y-auto relative text-left",
+          visualizerBox: "p-4 rounded-none bg-gray-950 border border-gray-800 space-y-2"
         };
       case 'aurora':
         return {
@@ -225,8 +226,9 @@ export default function MessageHelperPage() {
           toneBtnActive: "px-3 py-1.5 rounded-xl bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 text-xs font-semibold uppercase tracking-wider transition-all",
           toneBtnInactive: "px-3 py-1.5 rounded-xl text-indigo-200/50 hover:text-white hover:bg-indigo-950/40 text-xs font-semibold uppercase tracking-wider transition-all",
           sidebarCard: "p-5 rounded-2xl border border-indigo-500/10 bg-indigo-950/5 space-y-4 text-left shadow-[0_8px_32px_rgba(99,102,241,0.05)]",
-          sidebarBtn: "w-full p-3 rounded-xl bg-indigo-950/20 border border-indigo-500/10 hover:bg-indigo-950/40 hover:border-indigo-500/30 transition-all text-left space-y-1 block",
-          outputPreBox: "p-4 rounded-2xl bg-indigo-950/30 border border-indigo-500/10 font-mono text-xs leading-relaxed space-y-2 max-h-[350px] overflow-y-auto relative text-left"
+          sidebarBtn: "w-full p-3 rounded-xl bg-indigo-955/20 border border-indigo-500/10 hover:bg-indigo-955/40 hover:border-indigo-500/30 transition-all text-left space-y-1 block",
+          outputPreBox: "p-4 rounded-2xl bg-indigo-955/30 border border-indigo-500/10 font-mono text-xs leading-relaxed space-y-2 max-h-[350px] overflow-y-auto relative text-left",
+          visualizerBox: "p-4 rounded-2xl bg-indigo-955/20 border border-indigo-500/10 space-y-2"
         };
       case 'cyber':
         return {
@@ -242,8 +244,9 @@ export default function MessageHelperPage() {
           toneBtnActive: "px-3 py-1.5 rounded-none bg-emerald-950/40 border border-emerald-500/50 text-emerald-400 text-xs font-semibold uppercase tracking-wider transition-all",
           toneBtnInactive: "px-3 py-1.5 rounded-none text-emerald-600 hover:text-emerald-400 hover:bg-emerald-950/20 text-xs font-semibold uppercase tracking-wider transition-all",
           sidebarCard: "p-5 rounded-none border border-emerald-500/30 bg-black space-y-4 text-left",
-          sidebarBtn: "w-full p-3 rounded-none bg-black border border-emerald-500/20 hover:bg-emerald-950/10 hover:border-emerald-500/40 transition-all text-left space-y-1 block",
-          outputPreBox: "p-4 rounded-none bg-black border border-emerald-500/20 font-mono text-xs leading-relaxed space-y-2 max-h-[350px] overflow-y-auto relative text-left"
+          sidebarBtn: "w-full p-3 rounded-none bg-black border border-emerald-500/20 hover:bg-emerald-955/10 hover:border-emerald-500/40 transition-all text-left space-y-1 block",
+          outputPreBox: "p-4 rounded-none bg-black border border-emerald-500/20 font-mono text-xs leading-relaxed space-y-2 max-h-[350px] overflow-y-auto relative text-left",
+          visualizerBox: "p-4 rounded-none bg-black border border-emerald-500/20 space-y-2"
         };
       case 'gold':
         return {
@@ -259,8 +262,9 @@ export default function MessageHelperPage() {
           toneBtnActive: "px-3 py-1.5 rounded-xl bg-amber-500/20 border border-amber-500/30 text-amber-300 text-xs font-semibold uppercase tracking-wider transition-all",
           toneBtnInactive: "px-3 py-1.5 rounded-xl text-amber-200/50 hover:text-white hover:bg-[#151515] text-xs font-semibold uppercase tracking-wider transition-all",
           sidebarCard: "p-5 rounded-2xl border border-amber-500/25 bg-[#0b0b0b] space-y-4 text-left shadow-md",
-          sidebarBtn: "w-full p-3 rounded-xl bg-black border border-amber-500/15 hover:bg-[#121212] hover:border-amber-500/35 transition-all text-left space-y-1 block",
-          outputPreBox: "p-4 rounded-2xl bg-black border border-amber-500/15 font-mono text-xs leading-relaxed space-y-2 max-h-[350px] overflow-y-auto relative text-left"
+          sidebarBtn: "w-full p-3 rounded-xl bg-[#121212] border border-amber-500/15 hover:bg-[#1a1a1a] hover:border-amber-500/30 transition-all text-left space-y-1 block",
+          outputPreBox: "p-4 rounded-2xl bg-black border border-amber-500/20 font-mono text-xs leading-relaxed space-y-2 max-h-[350px] overflow-y-auto relative text-left",
+          visualizerBox: "p-4 rounded-2xl bg-black border border-amber-500/20 space-y-2"
         };
       default:
         return {
@@ -277,7 +281,8 @@ export default function MessageHelperPage() {
           toneBtnInactive: "px-3 py-1.5 rounded-md text-xs font-semibold uppercase tracking-wider transition-all text-gray-400 hover:text-white hover:bg-glass-hover",
           sidebarCard: "p-5 rounded-xl border border-glass-border bg-gray-955/20 space-y-4 text-left",
           sidebarBtn: "w-full p-3 rounded-lg bg-gray-955/60 border border-glass-border hover:bg-glass-hover hover:border-white/10 transition-all text-left space-y-1 block",
-          outputPreBox: "p-4 rounded-xl bg-gray-955/60 border border-glass-border font-mono text-xs leading-relaxed space-y-2 max-h-[350px] overflow-y-auto relative text-left"
+          outputPreBox: "p-4 rounded-xl bg-gray-955/60 border border-glass-border font-mono text-xs leading-relaxed space-y-2 max-h-[350px] overflow-y-auto relative text-left",
+          visualizerBox: "p-4 rounded-xl bg-gray-955/40 border border-glass-border space-y-2"
         };
     }
   }, [activeMessageHelperLayout]);
