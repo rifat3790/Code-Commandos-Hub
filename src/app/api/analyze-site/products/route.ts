@@ -102,7 +102,7 @@ export async function GET(request: Request) {
           const wcData = await wcRes.json();
           if (Array.isArray(wcData)) {
             const mapped = wcData.map((p: any) => {
-               const variants = p.variations && p.variations.length > 0
+                const variants = p.variations && p.variations.length > 0
                 ? p.variations.map((v: any) => {
                     const price = v.price ? parseWooPrice(v.price) : (p.prices?.price ? parseWooPrice(p.prices.price) : '0.00');
                     const compPrice = v.regular_price && v.sale_price && v.regular_price !== v.sale_price
@@ -110,6 +110,10 @@ export async function GET(request: Request) {
                       : (p.prices?.regular_price && p.prices?.sale_price && p.prices.regular_price !== p.prices.sale_price
                           ? parseWooPrice(p.prices.regular_price)
                           : '');
+                    const invQty = v.stock_quantity !== undefined && v.stock_quantity !== null
+                      ? v.stock_quantity
+                      : (p.stock_quantity !== undefined && p.stock_quantity !== null ? p.stock_quantity : 100);
+
                     return {
                       id: v.id,
                       title: v.attributes?.map((a: any) => a.value).join(' / ') || 'Default Title',
@@ -117,6 +121,7 @@ export async function GET(request: Request) {
                       compare_at_price: compPrice,
                       sku: v.sku || '',
                       grams: 0,
+                      inventory_quantity: invQty,
                       requires_shipping: true,
                       taxable: true,
                       option1: v.attributes?.[0]?.value || null,
@@ -133,6 +138,7 @@ export async function GET(request: Request) {
                       : '',
                     sku: p.sku || '',
                     grams: 0,
+                    inventory_quantity: p.stock_quantity !== undefined && p.stock_quantity !== null ? p.stock_quantity : 100,
                     requires_shipping: true,
                     taxable: true
                   }];
@@ -229,7 +235,9 @@ export async function GET(request: Request) {
                       ? String(v.referralPriceMoney.value)
                       : (v.onSale && v.referralPrice ? (parseFloat(String(v.referralPrice)) / 100).toFixed(2) : '');
 
-                    const optionValues = v.optionValues || [];
+                    const sqInvQty = v.qtyInStock !== undefined && v.qtyInStock !== null
+                      ? v.qtyInStock
+                      : (v.stock !== undefined && v.stock !== null ? v.stock : 100);
 
                     return {
                       id: v.id || `${p.id}-${idx}`,
@@ -238,6 +246,7 @@ export async function GET(request: Request) {
                       compare_at_price: comparePrice,
                       sku: v.sku || '',
                       grams: v.weight || 0,
+                      inventory_quantity: sqInvQty,
                       requires_shipping: p.productType !== 2,
                       taxable: true,
                       barcode: v.upc || v.barcode || '',
@@ -254,6 +263,7 @@ export async function GET(request: Request) {
                     compare_at_price: p.salePriceMoney?.value || '',
                     sku: p.sku || '',
                     grams: 0,
+                    inventory_quantity: 100,
                     requires_shipping: p.productType !== 2,
                     taxable: true
                   }];

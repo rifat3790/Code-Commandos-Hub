@@ -159,7 +159,7 @@ export default function AuditSuitePage() {
           rowData['Variant Compare At Price'] = v.compare_at_price || '';
           rowData['Variant Grams'] = String(v.grams || 0);
           rowData['Variant Inventory Tracker'] = 'shopify';
-          rowData['Variant Inventory Qty'] = '100';
+          rowData['Variant Inventory Qty'] = v.inventory_quantity !== undefined && v.inventory_quantity !== null && v.inventory_quantity !== '' ? String(v.inventory_quantity) : '100';
           rowData['Variant Inventory Policy'] = 'deny';
           rowData['Variant Fulfillment Service'] = 'manual';
           rowData['Variant Requires Shipping'] = v.requires_shipping === false ? 'FALSE' : 'TRUE';
