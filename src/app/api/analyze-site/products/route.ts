@@ -239,6 +239,8 @@ export async function GET(request: Request) {
                       ? v.qtyInStock
                       : (v.stock !== undefined && v.stock !== null ? v.stock : 100);
 
+                    const optionValues = v.optionValues || [];
+
                     return {
                       id: v.id || `${p.id}-${idx}`,
                       title: optionValues.map((o: any) => o.value).join(' / ') || 'Default Title',
