@@ -70,6 +70,7 @@ export default function AuditSuitePage() {
   const [activeTab, setActiveTab] = useState<'inspect' | 'speed' | 'seo' | 'transfer'>('inspect');
 
   // Migration Tab State
+  const [migrationPlatform, setMigrationPlatform] = useState<'squarespace' | 'woocommerce'>('squarespace');
   const [migrationSourceUrl, setMigrationSourceUrl] = useState('');
   const [fetchedWpProducts, setFetchedWpProducts] = useState<any[]>([]);
   const [selectedProductIds, setSelectedProductIds] = useState<Record<string, boolean>>({});
@@ -108,7 +109,7 @@ export default function AuditSuitePage() {
 
     selectedList.forEach(p => {
       // Create clean handle
-      const handle = p.title
+      const handle = (p.handle || p.title || 'product')
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/(^-|-$)/g, '');
@@ -125,6 +126,8 @@ export default function AuditSuitePage() {
         ? p.categories.join(', ')
         : (p.product_type || 'General');
 
+      const defaultVendor = migrationPlatform === 'squarespace' ? 'Squarespace Import' : 'WooCommerce Import';
+
       for (let i = 0; i < maxRows; i++) {
         const rowData: Record<string, string> = {};
 
@@ -134,7 +137,7 @@ export default function AuditSuitePage() {
         if (i === 0) {
           rowData['Title'] = p.title;
           rowData['Body (HTML)'] = p.body_html || '';
-          rowData['Vendor'] = p.vendor || 'WooCommerce Import';
+          rowData['Vendor'] = p.vendor || defaultVendor;
           rowData['Type'] = p.product_type || 'General';
           rowData['Tags'] = p.tags || '';
           rowData['Published'] = 'TRUE';
@@ -154,13 +157,14 @@ export default function AuditSuitePage() {
           rowData['Variant SKU'] = v.sku || '';
           rowData['Variant Price'] = v.price || '0.00';
           rowData['Variant Compare At Price'] = v.compare_at_price || '';
-          rowData['Variant Grams'] = '0';
+          rowData['Variant Grams'] = String(v.grams || 0);
           rowData['Variant Inventory Tracker'] = 'shopify';
           rowData['Variant Inventory Qty'] = '100';
           rowData['Variant Inventory Policy'] = 'deny';
           rowData['Variant Fulfillment Service'] = 'manual';
-          rowData['Variant Requires Shipping'] = 'TRUE';
+          rowData['Variant Requires Shipping'] = v.requires_shipping === false ? 'FALSE' : 'TRUE';
           rowData['Variant Taxable'] = 'TRUE';
+          rowData['Variant Barcode'] = v.barcode || '';
           rowData['Variant Weight Unit'] = 'g';
         }
 
@@ -180,15 +184,17 @@ export default function AuditSuitePage() {
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
+    const platformPrefix = migrationPlatform === 'squarespace' ? 'squarespace' : 'woocommerce';
     link.setAttribute('href', url);
-    link.setAttribute('download', `shopify_import_${Date.now()}.csv`);
+    link.setAttribute('download', `${platformPrefix}_to_shopify_import_${Date.now()}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
 
     setDownloadedCSV(true);
     setTimeout(() => setDownloadedCSV(false), 2000);
-    addMigrationLog(`Successfully compiled and downloaded Shopify CSV with ${selectedList.length} products!`, 'success');
+    const platformLabel = migrationPlatform === 'squarespace' ? 'Squarespace' : 'WooCommerce';
+    addMigrationLog(`Successfully compiled and downloaded official Shopify CSV with ${selectedList.length} ${platformLabel} products!`, 'success');
   };
 
   const addMigrationLog = (message: string, type: 'info' | 'success' | 'error' = 'info') => {
@@ -197,39 +203,49 @@ export default function AuditSuitePage() {
     setMigrationLogs(prev => [...prev, `[${timestamp}] ${prefix} ${message}`]);
   };
 
-  const handleFetchWpProducts = async () => {
+  const handleFetchCatalogProducts = async () => {
     if (!migrationSourceUrl.trim()) {
-      alert('Please enter a WooCommerce website URL.');
+      const pName = migrationPlatform === 'squarespace' ? 'Squarespace' : 'WooCommerce';
+      alert(`Please enter a valid ${pName} website or shop URL.`);
       return;
     }
     setIsFetchingWp(true);
     setFetchedWpProducts([]);
     setSelectedProductIds({});
-    
+
+    let cleanUrl = migrationSourceUrl.trim();
+    if (!/^https?:\/\//i.test(cleanUrl)) {
+      cleanUrl = 'https://' + cleanUrl;
+    }
+
+    const platformLabel = migrationPlatform === 'squarespace' ? 'Squarespace' : 'WooCommerce';
     const timestamp = new Date().toLocaleTimeString();
-    setMigrationLogs([`[${timestamp}] ℹ [INFO] Connecting to WooCommerce Store: ${migrationSourceUrl}`]);
+    setMigrationLogs([`[${timestamp}] ℹ [INFO] Connecting to ${platformLabel} Store: ${cleanUrl}`]);
     
     try {
-      addMigrationLog('Querying store API for products catalog...');
-      const cleanUrl = migrationSourceUrl.trim();
-      const res = await fetch(`/api/analyze-site/products?domain=${encodeURIComponent(cleanUrl)}&page=1&limit=100&platform=WooCommerce`);
+      addMigrationLog(`Querying ${platformLabel} store API and catalog manifests...`);
+      const res = await fetch(`/api/analyze-site/products?domain=${encodeURIComponent(cleanUrl)}&page=1&limit=250&platform=${encodeURIComponent(platformLabel)}`);
       const data = await res.json();
       
       if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Failed to fetch catalog.');
+        throw new Error(data.error || `Failed to fetch ${platformLabel} catalog.`);
       }
       
       const products = data.products || [];
-      setFetchedWpProducts(products);
-      
-      // Auto select all products
-      const initialSelected: Record<string, boolean> = {};
-      products.forEach((p: any) => {
-        initialSelected[p.id] = true;
-      });
-      setSelectedProductIds(initialSelected);
-      
-      addMigrationLog(`Success! Discovered ${products.length} products with variation models. Ready for direct Shopify transfer.`, 'success');
+      if (products.length === 0) {
+        addMigrationLog(`No public products discovered at URL. Ensure products page is accessible.`, 'error');
+      } else {
+        setFetchedWpProducts(products);
+        
+        // Auto select all products
+        const initialSelected: Record<string, boolean> = {};
+        products.forEach((p: any) => {
+          initialSelected[p.id] = true;
+        });
+        setSelectedProductIds(initialSelected);
+        
+        addMigrationLog(`Success! Discovered ${products.length} products with full variant & image models from ${platformLabel}. Ready for direct Shopify transfer.`, 'success');
+      }
     } catch (err: any) {
       addMigrationLog(`Failed: ${err.message}`, 'error');
     } finally {
@@ -1211,7 +1227,7 @@ Report generated on Code Commandos Speed Audit Suite.`;
           { id: 'inspect', name: 'Intelligence Inspector', icon: Globe },
           { id: 'speed', name: 'Speed Optimizer', icon: Gauge },
           { id: 'seo', name: 'SEO & Schema Auditor', icon: FileSearch },
-          { id: 'transfer', name: 'WordPress to Shopify Transfer', icon: FolderSync }
+          { id: 'transfer', name: 'Squarespace & WP to Shopify Transfer', icon: FolderSync }
         ].map((tab) => {
           const isActive = activeTab === tab.id;
           const Icon = tab.icon;
@@ -2008,30 +2024,82 @@ Report generated on Code Commandos Speed Audit Suite.`;
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
               {/* Left Column: Settings */}
               <div className="lg:col-span-5 space-y-6">
-                {/* WooCommerce Source */}
+                {/* Platform Selector & Source URL */}
                 <div className={auditStyles.cardContainer}>
-                  <h3 className="text-xs uppercase font-extrabold text-white tracking-wider flex items-center gap-2">
-                    <Globe className="w-4 h-4 text-green-400" />
-                    1. WooCommerce Source Store
-                  </h3>
-                  <p className="text-[11px] text-gray-400">
-                    Enter the WooCommerce shop URL to fetch products catalog from public REST APIs.
+                  <div className="flex justify-between items-center border-b border-glass-border pb-2 mb-3">
+                    <h3 className="text-xs uppercase font-extrabold text-white tracking-wider flex items-center gap-2">
+                      <Globe className="w-4 h-4 text-green-400" />
+                      1. Select Source E-commerce Platform
+                    </h3>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 mb-4">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMigrationPlatform('squarespace');
+                        if (migrationSourceUrl.includes('wordpress') || migrationSourceUrl.includes('woocommerce')) {
+                          setMigrationSourceUrl('');
+                        }
+                      }}
+                      className={`px-3 py-2.5 rounded-xl border text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                        migrationPlatform === 'squarespace'
+                          ? 'bg-green-500/15 border-green-500/40 text-green-400 shadow-[0_0_15px_rgba(34,197,94,0.15)]'
+                          : 'bg-black/40 border-glass-border text-gray-400 hover:text-white hover:bg-white/5'
+                      }`}
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Squarespace</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMigrationPlatform('woocommerce');
+                        if (migrationSourceUrl.includes('squarespace')) {
+                          setMigrationSourceUrl('');
+                        }
+                      }}
+                      className={`px-3 py-2.5 rounded-xl border text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                        migrationPlatform === 'woocommerce'
+                          ? 'bg-green-500/15 border-green-500/40 text-green-400 shadow-[0_0_15px_rgba(34,197,94,0.15)]'
+                          : 'bg-black/40 border-glass-border text-gray-400 hover:text-white hover:bg-white/5'
+                      }`}
+                    >
+                      <Globe className="w-3.5 h-3.5" />
+                      <span>WooCommerce</span>
+                    </button>
+                  </div>
+
+                  <p className="text-[11px] text-gray-400 mb-2">
+                    {migrationPlatform === 'squarespace'
+                      ? 'Enter your Squarespace website or shop page URL to fetch catalog products via JSON APIs.'
+                      : 'Enter the WooCommerce shop URL to fetch products catalog from public REST APIs.'}
                   </p>
+
                   <div className="flex gap-2">
                     <input
                       type="text"
                       value={migrationSourceUrl}
-                      onChange={(e) => setMigrationSourceUrl(e.target.value)}
-                      placeholder="https://woocommerce-store.com"
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setMigrationSourceUrl(val);
+                        if (val.includes('squarespace.com') || val.includes('format=json')) {
+                          setMigrationPlatform('squarespace');
+                        } else if (val.includes('wp-json') || val.includes('woocommerce')) {
+                          setMigrationPlatform('woocommerce');
+                        }
+                      }}
+                      placeholder={migrationPlatform === 'squarespace' ? "https://yourstore.squarespace.com/shop" : "https://woocommerce-store.com"}
                       className={auditStyles.inputField}
                     />
                     <button
-                      onClick={handleFetchWpProducts}
+                      onClick={handleFetchCatalogProducts}
                       disabled={isFetchingWp || isMigrating}
                       className={auditStyles.btnPrimary + " shrink-0 flex items-center gap-1.5 cursor-pointer"}
                     >
                       {isFetchingWp ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-                      <span>Fetch</span>
+                      <span>Fetch Catalog</span>
                     </button>
                   </div>
                 </div>
@@ -2091,7 +2159,7 @@ Report generated on Code Commandos Speed Audit Suite.`;
                       </div>
                       <div className="flex gap-2">
                         <span className="text-green-400 font-bold">Step 4:</span>
-                        <span>Upload the downloaded CSV and click **Upload and preview**.</span>
+                        <span>Upload the downloaded CSV and click <strong>Upload and preview</strong>.</span>
                       </div>
                     </div>
                   </div>
@@ -2161,7 +2229,7 @@ Report generated on Code Commandos Speed Audit Suite.`;
                       })
                     ) : (
                       <div className="text-center py-12 text-gray-500 text-xs italic">
-                        No products fetched yet. Enter a WooCommerce URL on the left and fetch products.
+                        No products fetched yet. Enter a {migrationPlatform === 'squarespace' ? 'Squarespace' : 'WooCommerce'} URL on the left and click "Fetch Catalog".
                       </div>
                     )}
                   </div>

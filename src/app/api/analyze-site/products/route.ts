@@ -169,73 +169,128 @@ export async function GET(request: Request) {
     }
 
     // 2. Squarespace API format=json-pretty
-    if (platform.toLowerCase().includes('squarespace')) {
-      const sqUrls = [
-        `${domain}/shop?format=json-pretty`,
-        `${domain}/store?format=json-pretty`,
-        `${domain}/products?format=json-pretty`
+    if (platform.toLowerCase().includes('squarespace') || domain.includes('squarespace.com')) {
+      const sqCandidateUrls = [
+        domain.includes('format=json') ? domain : `${domain}${domain.includes('?') ? '&' : '/'}shop?format=json-pretty`,
+        `${domain.replace(/\/$/, '')}/store?format=json-pretty`,
+        `${domain.replace(/\/$/, '')}/products?format=json-pretty`,
+        `${domain.replace(/\/$/, '')}/catalog?format=json-pretty`,
+        `${domain.replace(/\/$/, '')}?format=json-pretty`
       ];
 
-      for (const sqUrl of sqUrls) {
+      for (const sqUrl of sqCandidateUrls) {
         try {
-          const sqRes = await fetch(sqUrl, {
-            headers: { 'User-Agent': USER_AGENT },
-            next: { revalidate: 0 }
-          });
-          if (sqRes.ok) {
+          let currentUrl: string | null = sqUrl;
+          let allSqItems: any[] = [];
+          let fetchedPages = 0;
+
+          while (currentUrl && fetchedPages < 10) {
+            fetchedPages++;
+            const sqRes = await fetch(currentUrl, {
+              headers: { 'User-Agent': USER_AGENT },
+              next: { revalidate: 0 }
+            });
+
+            if (!sqRes.ok) break;
+
             const sqData = await sqRes.json();
             const sqItems = sqData.items || [];
-            if (sqItems.length > 0) {
-              const mapped = sqItems.map((p: any) => {
-                const variants = p.structuredContent?.variants?.map((v: any, idx: number) => ({
-                  id: v.id || `${p.id}-${idx}`,
-                  title: v.optionValues?.map((o: any) => o.value).join(' / ') || 'Default Title',
-                  price: v.price ? (parseFloat(v.price) / 100).toFixed(2) : (p.priceMoney?.value || '0.00'),
-                  compare_at_price: v.onSale && v.referralPrice
-                    ? (parseFloat(v.referralPrice) / 100).toFixed(2)
-                    : '',
-                  sku: v.sku || '',
-                  grams: 0,
-                  requires_shipping: true,
-                  taxable: true
-                })) || [{
-                  id: p.id,
-                  title: 'Default Title',
-                  price: p.priceMoney?.value || '0.00',
-                  compare_at_price: '',
-                  sku: '',
-                  grams: 0,
-                  requires_shipping: true,
-                  taxable: true
-                }];
+            if (sqItems.length === 0 && allSqItems.length === 0) break;
 
-                return {
-                  id: p.id,
-                  title: p.title || '',
-                  handle: p.urlId || '',
-                  body_html: p.body || '',
-                  vendor: domain.replace(/^https?:\/\/(www\.)?/i, ''),
-                  product_type: p.categories?.[0] || 'General',
-                  tags: p.tags?.join(', ') || '',
-                  published_at: p.publishDate ? new Date(p.publishDate).toISOString() : new Date().toISOString(),
-                  options: p.structuredContent?.options?.map((o: any, idx: number) => ({
-                    name: o.name,
-                    position: idx + 1,
-                    values: o.values || []
-                  })) || [],
-                  variants,
-                  images: p.items?.map((img: any, idx: number) => ({
-                    src: img.assetUrl,
-                    position: idx + 1,
-                    alt: img.title || ''
-                  })) || (p.assetUrl ? [{ src: p.assetUrl, position: 1, alt: p.title || '' }] : [])
-                };
-              });
-              return NextResponse.json({ success: true, products: mapped });
+            allSqItems = [...allSqItems, ...sqItems];
+
+            const nextPageOffset = sqData.pagination?.nextPageOffset;
+            if (sqData.pagination?.nextPage && nextPageOffset && typeof currentUrl === 'string') {
+              const fetchUrlStr: string = currentUrl;
+              const urlObj: URL = new URL(fetchUrlStr);
+              urlObj.searchParams.set('offset', String(nextPageOffset));
+              currentUrl = urlObj.toString();
+            } else {
+              currentUrl = null;
             }
           }
+
+          if (allSqItems.length > 0) {
+            const mapped = allSqItems.map((p: any) => {
+              const options = p.structuredContent?.options?.map((o: any, idx: number) => ({
+                name: o.name || `Option${idx + 1}`,
+                position: idx + 1,
+                values: o.values || []
+              })) || [];
+
+              const rawVariants = p.structuredContent?.variants || [];
+              const variants = rawVariants.length > 0
+                ? rawVariants.map((v: any, idx: number) => {
+                    const price = v.priceMoney?.value 
+                      ? String(v.priceMoney.value) 
+                      : (v.price ? (parseFloat(String(v.price)) / 100).toFixed(2) : (p.priceMoney?.value || '0.00'));
+                    
+                    const comparePrice = v.referralPriceMoney?.value
+                      ? String(v.referralPriceMoney.value)
+                      : (v.onSale && v.referralPrice ? (parseFloat(String(v.referralPrice)) / 100).toFixed(2) : '');
+
+                    const optionValues = v.optionValues || [];
+
+                    return {
+                      id: v.id || `${p.id}-${idx}`,
+                      title: optionValues.map((o: any) => o.value).join(' / ') || 'Default Title',
+                      price,
+                      compare_at_price: comparePrice,
+                      sku: v.sku || '',
+                      grams: v.weight || 0,
+                      requires_shipping: p.productType !== 2,
+                      taxable: true,
+                      barcode: v.upc || v.barcode || '',
+                      option1: optionValues[0]?.value || null,
+                      option2: optionValues[1]?.value || null,
+                      option3: optionValues[2]?.value || null,
+                      featured_image: v.image?.assetUrl || v.mainImage?.assetUrl ? { src: v.image?.assetUrl || v.mainImage?.assetUrl } : null
+                    };
+                  })
+                : [{
+                    id: p.id,
+                    title: 'Default Title',
+                    price: p.priceMoney?.value || (p.price ? (parseFloat(String(p.price)) / 100).toFixed(2) : '0.00'),
+                    compare_at_price: p.salePriceMoney?.value || '',
+                    sku: p.sku || '',
+                    grams: 0,
+                    requires_shipping: p.productType !== 2,
+                    taxable: true
+                  }];
+
+              const mediaList = p.items || p.media || [];
+              let images = mediaList
+                .filter((img: any) => img && (img.assetUrl || img.url))
+                .map((img: any, idx: number) => ({
+                  src: img.assetUrl || img.url,
+                  position: idx + 1,
+                  alt: img.title || img.caption || p.title || ''
+                }));
+
+              if (images.length === 0 && p.assetUrl) {
+                images = [{ src: p.assetUrl, position: 1, alt: p.title || '' }];
+              }
+
+              return {
+                id: p.id,
+                title: p.title || '',
+                handle: p.urlId || p.slug || (p.title ? p.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') : `product-${p.id}`),
+                body_html: p.body || p.excerpt || p.description || '',
+                vendor: p.author?.displayName || domain.replace(/^https?:\/\/(www\.)?/i, '').split('/')[0],
+                product_type: p.categories?.[0] || 'General',
+                tags: Array.isArray(p.tags) ? p.tags.join(', ') : (typeof p.tags === 'string' ? p.tags : ''),
+                categories: p.categories || [],
+                published_at: p.publishDate ? new Date(p.publishDate).toISOString() : new Date().toISOString(),
+                options,
+                variants,
+                images
+              };
+            });
+
+            return NextResponse.json({ success: true, products: mapped });
+          }
         } catch (err) {
-          console.warn('Squarespace products fetch failed, trying next', err);
+          console.warn('Squarespace products fetch error:', err);
         }
       }
     }
