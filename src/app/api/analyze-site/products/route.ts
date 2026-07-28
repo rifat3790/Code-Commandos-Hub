@@ -307,97 +307,235 @@ export async function GET(request: Request) {
       }
     }
 
-    // 3. Wix Stores API & JSON-LD
-    if (platform.toLowerCase().includes('wix') || domain.includes('wixsite.com') || domain.includes('wix.com')) {
-      const wixCandidateUrls = [
-        `${domain.replace(/\/$/, '')}/_api/v2/catalog/products?limit=100`,
-        `${domain.replace(/\/$/, '')}/_api/v1/products?limit=100`,
-        `${domain.replace(/\/$/, '')}/shop`,
-        `${domain.replace(/\/$/, '')}/store`,
-        `${domain.replace(/\/$/, '')}/products`
-      ];
+    // 3. Wix Stores API, Sitemaps & Product-Page JSON-LD Crawler
+    if (platform.toLowerCase().includes('wix') || domain.includes('wixsite.com') || domain.includes('wix.com') || domain.includes('thesweathouse')) {
+      try {
+        const cleanDomain = domain.replace(/\/$/, '');
 
-      for (const wixUrl of wixCandidateUrls) {
-        try {
-          const wixRes = await fetch(wixUrl, {
-            headers: { 'User-Agent': USER_AGENT },
-            next: { revalidate: 0 }
-          });
+        // Step 1: Check Wix JSON APIs
+        const wixCandidateUrls = [
+          `${cleanDomain}/_api/v2/catalog/products?limit=100`,
+          `${cleanDomain}/_api/v1/products?limit=100`,
+          `${cleanDomain}/_api/wix-ecommerce-renderer-web/storefront/products`
+        ];
 
-          if (wixRes.ok) {
-            const contentType = wixRes.headers.get('content-type') || '';
-            if (contentType.includes('application/json')) {
-              const wixData = await wixRes.json();
-              const wixProducts = wixData.products || wixData.items || [];
-              if (Array.isArray(wixProducts) && wixProducts.length > 0) {
-                const mapped = wixProducts.map((p: any) => {
-                  const options = p.productOptions?.map((o: any, idx: number) => ({
-                    name: o.name || o.title || `Option${idx + 1}`,
-                    position: idx + 1,
-                    values: o.choices?.map((c: any) => c.value || c.description || c.title) || []
-                  })) || [];
+        for (const wixUrl of wixCandidateUrls) {
+          try {
+            const wixRes = await fetch(wixUrl, {
+              headers: { 'User-Agent': USER_AGENT },
+              next: { revalidate: 0 }
+            });
 
-                  const rawVariants = p.variants || p.productVariants || [];
-                  const variants = rawVariants.length > 0
-                    ? rawVariants.map((v: any, idx: number) => ({
-                        id: v.id || `${p.id}-${idx}`,
-                        title: v.title || v.choices?.map((c: any) => c.value).join(' / ') || 'Default Title',
-                        price: v.price?.formatted || v.price?.amount || (v.variant?.price ? String(v.variant.price) : (p.price?.formatted || p.price?.amount || '0.00')),
-                        compare_at_price: v.comparePrice?.formatted || v.comparePrice?.amount || '',
-                        sku: v.sku || p.sku || '',
-                        grams: v.weight || p.weight || 0,
-                        inventory_quantity: v.inventory?.quantity ?? v.quantity ?? (p.inventory?.quantity ?? 100),
-                        requires_shipping: true,
-                        taxable: true,
-                        option1: v.choices?.[0]?.value || null,
-                        option2: v.choices?.[1]?.value || null,
-                        option3: v.choices?.[2]?.value || null
-                      }))
-                    : [{
-                        id: p.id,
+            if (wixRes.ok) {
+              const contentType = wixRes.headers.get('content-type') || '';
+              if (contentType.includes('application/json')) {
+                const wixData = await wixRes.json();
+                const wixProducts = wixData.products || wixData.items || [];
+                if (Array.isArray(wixProducts) && wixProducts.length > 0) {
+                  const mapped = wixProducts.map((p: any) => {
+                    const options = p.productOptions?.map((o: any, idx: number) => ({
+                      name: o.name || o.title || `Option${idx + 1}`,
+                      position: idx + 1,
+                      values: o.choices?.map((c: any) => c.value || c.description || c.title) || []
+                    })) || [];
+
+                    const rawVariants = p.variants || p.productVariants || [];
+                    const variants = rawVariants.length > 0
+                      ? rawVariants.map((v: any, idx: number) => ({
+                          id: v.id || `${p.id}-${idx}`,
+                          title: v.title || v.choices?.map((c: any) => c.value).join(' / ') || 'Default Title',
+                          price: v.price?.formatted || v.price?.amount || (v.variant?.price ? String(v.variant.price) : (p.price?.formatted || p.price?.amount || '0.00')),
+                          compare_at_price: v.comparePrice?.formatted || v.comparePrice?.amount || '',
+                          sku: v.sku || p.sku || '',
+                          grams: v.weight || p.weight || 0,
+                          inventory_quantity: v.inventory?.quantity ?? v.quantity ?? (p.inventory?.quantity ?? 100),
+                          requires_shipping: true,
+                          taxable: true,
+                          option1: v.choices?.[0]?.value || null,
+                          option2: v.choices?.[1]?.value || null,
+                          option3: v.choices?.[2]?.value || null
+                        }))
+                      : [{
+                          id: p.id,
+                          title: 'Default Title',
+                          price: String(p.price?.formatted || p.price?.amount || p.discountedPrice || '0.00').replace(/[^0-9.]/g, ''),
+                          compare_at_price: p.comparePrice ? String(p.comparePrice).replace(/[^0-9.]/g, '') : '',
+                          sku: p.sku || '',
+                          grams: p.weight || 0,
+                          inventory_quantity: p.inventory?.quantity ?? (p.inStock === false ? 0 : 100),
+                          requires_shipping: true,
+                          taxable: true
+                        }];
+
+                    const rawMedia = p.media || p.images || [];
+                    let images = rawMedia.map((m: any, idx: number) => ({
+                      src: m.url || m.src || m.fullUrl || m,
+                      position: idx + 1,
+                      alt: m.altText || m.title || p.name || p.title || ''
+                    })).filter((img: any) => img.src && typeof img.src === 'string');
+
+                    if (images.length === 0 && p.mainMedia?.url) {
+                      images = [{ src: p.mainMedia.url, position: 1, alt: p.name || '' }];
+                    }
+
+                    return {
+                      id: p.id || p.productId,
+                      title: p.name || p.title || '',
+                      handle: p.slug || (p.name || p.title || `wix-${p.id}`).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
+                      body_html: p.description || p.body || '',
+                      vendor: domain.replace(/^https?:\/\/(www\.)?/i, '').split('/')[0],
+                      product_type: p.category?.name || p.collectionIds?.[0] || 'General',
+                      tags: Array.isArray(p.tags) ? p.tags.join(', ') : '',
+                      categories: p.collectionIds || [],
+                      published_at: new Date().toISOString(),
+                      options,
+                      variants,
+                      images
+                    };
+                  });
+                  return NextResponse.json({ success: true, products: mapped });
+                }
+              }
+            }
+          } catch (e) {
+            console.warn('Wix Stores API fetch error:', e);
+          }
+        }
+
+        // Step 2: Probe Wix Sitemaps & HTML Product Page links
+        const productUrls = new Set<string>();
+        const sitemaps = [
+          `${cleanDomain}/store-products-sitemap.xml`,
+          `${cleanDomain}/sitemap.xml`,
+          `${cleanDomain}/pages-sitemap.xml`
+        ];
+
+        for (const sm of sitemaps) {
+          try {
+            const smRes = await fetch(sm, { headers: { 'User-Agent': USER_AGENT } });
+            if (smRes.ok) {
+              const smXml = await smRes.text();
+              const matches = [...smXml.matchAll(/<loc>([^<]*\/product-page\/[^<]+)<\/loc>/gi)].map(m => m[1]);
+              matches.forEach(u => productUrls.add(u));
+            }
+          } catch (e) {}
+        }
+
+        // If sitemaps didn't yield links, scan shop subpages HTML
+        if (productUrls.size === 0) {
+          const shopSubpages = [cleanDomain, `${cleanDomain}/shop`, `${cleanDomain}/store`, `${cleanDomain}/products`, `${cleanDomain}/shop-all` ];
+          for (const sub of shopSubpages) {
+            try {
+              const subRes = await fetch(sub, { headers: { 'User-Agent': USER_AGENT } });
+              if (subRes.ok) {
+                const subHtml = await subRes.text();
+                const matches = [...subHtml.matchAll(/href=["']([^"']*\/product-page\/[^"']+)["']/gi)].map(m => m[1]);
+                matches.forEach(u => {
+                  const absUrl = u.startsWith('http') ? u : cleanDomain + u;
+                  productUrls.add(absUrl);
+                });
+              }
+            } catch (e) {}
+          }
+        }
+
+        // Step 3: Fetch Product Pages & parse Schema.org JSON-LD
+        if (productUrls.size > 0) {
+          const urlArray = Array.from(productUrls);
+          const products: any[] = [];
+          const batchSize = 10;
+
+          for (let i = 0; i < urlArray.length; i += batchSize) {
+            const batch = urlArray.slice(i, i + batchSize);
+            const results = await Promise.allSettled(batch.map(async (pUrl) => {
+              const res = await fetch(pUrl, { headers: { 'User-Agent': USER_AGENT } });
+              if (!res.ok) return null;
+              const html = await res.text();
+
+              const ldMatches = [...html.matchAll(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)];
+              for (const m of ldMatches) {
+                try {
+                  const json = JSON.parse(m[1].trim());
+                  const extractFromObj = (obj: any): any => {
+                    if (!obj) return null;
+                    if (obj['@type'] === 'Product' || (Array.isArray(obj['@type']) && obj['@type'].includes('Product'))) {
+                      return obj;
+                    }
+                    if (obj['@graph'] && Array.isArray(obj['@graph'])) {
+                      for (const item of obj['@graph']) {
+                        const found = extractFromObj(item);
+                        if (found) return found;
+                      }
+                    }
+                    return null;
+                  };
+                  const prodObj = extractFromObj(json);
+                  if (prodObj) {
+                    const offer = Array.isArray(prodObj.offers || prodObj.Offers) 
+                      ? (prodObj.offers || prodObj.Offers)[0] 
+                      : (prodObj.offers || prodObj.Offers);
+                    
+                    const rawPrice = offer?.price || offer?.lowPrice || '0.00';
+                    const price = String(rawPrice).replace(/[^0-9.]/g, '') || '0.00';
+
+                    const rawImages = Array.isArray(prodObj.image) ? prodObj.image : (prodObj.image ? [prodObj.image] : []);
+                    const images = rawImages.map((img: any, idx: number) => {
+                      const src = typeof img === 'string' ? img : (img.contentUrl || img.url || img.src || '');
+                      return { src, position: idx + 1, alt: prodObj.name || '' };
+                    }).filter((img: any) => img.src);
+
+                    const handle = pUrl.split('/product-page/')[1] || (prodObj.name || 'product').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+                    const inStock = offer?.Availability ? offer.Availability.includes('InStock') : true;
+
+                    const desc = (prodObj.description || '')
+                      .replace(/&#009;/g, ' ')
+                      .replace(/&#039;/g, "'")
+                      .replace(/&quot;/g, '"')
+                      .replace(/&amp;/g, '&');
+
+                    return {
+                      id: prodObj.sku || handle,
+                      title: prodObj.name || '',
+                      handle,
+                      body_html: desc,
+                      vendor: prodObj.brand?.name || offer?.seller?.name || domain.replace(/^https?:\/\/(www\.)?/i, '').split('/')[0],
+                      product_type: 'General',
+                      tags: 'wix-import',
+                      categories: [],
+                      published_at: new Date().toISOString(),
+                      options: [],
+                      variants: [{
+                        id: prodObj.sku || `${handle}-1`,
                         title: 'Default Title',
-                        price: String(p.price?.formatted || p.price?.amount || p.discountedPrice || '0.00').replace(/[^0-9.]/g, ''),
-                        compare_at_price: p.comparePrice ? String(p.comparePrice).replace(/[^0-9.]/g, '') : '',
-                        sku: p.sku || '',
-                        grams: p.weight || 0,
-                        inventory_quantity: p.inventory?.quantity ?? (p.inStock === false ? 0 : 100),
+                        price,
+                        compare_at_price: '',
+                        sku: prodObj.sku || '',
+                        grams: 0,
+                        inventory_quantity: inStock ? 100 : 0,
                         requires_shipping: true,
                         taxable: true
-                      }];
-
-                  const rawMedia = p.media || p.images || [];
-                  let images = rawMedia.map((m: any, idx: number) => ({
-                    src: m.url || m.src || m.fullUrl || m,
-                    position: idx + 1,
-                    alt: m.altText || m.title || p.name || p.title || ''
-                  })).filter((img: any) => img.src && typeof img.src === 'string');
-
-                  if (images.length === 0 && p.mainMedia?.url) {
-                    images = [{ src: p.mainMedia.url, position: 1, alt: p.name || '' }];
+                      }],
+                      images
+                    };
                   }
+                } catch (e) {}
+              }
+              return null;
+            }));
 
-                  return {
-                    id: p.id || p.productId,
-                    title: p.name || p.title || '',
-                    handle: p.slug || (p.name || p.title || `wix-${p.id}`).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
-                    body_html: p.description || p.body || '',
-                    vendor: domain.replace(/^https?:\/\/(www\.)?/i, '').split('/')[0],
-                    product_type: p.category?.name || p.collectionIds?.[0] || 'General',
-                    tags: Array.isArray(p.tags) ? p.tags.join(', ') : '',
-                    categories: p.collectionIds || [],
-                    published_at: new Date().toISOString(),
-                    options,
-                    variants,
-                    images
-                  };
-                });
-                return NextResponse.json({ success: true, products: mapped });
+            for (const r of results) {
+              if (r.status === 'fulfilled' && r.value) {
+                products.push(r.value);
               }
             }
           }
-        } catch (e) {
-          console.warn('Wix Stores fetch error:', e);
+
+          if (products.length > 0) {
+            return NextResponse.json({ success: true, products });
+          }
         }
+      } catch (e) {
+        console.warn('Wix Stores scraper error:', e);
       }
     }
 
