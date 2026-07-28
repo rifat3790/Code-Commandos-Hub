@@ -70,10 +70,21 @@ export default function AuditSuitePage() {
   const [activeTab, setActiveTab] = useState<'inspect' | 'speed' | 'seo' | 'transfer'>('inspect');
 
   // Migration Tab State
-  const [migrationPlatform, setMigrationPlatform] = useState<'squarespace' | 'woocommerce'>('squarespace');
+  const CMS_PLATFORMS = [
+    { id: 'wix', name: 'Wix Stores', icon: Sparkles, badge: 'Popular', label: 'Wix', placeholder: 'https://username.wixsite.com/myshop' },
+    { id: 'squarespace', name: 'Squarespace', icon: Zap, badge: 'Popular', label: 'Squarespace', placeholder: 'https://store.squarespace.com/shop' },
+    { id: 'woocommerce', name: 'WooCommerce', icon: Globe, badge: 'WordPress', label: 'WooCommerce', placeholder: 'https://woocommerce-store.com' },
+    { id: 'bigcommerce', name: 'BigCommerce', icon: Database, badge: 'Cloud', label: 'BigCommerce', placeholder: 'https://store.mybigcommerce.com' },
+    { id: 'magento', name: 'Magento / Adobe', icon: ShieldCheck, badge: 'Enterprise', label: 'Magento', placeholder: 'https://magento-store.com' },
+    { id: 'webflow', name: 'Webflow Store', icon: Code, badge: 'CMS', label: 'Webflow', placeholder: 'https://store.webflow.io' },
+    { id: 'custom', name: 'Universal Multi-CMS', icon: Search, badge: 'Any Site', label: 'Universal CMS', placeholder: 'https://any-ecommerce-website.com' },
+  ];
+
+  const [migrationPlatform, setMigrationPlatform] = useState<string>('wix');
   const [migrationSourceUrl, setMigrationSourceUrl] = useState('');
   const [fetchedWpProducts, setFetchedWpProducts] = useState<any[]>([]);
   const [selectedProductIds, setSelectedProductIds] = useState<Record<string, boolean>>({});
+  const [catalogSearchQuery, setCatalogSearchQuery] = useState('');
   const [isFetchingWp, setIsFetchingWp] = useState(false);
   const [isMigrating, setIsMigrating] = useState(false);
   const [migrationLogs, setMigrationLogs] = useState<string[]>([]);
@@ -126,7 +137,8 @@ export default function AuditSuitePage() {
         ? p.categories.join(', ')
         : (p.product_type || 'General');
 
-      const defaultVendor = migrationPlatform === 'squarespace' ? 'Squarespace Import' : 'WooCommerce Import';
+      const currentCmsObj = CMS_PLATFORMS.find(c => c.id === migrationPlatform);
+      const defaultVendor = p.vendor || `${currentCmsObj?.label || 'Store'} Import`;
 
       for (let i = 0; i < maxRows; i++) {
         const rowData: Record<string, string> = {};
@@ -137,7 +149,7 @@ export default function AuditSuitePage() {
         if (i === 0) {
           rowData['Title'] = p.title;
           rowData['Body (HTML)'] = p.body_html || '';
-          rowData['Vendor'] = p.vendor || defaultVendor;
+          rowData['Vendor'] = defaultVendor;
           rowData['Type'] = p.product_type || 'General';
           rowData['Tags'] = p.tags || '';
           rowData['Published'] = 'TRUE';
@@ -184,17 +196,34 @@ export default function AuditSuitePage() {
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
-    const platformPrefix = migrationPlatform === 'squarespace' ? 'squarespace' : 'woocommerce';
     link.setAttribute('href', url);
-    link.setAttribute('download', `${platformPrefix}_to_shopify_import_${Date.now()}.csv`);
+    link.setAttribute('download', `${migrationPlatform}_to_shopify_import_${Date.now()}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
 
     setDownloadedCSV(true);
     setTimeout(() => setDownloadedCSV(false), 2000);
-    const platformLabel = migrationPlatform === 'squarespace' ? 'Squarespace' : 'WooCommerce';
+    const platformLabel = CMS_PLATFORMS.find(c => c.id === migrationPlatform)?.label || migrationPlatform;
     addMigrationLog(`Successfully compiled and downloaded official Shopify CSV with ${selectedList.length} ${platformLabel} products!`, 'success');
+  };
+
+  const handleExportJSONCatalog = () => {
+    const selectedList = fetchedWpProducts.filter(p => selectedProductIds[p.id]);
+    if (selectedList.length === 0) {
+      alert('Please select at least one product to export.');
+      return;
+    }
+    const jsonStr = JSON.stringify(selectedList, null, 2);
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${migrationPlatform}_catalog_backup_${Date.now()}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    addMigrationLog(`Exported JSON catalog with ${selectedList.length} items.`, 'success');
   };
 
   const addMigrationLog = (message: string, type: 'info' | 'success' | 'error' = 'info') => {
@@ -205,8 +234,8 @@ export default function AuditSuitePage() {
 
   const handleFetchCatalogProducts = async () => {
     if (!migrationSourceUrl.trim()) {
-      const pName = migrationPlatform === 'squarespace' ? 'Squarespace' : 'WooCommerce';
-      alert(`Please enter a valid ${pName} website or shop URL.`);
+      const activePlatformObj = CMS_PLATFORMS.find(c => c.id === migrationPlatform);
+      alert(`Please enter a valid ${activePlatformObj?.name || 'store'} website or shop URL.`);
       return;
     }
     setIsFetchingWp(true);
@@ -218,13 +247,13 @@ export default function AuditSuitePage() {
       cleanUrl = 'https://' + cleanUrl;
     }
 
-    const platformLabel = migrationPlatform === 'squarespace' ? 'Squarespace' : 'WooCommerce';
+    const platformLabel = CMS_PLATFORMS.find(c => c.id === migrationPlatform)?.name || migrationPlatform;
     const timestamp = new Date().toLocaleTimeString();
-    setMigrationLogs([`[${timestamp}] ℹ [INFO] Connecting to ${platformLabel} Store: ${cleanUrl}`]);
+    setMigrationLogs([`[${timestamp}] ℹ [INFO] Connecting to ${platformLabel} Engine: ${cleanUrl}`]);
     
     try {
-      addMigrationLog(`Querying ${platformLabel} store API and catalog manifests...`);
-      const res = await fetch(`/api/analyze-site/products?domain=${encodeURIComponent(cleanUrl)}&page=1&limit=250&platform=${encodeURIComponent(platformLabel)}`);
+      addMigrationLog(`Scanning ${platformLabel} catalog endpoints and JSON-LD graphs...`);
+      const res = await fetch(`/api/analyze-site/products?domain=${encodeURIComponent(cleanUrl)}&page=1&limit=250&platform=${encodeURIComponent(migrationPlatform)}`);
       const data = await res.json();
       
       if (!res.ok || !data.success) {
@@ -233,7 +262,7 @@ export default function AuditSuitePage() {
       
       const products = data.products || [];
       if (products.length === 0) {
-        addMigrationLog(`No public products discovered at URL. Ensure products page is accessible.`, 'error');
+        addMigrationLog(`No public products discovered at URL. Ensure store shop page is accessible.`, 'error');
       } else {
         setFetchedWpProducts(products);
         
@@ -244,10 +273,10 @@ export default function AuditSuitePage() {
         });
         setSelectedProductIds(initialSelected);
         
-        addMigrationLog(`Success! Discovered ${products.length} products with full variant & image models from ${platformLabel}. Ready for direct Shopify transfer.`, 'success');
+        addMigrationLog(`Success! Extracted ${products.length} products with complete variants, SKUs & image media from ${platformLabel}. Ready for Shopify transfer.`, 'success');
       }
     } catch (err: any) {
-      addMigrationLog(`Failed: ${err.message}`, 'error');
+      addMigrationLog(`Crawl Error: ${err.message}`, 'error');
     } finally {
       setIsFetchingWp(false);
     }
@@ -1227,7 +1256,7 @@ Report generated on Code Commandos Speed Audit Suite.`;
           { id: 'inspect', name: 'Intelligence Inspector', icon: Globe },
           { id: 'speed', name: 'Speed Optimizer', icon: Gauge },
           { id: 'seo', name: 'SEO & Schema Auditor', icon: FileSearch },
-          { id: 'transfer', name: 'Squarespace & WP to Shopify Transfer', icon: FolderSync }
+          { id: 'transfer', name: 'Multi-CMS Transfer to Shopify', icon: FolderSync }
         ].map((tab) => {
           const isActive = activeTab === tab.id;
           const Icon = tab.icon;
@@ -2013,7 +2042,7 @@ Report generated on Code Commandos Speed Audit Suite.`;
             </div>
           </motion.div>
         ) : (
-          // Migration/Transfer tab panel
+          // Migration/Transfer tab panel - Premium Multi-CMS Dashboard
           <motion.div
             key="transfer-panel"
             initial={{ opacity: 0, y: 10 }}
@@ -2022,214 +2051,258 @@ Report generated on Code Commandos Speed Audit Suite.`;
             className="space-y-6 text-left"
           >
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-              {/* Left Column: Settings */}
+              {/* Left Column: Platform Selector & Settings */}
               <div className="lg:col-span-5 space-y-6">
-                {/* Platform Selector & Source URL */}
+                {/* Platform Selector Grid */}
                 <div className={auditStyles.cardContainer}>
-                  <div className="flex justify-between items-center border-b border-glass-border pb-2 mb-3">
+                  <div className="flex justify-between items-center border-b border-glass-border pb-2.5 mb-3">
                     <h3 className="text-xs uppercase font-extrabold text-white tracking-wider flex items-center gap-2">
-                      <Globe className="w-4 h-4 text-green-400" />
-                      1. Select Source E-commerce Platform
+                      <FolderSync className="w-4 h-4 text-green-400" />
+                      <span>1. Select Source E-commerce Platform</span>
                     </h3>
+                    <span className="text-[9px] uppercase font-bold px-2 py-0.5 rounded bg-green-500/10 border border-green-500/20 text-green-400">
+                      7 Platforms Supported
+                    </span>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2 mb-4">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setMigrationPlatform('squarespace');
-                        if (migrationSourceUrl.includes('wordpress') || migrationSourceUrl.includes('woocommerce')) {
-                          setMigrationSourceUrl('');
-                        }
-                      }}
-                      className={`px-3 py-2.5 rounded-xl border text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                        migrationPlatform === 'squarespace'
-                          ? 'bg-green-500/15 border-green-500/40 text-green-400 shadow-[0_0_15px_rgba(34,197,94,0.15)]'
-                          : 'bg-black/40 border-glass-border text-gray-400 hover:text-white hover:bg-white/5'
-                      }`}
-                    >
-                      <Sparkles className="w-3.5 h-3.5" />
-                      <span>Squarespace</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setMigrationPlatform('woocommerce');
-                        if (migrationSourceUrl.includes('squarespace')) {
-                          setMigrationSourceUrl('');
-                        }
-                      }}
-                      className={`px-3 py-2.5 rounded-xl border text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                        migrationPlatform === 'woocommerce'
-                          ? 'bg-green-500/15 border-green-500/40 text-green-400 shadow-[0_0_15px_rgba(34,197,94,0.15)]'
-                          : 'bg-black/40 border-glass-border text-gray-400 hover:text-white hover:bg-white/5'
-                      }`}
-                    >
-                      <Globe className="w-3.5 h-3.5" />
-                      <span>WooCommerce</span>
-                    </button>
+                  <div className="grid grid-cols-2 gap-2 mb-4 max-h-[220px] overflow-y-auto pr-1">
+                    {CMS_PLATFORMS.map((cms) => {
+                      const isSelected = migrationPlatform === cms.id;
+                      const IconComponent = cms.icon;
+                      return (
+                        <button
+                          key={cms.id}
+                          type="button"
+                          onClick={() => {
+                            setMigrationPlatform(cms.id);
+                            setMigrationSourceUrl('');
+                          }}
+                          className={`p-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer flex flex-col items-start gap-1 select-none text-left relative overflow-hidden ${
+                            isSelected
+                              ? 'bg-green-500/15 border-green-500/40 text-green-300 shadow-[0_0_15px_rgba(34,197,94,0.15)]'
+                              : 'bg-black/40 border-glass-border text-gray-400 hover:text-white hover:bg-white/5'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between w-full">
+                            <div className="flex items-center gap-1.5">
+                              <IconComponent className={`w-3.5 h-3.5 ${isSelected ? 'text-green-400 animate-pulse' : 'text-gray-500'}`} />
+                              <span className="font-extrabold text-[11px] truncate">{cms.name}</span>
+                            </div>
+                            <span className="text-[8px] font-black uppercase px-1.5 py-0.2 rounded bg-white/5 border border-white/10 text-gray-400">
+                              {cms.badge}
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    })}
                   </div>
 
                   <p className="text-[11px] text-gray-400 mb-2">
-                    {migrationPlatform === 'squarespace'
-                      ? 'Enter your Squarespace website or shop page URL to fetch catalog products via JSON APIs.'
-                      : 'Enter the WooCommerce shop URL to fetch products catalog from public REST APIs.'}
+                    Enter the storefront or shop URL for <strong className="text-white">{CMS_PLATFORMS.find(c => c.id === migrationPlatform)?.name}</strong>:
                   </p>
 
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={migrationSourceUrl}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setMigrationSourceUrl(val);
-                        if (val.includes('squarespace.com') || val.includes('format=json')) {
-                          setMigrationPlatform('squarespace');
-                        } else if (val.includes('wp-json') || val.includes('woocommerce')) {
-                          setMigrationPlatform('woocommerce');
-                        }
-                      }}
-                      placeholder={migrationPlatform === 'squarespace' ? "https://yourstore.squarespace.com/shop" : "https://woocommerce-store.com"}
-                      className={auditStyles.inputField}
-                    />
-                    <button
-                      onClick={handleFetchCatalogProducts}
-                      disabled={isFetchingWp || isMigrating}
-                      className={auditStyles.btnPrimary + " shrink-0 flex items-center gap-1.5 cursor-pointer"}
-                    >
-                      {isFetchingWp ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-                      <span>Fetch Catalog</span>
-                    </button>
+                  <div className="space-y-2">
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={migrationSourceUrl}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setMigrationSourceUrl(val);
+                          const detected = CMS_PLATFORMS.find(c => {
+                            if (c.id === 'wix' && (val.includes('wixsite') || val.includes('wix.com'))) return true;
+                            if (c.id === 'squarespace' && (val.includes('squarespace.com') || val.includes('format=json'))) return true;
+                            if (c.id === 'woocommerce' && (val.includes('wp-json') || val.includes('woocommerce'))) return true;
+                            if (c.id === 'bigcommerce' && val.includes('mybigcommerce.com')) return true;
+                            if (c.id === 'webflow' && val.includes('webflow.io')) return true;
+                            return false;
+                          });
+                          if (detected) setMigrationPlatform(detected.id);
+                        }}
+                        placeholder={CMS_PLATFORMS.find(c => c.id === migrationPlatform)?.placeholder || "https://your-store.com"}
+                        className={auditStyles.inputField}
+                      />
+                      <button
+                        onClick={handleFetchCatalogProducts}
+                        disabled={isFetchingWp || isMigrating}
+                        className={auditStyles.btnPrimary + " shrink-0 flex items-center gap-1.5 cursor-pointer"}
+                      >
+                        {isFetchingWp ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                        <span>Fetch Catalog</span>
+                      </button>
+                    </div>
+
+                    {migrationSourceUrl && (
+                      <div className="text-[10px] text-green-400 flex items-center gap-1 font-mono">
+                        <CheckCircle2 className="w-3 h-3" />
+                        <span>Platform Engine Active: {CMS_PLATFORMS.find(c => c.id === migrationPlatform)?.name}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
+                {/* Export Options */}
                 <div className={auditStyles.cardContainer}>
                   <h3 className="text-xs uppercase font-extrabold text-white tracking-wider flex items-center gap-2">
                     <Download className="w-4 h-4 text-green-400" />
-                    2. Shopify Product CSV Export
+                    2. Shopify Product Export Center
                   </h3>
                   <p className="text-[11px] text-gray-400">
-                    Selected products will be formatted to match Shopify's official product migration CSV format.
+                    Export fetched catalog items matching official Shopify CSV specifications (all variants, images, SKUs & stock).
                   </p>
 
-                  <div className="space-y-4 pt-1">
+                  <div className="space-y-3 pt-1">
                     <div className="p-3 bg-black/40 border border-glass-border rounded-xl flex items-center justify-between text-xs">
                       <span className="text-gray-400 font-bold">Selected Products</span>
                       <span className="font-extrabold text-green-400 font-mono">
-                        {fetchedWpProducts.filter(p => selectedProductIds[p.id]).length} / {fetchedWpProducts.length}
+                        {fetchedWpProducts.filter(p => selectedProductIds[p.id]).length} / {fetchedWpProducts.length} items
                       </span>
                     </div>
 
-                    <button
-                      onClick={handleDownloadShopifyCSV}
-                      disabled={isFetchingWp || fetchedWpProducts.filter(p => selectedProductIds[p.id]).length === 0}
-                      className={`w-full flex items-center justify-center gap-2 font-extrabold text-xs uppercase tracking-wider py-3.5 px-4 rounded-xl transition-all shadow-lg cursor-pointer ${
-                        downloadedCSV
-                          ? 'bg-green-500/30 text-green-300 border border-green-400 scale-102 shadow-[0_0_15px_rgba(34,197,94,0.4)]'
-                          : 'bg-brand-green hover:bg-brand-green-hover text-black glow-green disabled:opacity-50 disabled:cursor-not-allowed'
-                      }`}
-                    >
-                      {downloadedCSV ? (
-                        <>
-                          <Check className="w-4 h-4 stroke-[3] animate-pulse" />
-                          <span>Shopify CSV Downloaded!</span>
-                        </>
-                      ) : (
-                        <>
-                          <Download className="w-4 h-4 stroke-[3]" />
-                          <span>Download Shopify CSV</span>
-                        </>
-                      )}
-                    </button>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <button
+                        onClick={handleDownloadShopifyCSV}
+                        disabled={isFetchingWp || fetchedWpProducts.filter(p => selectedProductIds[p.id]).length === 0}
+                        className={`w-full flex items-center justify-center gap-1.5 font-extrabold text-[11px] uppercase tracking-wider py-3 px-3 rounded-xl transition-all shadow-lg cursor-pointer ${
+                          downloadedCSV
+                            ? 'bg-green-500/30 text-green-300 border border-green-400 scale-102 shadow-[0_0_15px_rgba(34,197,94,0.4)]'
+                            : 'bg-brand-green hover:bg-brand-green-hover text-black glow-green disabled:opacity-50 disabled:cursor-not-allowed'
+                        }`}
+                      >
+                        {downloadedCSV ? (
+                          <>
+                            <Check className="w-3.5 h-3.5 stroke-[3] animate-pulse" />
+                            <span>Shopify CSV Downloaded!</span>
+                          </>
+                        ) : (
+                          <>
+                            <Download className="w-3.5 h-3.5 stroke-[3]" />
+                            <span>Download Shopify CSV</span>
+                          </>
+                        )}
+                      </button>
 
-                    <div className="text-[11px] text-gray-400 space-y-2 border-t border-glass-border/30 pt-3 text-left leading-relaxed">
+                      <button
+                        onClick={handleExportJSONCatalog}
+                        disabled={isFetchingWp || fetchedWpProducts.filter(p => selectedProductIds[p.id]).length === 0}
+                        className="w-full flex items-center justify-center gap-1.5 font-extrabold text-[11px] uppercase tracking-wider py-3 px-3 rounded-xl bg-white/5 border border-glass-border hover:bg-white/10 text-gray-300 transition-all cursor-pointer disabled:opacity-50"
+                      >
+                        <FileCode className="w-3.5 h-3.5 text-blue-400" />
+                        <span>Export JSON Catalog</span>
+                      </button>
+                    </div>
+
+                    <div className="text-[11px] text-gray-400 space-y-1.5 border-t border-glass-border/30 pt-3 text-left leading-relaxed">
                       <span className="text-[10px] uppercase font-bold text-gray-500 tracking-wider block">Importing into Shopify:</span>
                       <div className="flex gap-2">
-                        <span className="text-green-400 font-bold">Step 1:</span>
-                        <span>Open your target Shopify Admin dashboard (e.g. <code>https://admin.shopify.com/</code>).</span>
+                        <span className="text-green-400 font-bold">1.</span>
+                        <span>Open Shopify Admin (<code>https://admin.shopify.com</code>) &rarr; <strong>Products</strong>.</span>
                       </div>
                       <div className="flex gap-2">
-                        <span className="text-green-400 font-bold">Step 2:</span>
-                        <span>Navigate to <strong>Products</strong> on the left navigation.</span>
+                        <span className="text-green-400 font-bold">2.</span>
+                        <span>Click <strong>Import</strong> button at top right.</span>
                       </div>
                       <div className="flex gap-2">
-                        <span className="text-green-400 font-bold">Step 3:</span>
-                        <span>Click the <strong>Import</strong> button at the top right.</span>
-                      </div>
-                      <div className="flex gap-2">
-                        <span className="text-green-400 font-bold">Step 4:</span>
-                        <span>Upload the downloaded CSV and click <strong>Upload and preview</strong>.</span>
+                        <span className="text-green-400 font-bold">3.</span>
+                        <span>Upload downloaded CSV & click <strong>Upload and preview</strong>.</span>
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
 
+              {/* Right Column: Catalog Preview List & Logs */}
               <div className="lg:col-span-7 space-y-6">
                 <div className={auditStyles.cardContainer}>
-                  <div className="flex justify-between items-center border-b border-glass-border pb-2">
+                  <div className="flex flex-wrap justify-between items-center border-b border-glass-border pb-2.5 gap-2">
                     <h3 className="text-xs uppercase font-extrabold text-white tracking-wider flex items-center gap-2">
                       <Database className="w-4 h-4 text-green-400" />
-                      Fetched Catalog ({fetchedWpProducts.length} Items)
+                      <span>Fetched Catalog ({fetchedWpProducts.length} Items)</span>
                     </h3>
+
                     {fetchedWpProducts.length > 0 && (
-                      <button
-                        onClick={() => {
-                          const allSelected = fetchedWpProducts.every(p => selectedProductIds[p.id]);
-                          const updated: Record<string, boolean> = {};
-                          fetchedWpProducts.forEach(p => {
-                            updated[p.id] = !allSelected;
-                          });
-                          setSelectedProductIds(updated);
-                        }}
-                        className="text-[10px] text-green-400 hover:text-green-300 font-bold uppercase cursor-pointer"
-                      >
-                        {fetchedWpProducts.every(p => selectedProductIds[p.id]) ? 'Deselect All' : 'Select All'}
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={catalogSearchQuery}
+                          onChange={(e) => setCatalogSearchQuery(e.target.value)}
+                          placeholder="Filter products..."
+                          className="px-2.5 py-1 bg-black border border-glass-border rounded-lg text-[10px] text-white outline-none w-32 focus:w-40 transition-all font-mono"
+                        />
+
+                        <button
+                          onClick={() => {
+                            const allSelected = fetchedWpProducts.every(p => selectedProductIds[p.id]);
+                            const updated: Record<string, boolean> = {};
+                            fetchedWpProducts.forEach(p => {
+                              updated[p.id] = !allSelected;
+                            });
+                            setSelectedProductIds(updated);
+                          }}
+                          className="text-[10px] text-green-400 hover:text-green-300 font-bold uppercase cursor-pointer shrink-0"
+                        >
+                          {fetchedWpProducts.every(p => selectedProductIds[p.id]) ? 'Deselect All' : 'Select All'}
+                        </button>
+                      </div>
                     )}
                   </div>
 
-                  <div className="max-h-[350px] overflow-y-auto space-y-2.5 pr-1">
+                  <div className="max-h-[360px] overflow-y-auto space-y-2.5 pr-1">
                     {fetchedWpProducts.length > 0 ? (
-                      fetchedWpProducts.map((prod) => {
-                        const isChecked = !!selectedProductIds[prod.id];
-                        return (
-                          <div 
-                            key={prod.id}
-                            className="p-3 bg-black/40 border border-glass-border hover:border-glass-border/30 rounded-lg flex items-center justify-between gap-3 text-xs"
-                          >
-                            <div className="flex items-center gap-3">
-                              <input 
-                                type="checkbox" 
-                                checked={isChecked}
-                                onChange={() => {
-                                  setSelectedProductIds(prev => ({
-                                    ...prev,
-                                    [prod.id]: !prev[prod.id]
-                                  }));
-                                }}
-                                className="w-4 h-4 accent-green-500 rounded border-glass-border bg-black cursor-pointer"
-                              />
-                              {prod.images?.[0]?.src ? (
-                                <img src={prod.images[0].src} alt="" className="w-10 h-10 object-cover rounded-lg border border-glass-border" />
-                              ) : (
-                                <div className="w-10 h-10 rounded-lg border border-glass-border bg-white/5 flex items-center justify-center text-[9px] text-gray-600">No Image</div>
-                              )}
-                              <div className="space-y-0.5 text-left">
-                                <span className="font-bold text-white block line-clamp-1">{prod.title}</span>
-                                <span className="text-[10px] text-gray-500 block">{prod.product_type} • {prod.variants?.length || 1} Variant(s)</span>
+                      fetchedWpProducts
+                        .filter(p => !catalogSearchQuery || p.title.toLowerCase().includes(catalogSearchQuery.toLowerCase()) || (p.product_type && p.product_type.toLowerCase().includes(catalogSearchQuery.toLowerCase())))
+                        .map((prod) => {
+                          const isChecked = !!selectedProductIds[prod.id];
+                          return (
+                            <div 
+                              key={prod.id}
+                              className="p-3 bg-black/40 border border-glass-border hover:border-glass-border/30 rounded-xl flex items-center justify-between gap-3 text-xs transition-all"
+                            >
+                              <div className="flex items-center gap-3">
+                                <input 
+                                  type="checkbox" 
+                                  checked={isChecked}
+                                  onChange={() => {
+                                    setSelectedProductIds(prev => ({
+                                      ...prev,
+                                      [prod.id]: !prev[prod.id]
+                                    }));
+                                  }}
+                                  className="w-4 h-4 accent-green-500 rounded border-glass-border bg-black cursor-pointer"
+                                />
+                                {prod.images?.[0]?.src ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img src={prod.images[0].src} alt="" className="w-10 h-10 object-cover rounded-lg border border-glass-border" />
+                                ) : (
+                                  <div className="w-10 h-10 rounded-lg border border-glass-border bg-white/5 flex items-center justify-center text-[9px] text-gray-600">No Image</div>
+                                )}
+                                <div className="space-y-0.5 text-left">
+                                  <span className="font-bold text-white block line-clamp-1">{prod.title}</span>
+                                  <div className="flex items-center gap-2 text-[10px] text-gray-500">
+                                    <span>{prod.product_type || 'General'}</span>
+                                    <span>•</span>
+                                    <span className="text-green-400 font-bold">{prod.variants?.length || 1} Variant(s)</span>
+                                    <span>•</span>
+                                    <span>{prod.images?.length || 0} Media</span>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="text-right shrink-0">
+                                <div className="font-mono font-bold text-green-400 text-sm">
+                                  ${prod.variants?.[0]?.price || '0.00'}
+                                </div>
+                                {prod.variants?.[0]?.compare_at_price && (
+                                  <div className="text-[10px] text-gray-500 line-through font-mono">
+                                    ${prod.variants[0].compare_at_price}
+                                  </div>
+                                )}
                               </div>
                             </div>
-                            <div className="text-right font-mono font-bold text-green-400">
-                              ${prod.variants?.[0]?.price || '0.00'}
-                            </div>
-                          </div>
-                        );
-                      })
+                          );
+                        })
                     ) : (
                       <div className="text-center py-12 text-gray-500 text-xs italic">
-                        No products fetched yet. Enter a {migrationPlatform === 'squarespace' ? 'Squarespace' : 'WooCommerce'} URL on the left and click "Fetch Catalog".
+                        No products loaded. Select a platform on the left, enter URL, and click "Fetch Catalog".
                       </div>
                     )}
                   </div>
@@ -2239,7 +2312,7 @@ Report generated on Code Commandos Speed Audit Suite.`;
                 <div className={auditStyles.cardContainer}>
                   <span className="text-[10px] text-gray-400 font-extrabold uppercase tracking-wider flex items-center gap-1.5">
                     <Terminal className="w-3.5 h-3.5 text-green-400" />
-                    Migration Console output
+                    <span>Migration Console Engine Output</span>
                   </span>
                   <div className={auditStyles.consoleBox + " h-[160px]"}>
                     {migrationLogs.length > 0 ? (
@@ -2247,7 +2320,7 @@ Report generated on Code Commandos Speed Audit Suite.`;
                         <div key={idx} className="leading-normal">{log}</div>
                       ))
                     ) : (
-                      <div className="text-gray-600 italic">Logs will appear here once migration begins...</div>
+                      <div className="text-gray-600 italic">Logs will appear here once catalog probe starts...</div>
                     )}
                   </div>
                 </div>

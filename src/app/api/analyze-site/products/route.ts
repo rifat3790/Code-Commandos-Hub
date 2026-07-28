@@ -305,7 +305,145 @@ export async function GET(request: Request) {
       }
     }
 
-    // 3. Fallback: Scraping Shop Pages & Schema parsing
+    // 3. Wix Stores API & JSON-LD
+    if (platform.toLowerCase().includes('wix') || domain.includes('wixsite.com') || domain.includes('wix.com')) {
+      const wixCandidateUrls = [
+        `${domain.replace(/\/$/, '')}/_api/v2/catalog/products?limit=100`,
+        `${domain.replace(/\/$/, '')}/_api/v1/products?limit=100`,
+        `${domain.replace(/\/$/, '')}/shop`,
+        `${domain.replace(/\/$/, '')}/store`,
+        `${domain.replace(/\/$/, '')}/products`
+      ];
+
+      for (const wixUrl of wixCandidateUrls) {
+        try {
+          const wixRes = await fetch(wixUrl, {
+            headers: { 'User-Agent': USER_AGENT },
+            next: { revalidate: 0 }
+          });
+
+          if (wixRes.ok) {
+            const contentType = wixRes.headers.get('content-type') || '';
+            if (contentType.includes('application/json')) {
+              const wixData = await wixRes.json();
+              const wixProducts = wixData.products || wixData.items || [];
+              if (Array.isArray(wixProducts) && wixProducts.length > 0) {
+                const mapped = wixProducts.map((p: any) => {
+                  const options = p.productOptions?.map((o: any, idx: number) => ({
+                    name: o.name || o.title || `Option${idx + 1}`,
+                    position: idx + 1,
+                    values: o.choices?.map((c: any) => c.value || c.description || c.title) || []
+                  })) || [];
+
+                  const rawVariants = p.variants || p.productVariants || [];
+                  const variants = rawVariants.length > 0
+                    ? rawVariants.map((v: any, idx: number) => ({
+                        id: v.id || `${p.id}-${idx}`,
+                        title: v.title || v.choices?.map((c: any) => c.value).join(' / ') || 'Default Title',
+                        price: v.price?.formatted || v.price?.amount || (v.variant?.price ? String(v.variant.price) : (p.price?.formatted || p.price?.amount || '0.00')),
+                        compare_at_price: v.comparePrice?.formatted || v.comparePrice?.amount || '',
+                        sku: v.sku || p.sku || '',
+                        grams: v.weight || p.weight || 0,
+                        inventory_quantity: v.inventory?.quantity ?? v.quantity ?? (p.inventory?.quantity ?? 100),
+                        requires_shipping: true,
+                        taxable: true,
+                        option1: v.choices?.[0]?.value || null,
+                        option2: v.choices?.[1]?.value || null,
+                        option3: v.choices?.[2]?.value || null
+                      }))
+                    : [{
+                        id: p.id,
+                        title: 'Default Title',
+                        price: String(p.price?.formatted || p.price?.amount || p.discountedPrice || '0.00').replace(/[^0-9.]/g, ''),
+                        compare_at_price: p.comparePrice ? String(p.comparePrice).replace(/[^0-9.]/g, '') : '',
+                        sku: p.sku || '',
+                        grams: p.weight || 0,
+                        inventory_quantity: p.inventory?.quantity ?? (p.inStock === false ? 0 : 100),
+                        requires_shipping: true,
+                        taxable: true
+                      }];
+
+                  const rawMedia = p.media || p.images || [];
+                  let images = rawMedia.map((m: any, idx: number) => ({
+                    src: m.url || m.src || m.fullUrl || m,
+                    position: idx + 1,
+                    alt: m.altText || m.title || p.name || p.title || ''
+                  })).filter((img: any) => img.src && typeof img.src === 'string');
+
+                  if (images.length === 0 && p.mainMedia?.url) {
+                    images = [{ src: p.mainMedia.url, position: 1, alt: p.name || '' }];
+                  }
+
+                  return {
+                    id: p.id || p.productId,
+                    title: p.name || p.title || '',
+                    handle: p.slug || (p.name || p.title || `wix-${p.id}`).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
+                    body_html: p.description || p.body || '',
+                    vendor: domain.replace(/^https?:\/\/(www\.)?/i, '').split('/')[0],
+                    product_type: p.category?.name || p.collectionIds?.[0] || 'General',
+                    tags: Array.isArray(p.tags) ? p.tags.join(', ') : '',
+                    categories: p.collectionIds || [],
+                    published_at: new Date().toISOString(),
+                    options,
+                    variants,
+                    images
+                  };
+                });
+                return NextResponse.json({ success: true, products: mapped });
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('Wix Stores fetch error:', e);
+        }
+      }
+    }
+
+    // 4. BigCommerce Store API
+    if (platform.toLowerCase().includes('bigcommerce') || domain.includes('mybigcommerce.com')) {
+      try {
+        const bcUrl = `${domain.replace(/\/$/, '')}/api/storefront/products?limit=100`;
+        const bcRes = await fetch(bcUrl, {
+          headers: { 'User-Agent': USER_AGENT },
+          next: { revalidate: 0 }
+        });
+        if (bcRes.ok) {
+          const bcData = await bcRes.json();
+          const bcItems = Array.isArray(bcData) ? bcData : bcData.products || [];
+          if (bcItems.length > 0) {
+            const mapped = bcItems.map((p: any) => ({
+              id: p.id,
+              title: p.name || '',
+              handle: p.custom_url?.url?.replace(/^\//, '').replace(/\/$/, '') || (p.name || `bc-${p.id}`).toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+              body_html: p.description || '',
+              vendor: p.brand?.name || domain.replace(/^https?:\/\/(www\.)?/i, '').split('/')[0],
+              product_type: 'General',
+              tags: Array.isArray(p.search_keywords) ? p.search_keywords.join(', ') : '',
+              categories: [],
+              published_at: new Date().toISOString(),
+              options: p.options?.map((o: any, idx: number) => ({ name: o.display_name, position: idx + 1, values: o.option_values?.map((v: any) => v.label) || [] })) || [],
+              variants: [{
+                id: p.id,
+                title: 'Default Title',
+                price: String(p.price?.value || p.price || '0.00'),
+                compare_at_price: p.retail_price?.value ? String(p.retail_price.value) : '',
+                sku: p.sku || '',
+                grams: p.weight || 0,
+                inventory_quantity: p.inventory_level ?? 100,
+                requires_shipping: true,
+                taxable: true
+              }],
+              images: p.images?.map((img: any, idx: number) => ({ src: img.url_standard || img.url_zoom || img.src, position: idx + 1, alt: img.alt || p.name })) || []
+            }));
+            return NextResponse.json({ success: true, products: mapped });
+          }
+        }
+      } catch (e) {
+        console.warn('BigCommerce fetch error:', e);
+      }
+    }
+
+    // 5. Fallback: Scraping Shop Pages & Schema parsing
     let shopHtml = '';
     const shopUrls = [
       `${domain}/shop`,
