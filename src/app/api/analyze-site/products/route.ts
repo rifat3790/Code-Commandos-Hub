@@ -89,85 +89,105 @@ export async function GET(request: Request) {
 
     // --- NON-SHOPIFY PRODUCT CRAWLERS ---
     
-    // 1. WooCommerce store API
+    // 1. WooCommerce store API (Full multi-page pagination for 1k, 2k, 10k+ products)
     if (platform.toLowerCase().includes('wordpress') || platform.toLowerCase().includes('woocommerce')) {
       try {
-        const wcUrl = `${domain}/wp-json/wc/store/v1/products?per_page=100&page=${page}`;
-        const wcRes = await fetch(wcUrl, {
-          headers: { 'User-Agent': USER_AGENT },
-          next: { revalidate: 0 }
-        });
+        let allWcProducts: any[] = [];
+        let currentPage = 1;
+        let hasMore = true;
 
-        if (wcRes.ok) {
+        while (hasMore && currentPage <= 100) {
+          const wcUrl = `${domain}/wp-json/wc/store/v1/products?per_page=100&page=${currentPage}`;
+          const wcRes = await fetch(wcUrl, {
+            headers: { 'User-Agent': USER_AGENT },
+            next: { revalidate: 0 }
+          });
+
+          if (!wcRes.ok) break;
+
           const wcData = await wcRes.json();
-          if (Array.isArray(wcData)) {
-            const mapped = wcData.map((p: any) => {
-                const variants = p.variations && p.variations.length > 0
-                ? p.variations.map((v: any) => {
-                    const price = v.price ? parseWooPrice(v.price) : (p.prices?.price ? parseWooPrice(p.prices.price) : '0.00');
-                    const compPrice = v.regular_price && v.sale_price && v.regular_price !== v.sale_price
-                      ? parseWooPrice(v.regular_price)
-                      : (p.prices?.regular_price && p.prices?.sale_price && p.prices.regular_price !== p.prices.sale_price
-                          ? parseWooPrice(p.prices.regular_price)
-                          : '');
-                    const invQty = v.stock_quantity !== undefined && v.stock_quantity !== null
-                      ? v.stock_quantity
-                      : (p.stock_quantity !== undefined && p.stock_quantity !== null ? p.stock_quantity : 100);
-
-                    return {
-                      id: v.id,
-                      title: v.attributes?.map((a: any) => a.value).join(' / ') || 'Default Title',
-                      price,
-                      compare_at_price: compPrice,
-                      sku: v.sku || '',
-                      grams: 0,
-                      inventory_quantity: invQty,
-                      requires_shipping: true,
-                      taxable: true,
-                      option1: v.attributes?.[0]?.value || null,
-                      option2: v.attributes?.[1]?.value || null,
-                      option3: v.attributes?.[2]?.value || null
-                    };
-                  })
-                : [{
-                    id: p.id,
-                    title: 'Default Title',
-                    price: p.prices?.price ? parseWooPrice(p.prices.price) : '0.00',
-                    compare_at_price: p.prices?.regular_price && p.prices?.sale_price && p.prices.regular_price !== p.prices.sale_price
-                      ? parseWooPrice(p.prices.regular_price)
-                      : '',
-                    sku: p.sku || '',
-                    grams: 0,
-                    inventory_quantity: p.stock_quantity !== undefined && p.stock_quantity !== null ? p.stock_quantity : 100,
-                    requires_shipping: true,
-                    taxable: true
-                  }];
-
-              return {
-                id: p.id,
-                title: p.name || '',
-                handle: p.slug || '',
-                body_html: p.description || '',
-                vendor: domain.replace(/^https?:\/\/(www\.)?/i, ''),
-                product_type: p.categories?.[0]?.name || 'General',
-                tags: p.tags?.map((t: any) => t.name).join(', ') || '',
-                published_at: p.date_created || new Date().toISOString(),
-                options: p.attributes?.map((a: any, idx: number) => ({
-                  name: a.name,
-                  position: idx + 1,
-                  values: a.terms?.map((t: any) => t.name) || []
-                })) || [],
-                categories: p.categories?.map((c: any) => c.name) || [],
-                variants,
-                images: p.images?.map((img: any, idx: number) => ({
-                  src: img.src,
-                  position: idx + 1,
-                  alt: img.alt || img.name || ''
-                })) || []
-              };
-            });
-            return NextResponse.json({ success: true, products: mapped });
+          if (!Array.isArray(wcData) || wcData.length === 0) {
+            hasMore = false;
+            break;
           }
+
+          allWcProducts = [...allWcProducts, ...wcData];
+
+          // If returned less than per_page limit, we reached the end
+          if (wcData.length < 100) {
+            hasMore = false;
+          } else {
+            currentPage++;
+          }
+        }
+
+        if (allWcProducts.length > 0) {
+          const mapped = allWcProducts.map((p: any) => {
+            const variants = p.variations && p.variations.length > 0
+              ? p.variations.map((v: any) => {
+                  const price = v.price ? parseWooPrice(v.price) : (p.prices?.price ? parseWooPrice(p.prices.price) : '0.00');
+                  const compPrice = v.regular_price && v.sale_price && v.regular_price !== v.sale_price
+                    ? parseWooPrice(v.regular_price)
+                    : (p.prices?.regular_price && p.prices?.sale_price && p.prices.regular_price !== p.prices.sale_price
+                        ? parseWooPrice(p.prices.regular_price)
+                        : '');
+                  const invQty = v.stock_quantity !== undefined && v.stock_quantity !== null
+                    ? v.stock_quantity
+                    : (p.stock_quantity !== undefined && p.stock_quantity !== null ? p.stock_quantity : 100);
+
+                  return {
+                    id: v.id,
+                    title: v.attributes?.map((a: any) => a.value).join(' / ') || 'Default Title',
+                    price,
+                    compare_at_price: compPrice,
+                    sku: v.sku || '',
+                    grams: 0,
+                    inventory_quantity: invQty,
+                    requires_shipping: true,
+                    taxable: true,
+                    option1: v.attributes?.[0]?.value || null,
+                    option2: v.attributes?.[1]?.value || null,
+                    option3: v.attributes?.[2]?.value || null
+                  };
+                })
+              : [{
+                  id: p.id,
+                  title: 'Default Title',
+                  price: p.prices?.price ? parseWooPrice(p.prices.price) : '0.00',
+                  compare_at_price: p.prices?.regular_price && p.prices?.sale_price && p.prices.regular_price !== p.prices.sale_price
+                    ? parseWooPrice(p.prices.regular_price)
+                    : '',
+                  sku: p.sku || '',
+                  grams: 0,
+                  inventory_quantity: p.stock_quantity !== undefined && p.stock_quantity !== null ? p.stock_quantity : 100,
+                  requires_shipping: true,
+                  taxable: true
+                }];
+
+            return {
+              id: p.id,
+              title: p.name || '',
+              handle: p.slug || '',
+              body_html: p.description || '',
+              vendor: domain.replace(/^https?:\/\/(www\.)?/i, ''),
+              product_type: p.categories?.[0]?.name || 'General',
+              tags: p.tags?.map((t: any) => t.name).join(', ') || '',
+              published_at: p.date_created || new Date().toISOString(),
+              options: p.attributes?.map((a: any, idx: number) => ({
+                name: a.name,
+                position: idx + 1,
+                values: a.terms?.map((t: any) => t.name) || []
+              })) || [],
+              categories: p.categories?.map((c: any) => c.name) || [],
+              variants,
+              images: p.images?.map((img: any, idx: number) => ({
+                src: img.src,
+                position: idx + 1,
+                alt: img.alt || img.name || ''
+              })) || []
+            };
+          });
+          return NextResponse.json({ success: true, products: mapped });
         }
       } catch (err) {
         console.warn('WooCommerce products crawl failed, falling back', err);
@@ -190,7 +210,7 @@ export async function GET(request: Request) {
           let allSqItems: any[] = [];
           let fetchedPages = 0;
 
-          while (currentUrl && fetchedPages < 10) {
+          while (currentUrl && fetchedPages < 100) {
             fetchedPages++;
             const sqRes = await fetch(currentUrl, {
               headers: { 'User-Agent': USER_AGENT },
