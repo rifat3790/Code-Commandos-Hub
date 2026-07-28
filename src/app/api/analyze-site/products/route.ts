@@ -491,12 +491,17 @@ export async function GET(request: Request) {
                   };
                   const prodObj = extractFromObj(json);
                   if (prodObj) {
-                    const offer = Array.isArray(prodObj.offers || prodObj.Offers) 
-                      ? (prodObj.offers || prodObj.Offers)[0] 
-                      : (prodObj.offers || prodObj.Offers);
-                    
-                    const rawPrice = offer?.price || offer?.lowPrice || '0.00';
-                    const price = String(rawPrice).replace(/[^0-9.]/g, '') || '0.00';
+                    const rawOffers = Array.isArray(prodObj.offers || prodObj.Offers)
+                      ? (prodObj.offers || prodObj.Offers)
+                      : (prodObj.offers || prodObj.Offers ? [prodObj.offers || prodObj.Offers] : []);
+                    const rawHasVariant = Array.isArray(prodObj.hasVariant) ? prodObj.hasVariant : [];
+
+                    const handle = pUrl.split('/product-page/')[1] || (prodObj.name || 'product').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+                    const desc = (prodObj.description || '')
+                      .replace(/&#009;/g, ' ')
+                      .replace(/&#039;/g, "'")
+                      .replace(/&quot;/g, '"')
+                      .replace(/&amp;/g, '&');
 
                     const rawImages = Array.isArray(prodObj.image) ? prodObj.image : (prodObj.image ? [prodObj.image] : []);
                     const images = rawImages.map((img: any, idx: number) => {
@@ -504,27 +509,102 @@ export async function GET(request: Request) {
                       return { src, position: idx + 1, alt: prodObj.name || '' };
                     }).filter((img: any) => img.src);
 
-                    const handle = pUrl.split('/product-page/')[1] || (prodObj.name || 'product').toLowerCase().replace(/[^a-z0-9]+/g, '-');
-                    const inStock = offer?.Availability ? offer.Availability.includes('InStock') : true;
+                    let options: any[] = [];
+                    let variants: any[] = [];
 
-                    const desc = (prodObj.description || '')
-                      .replace(/&#009;/g, ' ')
-                      .replace(/&#039;/g, "'")
-                      .replace(/&quot;/g, '"')
-                      .replace(/&amp;/g, '&');
+                    // 1. Check if embedded script has productOptions & productVariants
+                    const scriptMatches = [...html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/gi)];
+                    for (const s of scriptMatches) {
+                      const txt = s[1];
+                      if (txt.includes('productVariants') || txt.includes('productOptions')) {
+                        try {
+                          const optMatch = txt.match(/"productOptions"\s*:\s*(\[[^\]]+\])/);
+                          const varMatch = txt.match(/"productVariants"\s*:\s*(\[[^\]]+\])/);
+                          if (optMatch && varMatch) {
+                            const parsedOpts = JSON.parse(optMatch[1]);
+                            const parsedVars = JSON.parse(varMatch[1]);
+                            if (Array.isArray(parsedOpts) && parsedOpts.length > 0 && Array.isArray(parsedVars) && parsedVars.length > 0) {
+                              options = parsedOpts.map((o: any, idx: number) => ({
+                                name: o.name || o.title || `Option${idx + 1}`,
+                                position: idx + 1,
+                                values: o.choices?.map((c: any) => c.value || c.description || c.title) || []
+                              }));
 
-                    return {
-                      id: prodObj.sku || handle,
-                      title: prodObj.name || '',
-                      handle,
-                      body_html: desc,
-                      vendor: prodObj.brand?.name || offer?.seller?.name || domain.replace(/^https?:\/\/(www\.)?/i, '').split('/')[0],
-                      product_type: 'General',
-                      tags: 'wix-import',
-                      categories: [],
-                      published_at: new Date().toISOString(),
-                      options: [],
-                      variants: [{
+                              variants = parsedVars.map((v: any, idx: number) => ({
+                                id: v.id || `${handle}-${idx + 1}`,
+                                title: v.title || (v.choices ? Object.values(v.choices).join(' / ') : `Variant ${idx + 1}`),
+                                price: String(v.price?.formatted || v.price?.amount || v.price || (rawOffers[0]?.price || '0.00')).replace(/[^0-9.]/g, ''),
+                                compare_at_price: v.comparePrice ? String(v.comparePrice).replace(/[^0-9.]/g, '') : '',
+                                sku: v.sku || prodObj.sku || '',
+                                grams: v.weight || 0,
+                                inventory_quantity: v.inventory?.quantity ?? v.quantity ?? (v.inStock === false ? 0 : 100),
+                                requires_shipping: true,
+                                taxable: true,
+                                option1: v.choices ? Object.values(v.choices)[0] || null : null,
+                                option2: v.choices ? Object.values(v.choices)[1] || null : null,
+                                option3: v.choices ? Object.values(v.choices)[2] || null : null
+                              }));
+                              break;
+                            }
+                          }
+                        } catch (e) {}
+                      }
+                    }
+
+                    // 2. If script parsing didn't yield variants, check JSON-LD hasVariant
+                    if (variants.length === 0 && rawHasVariant.length > 0) {
+                      options = [{ name: 'Option', position: 1, values: rawHasVariant.map((hv: any) => hv.name || hv.title) }];
+                      variants = rawHasVariant.map((hv: any, idx: number) => {
+                        const hvOffer = Array.isArray(hv.offers) ? hv.offers[0] : hv.offers;
+                        const vPrice = String(hvOffer?.price || hvOffer?.lowPrice || hv.price || '0.00').replace(/[^0-9.]/g, '');
+                        const vTitle = hv.name || hv.title || `Variant ${idx + 1}`;
+                        const inStock = hvOffer?.Availability ? hvOffer.Availability.includes('InStock') : true;
+
+                        return {
+                          id: hv.sku || `${handle}-${idx + 1}`,
+                          title: vTitle,
+                          price: vPrice,
+                          compare_at_price: '',
+                          sku: hv.sku || prodObj.sku || '',
+                          grams: 0,
+                          inventory_quantity: inStock ? 100 : 0,
+                          requires_shipping: true,
+                          taxable: true,
+                          option1: vTitle
+                        };
+                      });
+                    }
+
+                    // 3. If multiple offers exist in JSON-LD
+                    if (variants.length === 0 && rawOffers.length > 1) {
+                      options = [{ name: 'Option', position: 1, values: rawOffers.map((off: any, idx: number) => off.name || off.title || `Option ${idx + 1}`) }];
+                      variants = rawOffers.map((off: any, idx: number) => {
+                        const vPrice = String(off.price || off.lowPrice || '0.00').replace(/[^0-9.]/g, '');
+                        const vTitle = off.name || off.title || (off.itemOffered?.name) || `Option ${idx + 1}`;
+                        const inStock = off.Availability ? off.Availability.includes('InStock') : true;
+
+                        return {
+                          id: off.sku || `${handle}-${idx + 1}`,
+                          title: vTitle,
+                          price: vPrice,
+                          compare_at_price: '',
+                          sku: off.sku || prodObj.sku || '',
+                          grams: 0,
+                          inventory_quantity: inStock ? 100 : 0,
+                          requires_shipping: true,
+                          taxable: true,
+                          option1: vTitle
+                        };
+                      });
+                    }
+
+                    // 4. Default single variant fallback
+                    if (variants.length === 0) {
+                      const offer = rawOffers[0];
+                      const price = String(offer?.price || offer?.lowPrice || '0.00').replace(/[^0-9.]/g, '');
+                      const inStock = offer?.Availability ? offer.Availability.includes('InStock') : true;
+
+                      variants = [{
                         id: prodObj.sku || `${handle}-1`,
                         title: 'Default Title',
                         price,
@@ -534,7 +614,21 @@ export async function GET(request: Request) {
                         inventory_quantity: inStock ? 100 : 0,
                         requires_shipping: true,
                         taxable: true
-                      }],
+                      }];
+                    }
+
+                    return {
+                      id: prodObj.sku || handle,
+                      title: prodObj.name || '',
+                      handle,
+                      body_html: desc,
+                      vendor: prodObj.brand?.name || rawOffers[0]?.seller?.name || domain.replace(/^https?:\/\/(www\.)?/i, '').split('/')[0],
+                      product_type: 'General',
+                      tags: 'wix-import',
+                      categories: [],
+                      published_at: new Date().toISOString(),
+                      options,
+                      variants,
                       images
                     };
                   }
