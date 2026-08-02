@@ -7,7 +7,7 @@ import { auth } from '@/lib/firebase';
 
 
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, sendPasswordResetEmail, signOut } from 'firebase/auth';
-import { Terminal, Lock, Mail, LogIn, CheckCircle, Clock, ShieldAlert, XCircle, RefreshCw, ShieldCheck, Sparkles, Activity } from 'lucide-react';
+import { Terminal, Lock, Mail, LogIn, CheckCircle, Clock, ShieldAlert, XCircle, RefreshCw, ShieldCheck, Sparkles, Activity, UserX } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
@@ -158,7 +158,7 @@ export default function LoginPage() {
         initial={{ opacity: 0, y: 25, scale: 0.96 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ type: 'spring', stiffness: 200, damping: 20, delay: 0.15 }}
-        className={`w-full transition-all duration-300 ${statusNotice === 'pending' ? 'max-w-lg border-green-500/30 shadow-[0_0_60px_rgba(34,197,94,0.18)] bg-[#030712]/90' : 'max-w-md border-glass-border bg-gray-900/40'} backdrop-blur-3xl border rounded-3xl p-8 sm:p-10 relative z-10 shadow-2xl overflow-hidden`}
+        className={`w-full transition-all duration-300 ${statusNotice === 'pending' ? 'max-w-lg border-green-500/30 shadow-[0_0_60px_rgba(34,197,94,0.18)] bg-[#030712]/90' : statusNotice === 'rejected' || statusNotice === 'suspended' ? 'max-w-lg border-red-500/30 shadow-[0_0_60px_rgba(239,68,68,0.18)] bg-[#030712]/90' : 'max-w-md border-glass-border bg-gray-900/40'} backdrop-blur-3xl border rounded-3xl p-8 sm:p-10 relative z-10 shadow-2xl overflow-hidden`}
       >
         {statusNotice === 'pending' ? (
           <div className="flex flex-col items-center text-center relative z-10">
@@ -242,21 +242,83 @@ export default function LoginPage() {
             </div>
           </div>
         ) : statusNotice === 'rejected' ? (
-          <div className="flex flex-col items-center text-center">
-            <div className="w-16 h-16 rounded-2xl bg-red-500/10 border border-red-500/30 flex items-center justify-center mb-5 shadow-[0_0_25px_rgba(239,68,68,0.2)]">
-              <XCircle className="w-8 h-8 text-red-500" />
+          <div className="flex flex-col items-center text-center relative z-10">
+            {/* Ambient Background Glows inside Card */}
+            <div className="absolute -top-16 -left-16 w-56 h-56 bg-red-500/10 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute -bottom-16 -right-16 w-56 h-56 bg-rose-500/10 rounded-full blur-3xl pointer-events-none" />
+
+            {/* Status Beacon Badge */}
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-red-500/10 border border-red-500/30 text-red-400 text-[10px] font-extrabold uppercase font-mono tracking-widest mb-6 shadow-[0_0_20px_rgba(239,68,68,0.25)]">
+              <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
+              <span>Registration Request Declined</span>
             </div>
-            <h2 className="text-xl font-bold text-white tracking-wide uppercase font-mono mb-2">Registration Declined</h2>
-            <p className="text-gray-300 text-xs leading-relaxed mb-6 bg-red-500/5 border border-red-500/20 p-4 rounded-xl">
-              Your account request was declined by an Administrator. Please contact your team lead or system admin if you believe this is an error.
+
+            {/* Glowing Emblem with Orbital Ring Effect */}
+            <div className="relative mb-6">
+              <div className="absolute -inset-3 rounded-full bg-gradient-to-r from-red-500 to-rose-500 opacity-25 blur-xl animate-pulse" />
+              <div className="w-20 h-20 rounded-3xl bg-gradient-to-b from-gray-900 via-gray-950 to-black border border-red-500/40 flex items-center justify-center relative shadow-[0_0_35px_rgba(239,68,68,0.3)]">
+                <UserX className="w-9 h-9 text-red-500 stroke-[1.75]" />
+              </div>
+            </div>
+
+            {/* Luxury Headline & Subtitle */}
+            <h2 className="text-2xl sm:text-3xl font-black text-white tracking-widest uppercase font-mono mb-1 bg-gradient-to-r from-red-200 via-red-400 to-rose-500 bg-clip-text text-transparent">
+              Access Declined
+            </h2>
+            <p className="text-gray-400 text-xs tracking-widest uppercase font-mono mb-6 flex items-center gap-1.5 justify-center">
+              <ShieldAlert className="w-3.5 h-3.5 text-red-500" /> Code Commandos Security Protocol
             </p>
-            <button
-              type="button"
-              onClick={() => setStatusNotice(null)}
-              className="w-full bg-white/10 hover:bg-white/20 text-white font-semibold rounded-xl py-2.5 text-xs transition-all cursor-pointer"
-            >
-              Back to Sign In
-            </button>
+
+            {/* Premium Narrative Box */}
+            <div className="w-full bg-black/60 border border-red-500/20 p-5 sm:p-6 rounded-2xl text-left space-y-3.5 mb-6 shadow-2xl relative overflow-hidden backdrop-blur-md">
+              <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-red-500 via-rose-400 to-red-600" />
+              
+              <div className="flex items-center justify-between text-red-400 font-extrabold text-xs uppercase font-mono tracking-wider">
+                <span className="flex items-center gap-2">
+                  <XCircle className="w-4 h-4" /> Registration Rejected
+                </span>
+                <span className="text-[10px] text-gray-500 font-mono">STATUS: 403 FORBIDDEN</span>
+              </div>
+              
+              <p className="text-gray-300 text-xs sm:text-sm leading-relaxed font-sans font-medium">
+                Your account registration request for <strong className="text-white font-semibold">Code Commandos Hub</strong> was reviewed and declined by a system Administrator.
+              </p>
+              
+              <p className="text-gray-400 text-xs leading-relaxed font-sans">
+                Access clearance to workspace modules and team tools has not been authorized. If you believe this decision was made in error or need assistance, please contact your team Lead or Administrator.
+              </p>
+
+              <div className="pt-3 border-t border-white/10 grid grid-cols-2 gap-3 text-[10px] font-mono">
+                <div className="bg-white/5 p-2.5 rounded-xl border border-white/5">
+                  <span className="text-gray-500 block uppercase">Review Result</span>
+                  <span className="text-red-400 font-bold text-xs block mt-0.5">Declined</span>
+                </div>
+                <div className="bg-white/5 p-2.5 rounded-xl border border-white/5">
+                  <span className="text-gray-500 block uppercase">Authorization</span>
+                  <span className="text-red-400 font-bold text-xs block mt-0.5">Restricted Access</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="w-full space-y-3">
+              <button
+                type="button"
+                onClick={() => {
+                  if (typeof window !== 'undefined') window.location.href = '/login';
+                }}
+                className="w-full bg-red-600 hover:bg-red-500 text-white font-black rounded-xl py-3.5 text-xs uppercase tracking-widest shadow-[0_0_25px_rgba(239,68,68,0.35)] transition-all flex items-center justify-center gap-2 cursor-pointer font-mono active:scale-[0.99]"
+              >
+                <RefreshCw className="w-4 h-4" /> Re-Check Clearance Status
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatusNotice(null)}
+                className="w-full bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white border border-glass-border rounded-xl py-2.5 text-xs font-semibold tracking-wide transition-all cursor-pointer font-mono"
+              >
+                Return to Sign In
+              </button>
+            </div>
           </div>
         ) : statusNotice === 'suspended' ? (
           <div className="flex flex-col items-center text-center">
