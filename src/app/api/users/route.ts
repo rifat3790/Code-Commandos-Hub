@@ -22,13 +22,21 @@ export async function POST(req: Request) {
       lastLoginAt: new Date()
     };
 
-    if (email === 'mdrifayethossen@gmail.com') {
+    if (email === 'mdrifayethossen@gmail.com' || email === 'refayethossenmd@gmail.com') {
       updateData.role = 'super_admin';
+      updateData.status = 'approved';
+    }
+
+    if (body.createdByAdmin || body.status === 'approved') {
+      updateData.status = 'approved';
     }
 
     const setOnInsertData: any = {};
     if (!updateData.role) {
       setOnInsertData.role = 'user';
+    }
+    if (!updateData.status) {
+      setOnInsertData.status = 'pending';
     }
 
     const updateOps: any = { $set: updateData };

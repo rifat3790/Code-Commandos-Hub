@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { ShieldAlert, Check, X, Database, Phone, Video, Palette, Type, Square, Calendar, Sparkles, Trash2, Shield, User as UserIcon } from 'lucide-react';
+import { ShieldAlert, Check, X, Database, Phone, Video, Palette, Type, Square, Calendar, Sparkles, Trash2, Shield, User as UserIcon, Clock, UserCheck, UserX, AlertTriangle, Filter } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useWorkspaceStore } from '@/store/workspaceStore';
 import { useCall } from '@/context/CallContext';
@@ -20,7 +20,8 @@ export default function AdminDashboard() {
   const { startCall } = useCall();
   const router = useRouter();
   
-  const [activeTab, setActiveTab] = useState<'pending' | 'shopify' | 'users' | 'menus' | 'storage' | 'active-users' | 'styles' | 'usage' | 'super-console'>('pending');
+  const [activeTab, setActiveTab] = useState<'user-approvals' | 'pending' | 'shopify' | 'users' | 'menus' | 'storage' | 'active-users' | 'styles' | 'usage' | 'super-console'>('user-approvals');
+  const [userStatusFilter, setUserStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected' | 'banned'>('all');
   const [selectedUserUsage, setSelectedUserUsage] = useState<any>(null);
   const [isUsageModalOpen, setIsUsageModalOpen] = useState(false);
   
@@ -370,6 +371,30 @@ export default function AdminDashboard() {
     fetchUsers();
   };
 
+  const handleUpdateUserStatus = async (targetUserId: string, newStatus: 'pending' | 'approved' | 'rejected' | 'banned') => {
+    try {
+      if (newStatus === 'banned') {
+        await handlePromote(targetUserId, 'banned');
+        toast.success("User account banned successfully");
+        return;
+      }
+      const res = await fetch('/api/users/roles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ promoterUid: user?.uid, targetUserId, status: newStatus })
+      });
+      if (res.ok) {
+        toast.success(`User status updated to ${newStatus.toUpperCase()}`);
+        fetchUsers();
+      } else {
+        const data = await res.json();
+        toast.error(data.error || "Failed to update user status");
+      }
+    } catch (e: any) {
+      toast.error("Network error updating status");
+    }
+  };
+
   const handleDeleteUser = async (userId: string) => {
     if (!confirm("Are you sure you want to permanently delete this user from the database? This action cannot be undone.")) return;
     try {
@@ -464,7 +489,9 @@ export default function AdminDashboard() {
           firebaseUid: newFirebaseUser.uid,
           email: newFirebaseUser.email,
           name: '',
-          photoURL: ''
+          photoURL: '',
+          createdByAdmin: true,
+          status: 'approved'
         })
       });
 
@@ -502,6 +529,9 @@ export default function AdminDashboard() {
     }
   };
 
+  const pendingUsers = allUsers.filter(u => (u.status || 'approved') === 'pending');
+  const pendingUsersCount = pendingUsers.length;
+
   if (loading || !dbUser) return null;
 
   return (
@@ -510,22 +540,34 @@ export default function AdminDashboard() {
         <ShieldAlert className="w-6 h-6 text-red-500" /> Admin Dashboard
       </h1>
 
-      <div className="flex border-b border-glass-border">
+      <div className="flex border-b border-glass-border overflow-x-auto">
+        <button
+          onClick={() => setActiveTab('user-approvals')}
+          className={`px-5 py-3 text-xs uppercase font-extrabold flex items-center gap-2 transition-all shrink-0 ${activeTab === 'user-approvals' ? 'text-amber-400 border-b-2 border-amber-500' : 'text-gray-500 hover:text-white'}`}
+        >
+          <Clock className="w-3.5 h-3.5" />
+          <span>User Approvals</span>
+          {pendingUsersCount > 0 && (
+            <span className="px-1.5 py-0.5 text-[10px] bg-amber-500 text-black font-black rounded-full shadow-[0_0_8px_rgba(245,158,11,0.5)] animate-pulse">
+              {pendingUsersCount}
+            </span>
+          )}
+        </button>
         <button
           onClick={() => setActiveTab('pending')}
-          className={`px-5 py-3 text-xs uppercase font-extrabold ${activeTab === 'pending' ? 'text-green-400 border-b-2 border-green-500' : 'text-gray-500 hover:text-white'}`}
+          className={`px-5 py-3 text-xs uppercase font-extrabold shrink-0 ${activeTab === 'pending' ? 'text-green-400 border-b-2 border-green-500' : 'text-gray-500 hover:text-white'}`}
         >
           Pending Changes
         </button>
         <button
           onClick={() => setActiveTab('shopify')}
-          className={`px-5 py-3 text-xs uppercase font-extrabold ${activeTab === 'shopify' ? 'text-green-400 border-b-2 border-green-500' : 'text-gray-500 hover:text-white'}`}
+          className={`px-5 py-3 text-xs uppercase font-extrabold shrink-0 ${activeTab === 'shopify' ? 'text-green-400 border-b-2 border-green-500' : 'text-gray-500 hover:text-white'}`}
         >
           Shopify Approvals
         </button>
         <button
           onClick={() => setActiveTab('active-users')}
-          className={`px-5 py-3 text-xs uppercase font-extrabold ${activeTab === 'active-users' ? 'text-green-400 border-b-2 border-green-500' : 'text-gray-500 hover:text-white'}`}
+          className={`px-5 py-3 text-xs uppercase font-extrabold shrink-0 ${activeTab === 'active-users' ? 'text-green-400 border-b-2 border-green-500' : 'text-gray-500 hover:text-white'}`}
         >
           Active Visitors
         </button>
@@ -533,37 +575,37 @@ export default function AdminDashboard() {
           <>
             <button
               onClick={() => setActiveTab('users')}
-              className={`px-5 py-3 text-xs uppercase font-extrabold ${activeTab === 'users' ? 'text-green-400 border-b-2 border-green-500' : 'text-gray-500 hover:text-white'}`}
+              className={`px-5 py-3 text-xs uppercase font-extrabold shrink-0 ${activeTab === 'users' ? 'text-green-400 border-b-2 border-green-500' : 'text-gray-500 hover:text-white'}`}
             >
               User Roles
             </button>
             <button
               onClick={() => setActiveTab('menus')}
-              className={`px-5 py-3 text-xs uppercase font-extrabold ${activeTab === 'menus' ? 'text-green-400 border-b-2 border-green-500' : 'text-gray-500 hover:text-white'}`}
+              className={`px-5 py-3 text-xs uppercase font-extrabold shrink-0 ${activeTab === 'menus' ? 'text-green-400 border-b-2 border-green-500' : 'text-gray-500 hover:text-white'}`}
             >
               Menu Settings
             </button>
             <button
               onClick={() => setActiveTab('styles')}
-              className={`px-5 py-3 text-xs uppercase font-extrabold ${activeTab === 'styles' ? 'text-green-400 border-b-2 border-green-500' : 'text-gray-500 hover:text-white'}`}
+              className={`px-5 py-3 text-xs uppercase font-extrabold shrink-0 ${activeTab === 'styles' ? 'text-green-400 border-b-2 border-green-500' : 'text-gray-500 hover:text-white'}`}
             >
               Global Styles
             </button>
             <button
               onClick={() => setActiveTab('storage')}
-              className={`px-5 py-3 text-xs uppercase font-extrabold ${activeTab === 'storage' ? 'text-green-400 border-b-2 border-green-500' : 'text-gray-500 hover:text-white'}`}
+              className={`px-5 py-3 text-xs uppercase font-extrabold shrink-0 ${activeTab === 'storage' ? 'text-green-400 border-b-2 border-green-500' : 'text-gray-500 hover:text-white'}`}
             >
               Storage Stats
             </button>
             <button
               onClick={() => setActiveTab('usage')}
-              className={`px-5 py-3 text-xs uppercase font-extrabold ${activeTab === 'usage' ? 'text-green-400 border-b-2 border-green-500' : 'text-gray-500 hover:text-white'}`}
+              className={`px-5 py-3 text-xs uppercase font-extrabold shrink-0 ${activeTab === 'usage' ? 'text-green-400 border-b-2 border-green-500' : 'text-gray-500 hover:text-white'}`}
             >
               Usage History
             </button>
             <button
               onClick={() => setActiveTab('super-console')}
-              className={`px-5 py-3 text-xs uppercase font-extrabold ${activeTab === 'super-console' ? 'text-green-400 border-b-2 border-green-500' : 'text-gray-500 hover:text-white'}`}
+              className={`px-5 py-3 text-xs uppercase font-extrabold shrink-0 ${activeTab === 'super-console' ? 'text-green-400 border-b-2 border-green-500' : 'text-gray-500 hover:text-white'}`}
             >
               Super Console
             </button>
@@ -571,7 +613,126 @@ export default function AdminDashboard() {
         )}
       </div>
 
-      {activeTab === 'pending' ? (
+      {activeTab === 'user-approvals' ? (
+        <div className="space-y-6">
+          {/* User Approval Statistics */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-[#0a0f1d]/50 border border-amber-500/20 rounded-xl p-4 flex flex-col justify-between shadow-lg relative overflow-hidden group">
+              <div className="absolute top-0 left-0 w-full h-[2px] bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)] animate-pulse" />
+              <span className="text-[10px] font-mono text-amber-400 uppercase tracking-widest block mb-1">Pending Approval</span>
+              <div className="flex items-baseline justify-between mt-2">
+                <span className="text-2xl font-black font-mono text-amber-400 leading-none">{pendingUsersCount}</span>
+                <span className="text-[9px] bg-amber-500/10 text-amber-400 px-1.5 py-0.5 rounded font-bold uppercase">Requires Action</span>
+              </div>
+            </div>
+
+            <div className="bg-[#0a0f1d]/50 border border-glass-border rounded-xl p-4 flex flex-col justify-between shadow-lg relative overflow-hidden group">
+              <div className="absolute top-0 left-0 w-full h-[2px] bg-green-500" />
+              <span className="text-[10px] font-mono text-gray-400 uppercase tracking-widest block mb-1">Approved Users</span>
+              <div className="flex items-baseline justify-between mt-2">
+                <span className="text-2xl font-black font-mono text-green-400 leading-none">{allUsers.filter(u => (!u.status || u.status === 'approved') && u.role !== 'banned').length}</span>
+                <span className="text-[9px] bg-green-500/10 text-green-400 px-1.5 py-0.5 rounded font-bold uppercase">Active</span>
+              </div>
+            </div>
+
+            <div className="bg-[#0a0f1d]/50 border border-glass-border rounded-xl p-4 flex flex-col justify-between shadow-lg relative overflow-hidden group">
+              <div className="absolute top-0 left-0 w-full h-[2px] bg-red-500" />
+              <span className="text-[10px] font-mono text-gray-400 uppercase tracking-widest block mb-1">Declined Requests</span>
+              <div className="flex items-baseline justify-between mt-2">
+                <span className="text-2xl font-black font-mono text-red-400 leading-none">{allUsers.filter(u => u.status === 'rejected').length}</span>
+                <span className="text-[9px] bg-red-500/10 text-red-400 px-1.5 py-0.5 rounded font-bold uppercase">Rejected</span>
+              </div>
+            </div>
+
+            <div className="bg-[#0a0f1d]/50 border border-glass-border rounded-xl p-4 flex flex-col justify-between shadow-lg relative overflow-hidden group">
+              <div className="absolute top-0 left-0 w-full h-[2px] bg-purple-500" />
+              <span className="text-[10px] font-mono text-gray-400 uppercase tracking-widest block mb-1">Total Accounts</span>
+              <div className="flex items-baseline justify-between mt-2">
+                <span className="text-2xl font-black font-mono text-white leading-none">{allUsers.length}</span>
+                <span className="text-[9px] bg-purple-500/10 text-purple-400 px-1.5 py-0.5 rounded font-bold uppercase">Database</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Pending Requests List */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-white font-extrabold text-sm uppercase tracking-wider font-mono flex items-center gap-2">
+                <Clock className="w-4 h-4 text-amber-400" /> Pending Approval Queue ({pendingUsersCount})
+              </h2>
+            </div>
+
+            {pendingUsers.length === 0 ? (
+              <div className="p-8 bg-gray-900/60 border border-glass-border rounded-2xl text-center space-y-3">
+                <div className="w-12 h-12 rounded-full bg-green-500/10 text-green-400 flex items-center justify-center mx-auto border border-green-500/20">
+                  <UserCheck className="w-6 h-6" />
+                </div>
+                <h3 className="text-white font-bold text-sm">All caught up!</h3>
+                <p className="text-gray-400 text-xs">There are currently no pending user registration requests requiring approval.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {pendingUsers.map((u) => {
+                  const initials = (u.name || u.email || 'U').substring(0, 2).toUpperCase();
+                  return (
+                    <div key={u._id} className="p-5 bg-gray-900 border border-amber-500/30 rounded-2xl flex flex-col justify-between space-y-4 shadow-xl relative overflow-hidden group">
+                      <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-600 animate-pulse" />
+                      
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 rounded-2xl border-2 border-amber-500 text-amber-400 bg-amber-500/10 shadow-[0_0_15px_rgba(245,158,11,0.2)] flex items-center justify-center font-black font-mono text-sm shrink-0">
+                            {initials}
+                          </div>
+                          <div className="min-w-0">
+                            <h3 className="font-extrabold text-white text-sm truncate leading-tight">{u.email}</h3>
+                            <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                              {u.name && <span className="text-[10px] text-gray-300 font-bold px-2 py-0.5 rounded bg-white/5 border border-white/5">{u.name}</span>}
+                              {u.teamName && <span className="text-[10px] text-purple-400 font-bold px-2 py-0.5 rounded bg-purple-500/5 border border-purple-500/10 uppercase tracking-wider">Team: {u.teamName}</span>}
+                              {u.phoneNumber && <span className="text-[10px] text-gray-400 font-mono px-2 py-0.5 rounded bg-white/5">{u.phoneNumber}</span>}
+                            </div>
+                            <p className="text-[10px] text-gray-500 font-mono mt-1">Requested: {new Date(u.createdAt).toLocaleString()}</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Approval Action Controls */}
+                      <div className="pt-3 border-t border-white/10 flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] text-gray-400 font-mono uppercase font-bold">Role:</span>
+                          <select
+                            value={u.role || 'user'}
+                            onChange={(e) => handlePromote(u._id, e.target.value)}
+                            className="bg-[#030712] border border-glass-border rounded-lg px-2 py-1 text-xs text-white outline-none focus:border-amber-500 font-extrabold font-mono cursor-pointer"
+                          >
+                            <option value="user">User</option>
+                            <option value="admin">Admin</option>
+                            <option value="super_admin">Super Admin</option>
+                          </select>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleUpdateUserStatus(u._id, 'rejected')}
+                            className="px-3 py-1.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 text-xs font-extrabold uppercase flex items-center gap-1.5 transition-all cursor-pointer"
+                          >
+                            <UserX className="w-3.5 h-3.5" /> Decline
+                          </button>
+                          <button
+                            onClick={() => handleUpdateUserStatus(u._id, 'approved')}
+                            className="px-4 py-1.5 rounded-xl bg-green-500 hover:bg-green-400 text-black text-xs font-black uppercase tracking-wider flex items-center gap-1.5 shadow-[0_0_15px_rgba(34,197,94,0.3)] transition-all cursor-pointer"
+                          >
+                            <UserCheck className="w-4 h-4" /> Accept User
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      ) : activeTab === 'pending' ? (
         <div className="space-y-4">
           {pendingChanges.length === 0 ? (
             <p className="text-gray-500 text-sm">No pending changes awaiting approval.</p>
@@ -730,18 +891,55 @@ export default function AdminDashboard() {
               </form>
             </div>
           )}
+          {/* Status Filter Tabs */}
+          <div className="flex items-center gap-2 border-b border-white/5 pb-3 overflow-x-auto">
+            <span className="text-[10px] font-mono text-gray-500 uppercase tracking-wider flex items-center gap-1 mr-2 shrink-0">
+              <Filter className="w-3 h-3" /> Status Filter:
+            </span>
+            {(['all', 'approved', 'pending', 'rejected', 'banned'] as const).map(st => (
+              <button
+                key={st}
+                onClick={() => setUserStatusFilter(st)}
+                className={`px-3 py-1 rounded-lg text-[10px] font-extrabold uppercase font-mono transition-all cursor-pointer shrink-0 ${
+                  userStatusFilter === st
+                    ? st === 'pending' ? 'bg-amber-500 text-black shadow-[0_0_10px_rgba(245,158,11,0.4)]'
+                      : st === 'approved' ? 'bg-green-500 text-black shadow-[0_0_10px_rgba(34,197,94,0.4)]'
+                      : st === 'rejected' ? 'bg-red-500 text-white'
+                      : st === 'banned' ? 'bg-red-800 text-white'
+                      : 'bg-white text-black'
+                    : 'bg-white/5 text-gray-400 hover:text-white border border-white/5'
+                }`}
+              >
+                {st}
+              </button>
+            ))}
+          </div>
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {allUsers
-              .filter(u => 
-                u.email?.toLowerCase().includes(userSearch.toLowerCase()) || 
-                u.name?.toLowerCase().includes(userSearch.toLowerCase()) ||
-                u.teamName?.toLowerCase().includes(userSearch.toLowerCase())
-              )
+              .filter(u => {
+                const matchesSearch = u.email?.toLowerCase().includes(userSearch.toLowerCase()) || 
+                  u.name?.toLowerCase().includes(userSearch.toLowerCase()) ||
+                  u.teamName?.toLowerCase().includes(userSearch.toLowerCase());
+                const uStatus = u.status || 'approved';
+                if (userStatusFilter === 'all') return matchesSearch;
+                if (userStatusFilter === 'banned') return matchesSearch && u.role === 'banned';
+                return matchesSearch && uStatus === userStatusFilter;
+              })
               .map((u) => {
                 const initials = (u.name || u.email || 'U').substring(0, 2).toUpperCase();
                 const isSuperAdmin = u.role === 'super_admin';
                 const isAdmin = u.role === 'admin';
                 const isBanned = u.role === 'banned';
+
+                const currentStatus = isBanned ? 'banned' : (u.status || 'approved');
+                const statusBadgeStyle = currentStatus === 'approved'
+                  ? 'bg-green-500/10 border-green-500/20 text-green-400'
+                  : currentStatus === 'pending'
+                  ? 'bg-amber-500/10 border-amber-500/20 text-amber-400 animate-pulse'
+                  : currentStatus === 'rejected'
+                  ? 'bg-red-500/10 border-red-500/20 text-red-400'
+                  : 'bg-red-950 border-red-800 text-red-500';
 
                 const avatarStyle = isSuperAdmin 
                   ? 'border-yellow-500 text-yellow-400 bg-yellow-500/10 shadow-[0_0_12px_rgba(234,179,8,0.25)]' 
@@ -775,6 +973,7 @@ export default function AdminDashboard() {
                           <div className="flex flex-wrap items-center gap-2 mt-1.5">
                             {u.name && <span className="text-[10px] text-gray-300 font-bold px-2 py-0.5 rounded bg-white/5 border border-white/5">{u.name}</span>}
                             {u.teamName && <span className="text-[10px] text-purple-400 font-bold px-2 py-0.5 rounded bg-purple-500/5 border border-purple-500/10 uppercase tracking-wider">Team: {u.teamName}</span>}
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase tracking-wider font-mono ${statusBadgeStyle}`}>{currentStatus}</span>
                           </div>
                         </div>
                       </div>
@@ -789,19 +988,34 @@ export default function AdminDashboard() {
                       </button>
                     </div>
 
-                    {/* Interactive Role Switcher Pill */}
-                    <div className="flex items-center justify-between bg-black/40 border border-glass-border p-2.5 rounded-xl text-xs">
-                      <span className="text-[10px] text-gray-500 font-bold font-mono uppercase">User Classification</span>
-                      <select
-                        value={u.role}
-                        onChange={(e) => handlePromote(u._id, e.target.value)}
-                        className="bg-[#030712] border border-glass-border rounded-lg px-2.5 py-1 text-xs text-white outline-none focus:border-green-500 cursor-pointer font-extrabold uppercase font-mono shadow-md"
-                      >
-                        <option value="user">User</option>
-                        <option value="admin">Admin</option>
-                        <option value="super_admin">Super Admin</option>
-                        <option value="banned">Banned</option>
-                      </select>
+                    {/* Interactive Role & Status Switcher Pills */}
+                    <div className="grid grid-cols-2 gap-2 bg-black/40 border border-glass-border p-2.5 rounded-xl text-xs">
+                      <div>
+                        <span className="text-[9px] text-gray-500 font-bold font-mono uppercase block mb-1">Role Classification</span>
+                        <select
+                          value={u.role}
+                          onChange={(e) => handlePromote(u._id, e.target.value)}
+                          className="w-full bg-[#030712] border border-glass-border rounded-lg px-2 py-1 text-xs text-white outline-none focus:border-green-500 cursor-pointer font-extrabold uppercase font-mono"
+                        >
+                          <option value="user">User</option>
+                          <option value="admin">Admin</option>
+                          <option value="super_admin">Super Admin</option>
+                          <option value="banned">Banned</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <span className="text-[9px] text-gray-500 font-bold font-mono uppercase block mb-1">Approval Status</span>
+                        <select
+                          value={u.status || 'approved'}
+                          onChange={(e) => handleUpdateUserStatus(u._id, e.target.value as any)}
+                          className="w-full bg-[#030712] border border-glass-border rounded-lg px-2 py-1 text-xs text-white outline-none focus:border-green-500 cursor-pointer font-extrabold uppercase font-mono"
+                        >
+                          <option value="approved">Approved</option>
+                          <option value="pending">Pending</option>
+                          <option value="rejected">Rejected</option>
+                        </select>
+                      </div>
                     </div>
 
                     {/* Permissions Grid Matrix */}

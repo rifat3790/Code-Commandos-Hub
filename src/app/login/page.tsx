@@ -7,12 +7,13 @@ import { auth } from '@/lib/firebase';
 
 
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, sendPasswordResetEmail } from 'firebase/auth';
-import { Terminal, Lock, Mail, LogIn, CheckCircle } from 'lucide-react';
+import { Terminal, Lock, Mail, LogIn, CheckCircle, Clock, ShieldAlert, XCircle, RefreshCw } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
   const [isRegistering, setIsRegistering] = useState(false);
   const [isForgotPassword, setIsForgotPassword] = useState(false);
+  const [statusNotice, setStatusNotice] = useState<'pending' | 'rejected' | 'suspended' | null>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [teamName, setTeamName] = useState('');
@@ -21,6 +22,16 @@ export default function LoginPage() {
   const [successMessage, setSuccessMessage] = useState('');
   const [showSuccess, setShowSuccess] = useState(false);
   const router = useRouter();
+
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const err = params.get('error');
+      if (err === 'pending_approval') setStatusNotice('pending');
+      else if (err === 'account_rejected') setStatusNotice('rejected');
+      else if (err === 'account_suspended') setStatusNotice('suspended');
+    }
+  }, []);
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -101,7 +112,67 @@ export default function LoginPage() {
         transition={{ type: 'spring', stiffness: 200, damping: 20, delay: 0.15 }}
         className="w-full max-w-md bg-gray-900/40 backdrop-blur-2xl border border-glass-border rounded-2xl p-8 relative z-10 shadow-2xl"
       >
-        {isForgotPassword ? (
+        {statusNotice === 'pending' ? (
+          <div className="flex flex-col items-center text-center">
+            <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center mb-5 shadow-[0_0_25px_rgba(245,158,11,0.2)]">
+              <Clock className="w-8 h-8 text-amber-400 animate-pulse" />
+            </div>
+            <h2 className="text-xl font-bold text-white tracking-wide uppercase font-mono mb-2">Account Pending Approval</h2>
+            <p className="text-gray-300 text-xs leading-relaxed mb-6 bg-amber-500/5 border border-amber-500/20 p-4 rounded-xl">
+              Your registration request has been submitted and is currently awaiting Administrator approval. Once approved by an Admin, you will be able to access Code Commandos Hub.
+            </p>
+            <div className="w-full space-y-3">
+              <button
+                type="button"
+                onClick={() => window.location.href = '/login'}
+                className="w-full bg-amber-500 hover:bg-amber-400 text-black font-extrabold rounded-xl py-2.5 text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <RefreshCw className="w-4 h-4" /> Check Approval Status
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatusNotice(null)}
+                className="w-full bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white rounded-xl py-2.5 text-xs font-semibold transition-all cursor-pointer"
+              >
+                Back to Sign In
+              </button>
+            </div>
+          </div>
+        ) : statusNotice === 'rejected' ? (
+          <div className="flex flex-col items-center text-center">
+            <div className="w-16 h-16 rounded-2xl bg-red-500/10 border border-red-500/30 flex items-center justify-center mb-5 shadow-[0_0_25px_rgba(239,68,68,0.2)]">
+              <XCircle className="w-8 h-8 text-red-500" />
+            </div>
+            <h2 className="text-xl font-bold text-white tracking-wide uppercase font-mono mb-2">Registration Declined</h2>
+            <p className="text-gray-300 text-xs leading-relaxed mb-6 bg-red-500/5 border border-red-500/20 p-4 rounded-xl">
+              Your account request was declined by an Administrator. Please contact your team lead or system admin if you believe this is an error.
+            </p>
+            <button
+              type="button"
+              onClick={() => setStatusNotice(null)}
+              className="w-full bg-white/10 hover:bg-white/20 text-white font-semibold rounded-xl py-2.5 text-xs transition-all cursor-pointer"
+            >
+              Back to Sign In
+            </button>
+          </div>
+        ) : statusNotice === 'suspended' ? (
+          <div className="flex flex-col items-center text-center">
+            <div className="w-16 h-16 rounded-2xl bg-red-500/10 border border-red-500/30 flex items-center justify-center mb-5 shadow-[0_0_25px_rgba(239,68,68,0.2)]">
+              <ShieldAlert className="w-8 h-8 text-red-500" />
+            </div>
+            <h2 className="text-xl font-bold text-white tracking-wide uppercase font-mono mb-2">Account Suspended</h2>
+            <p className="text-gray-300 text-xs leading-relaxed mb-6 bg-red-500/5 border border-red-500/20 p-4 rounded-xl">
+              Your account has been suspended by an Administrator. Access to Code Commandos Hub has been restricted.
+            </p>
+            <button
+              type="button"
+              onClick={() => setStatusNotice(null)}
+              className="w-full bg-white/10 hover:bg-white/20 text-white font-semibold rounded-xl py-2.5 text-xs transition-all cursor-pointer"
+            >
+              Back to Sign In
+            </button>
+          </div>
+        ) : isForgotPassword ? (
           <div>
             <div className="flex flex-col items-center mb-8">
               <div className="w-16 h-16 rounded-2xl bg-green-500/10 border border-green-500/30 flex items-center justify-center mb-4 glow-green">

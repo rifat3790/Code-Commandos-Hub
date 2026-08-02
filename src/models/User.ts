@@ -9,6 +9,7 @@ export interface IUser extends Document {
   photoURL?: string;
   skills?: string[];
   role: 'super_admin' | 'admin' | 'user' | 'banned';
+  status?: 'pending' | 'approved' | 'rejected';
   callingAllowed?: boolean;
   showWorkloadMetrics?: boolean;
   canViewWorkspaceMonthlyTarget?: boolean;
@@ -38,6 +39,7 @@ const UserSchema: Schema = new Schema({
   photoURL: { type: String },
   skills: { type: [String], default: [] },
   role: { type: String, enum: ['super_admin', 'admin', 'user', 'banned'], default: 'user' },
+  status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
   callingAllowed: { type: Boolean, default: true },
   showWorkloadMetrics: { type: Boolean, default: false },
   canViewWorkspaceMonthlyTarget: { type: Boolean, default: false },

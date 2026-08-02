@@ -63,11 +63,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const res = await fetch(`/api/users/me?uid=${currentUser.uid}`);
           const data = await res.json();
           if (data.success) {
+            const userStatus = data.user.status || 'approved';
             if (data.user.role === 'banned') {
               localStorage.removeItem('cached_db_user');
               await signOut(auth);
               setDbUser(null);
               router.push('/login?error=account_suspended');
+            } else if (userStatus === 'pending') {
+              localStorage.removeItem('cached_db_user');
+              await signOut(auth);
+              setDbUser(null);
+              router.push('/login?error=pending_approval');
+            } else if (userStatus === 'rejected') {
+              localStorage.removeItem('cached_db_user');
+              await signOut(auth);
+              setDbUser(null);
+              router.push('/login?error=account_rejected');
             } else {
               setDbUser(data.user);
               localStorage.setItem('cached_db_user', JSON.stringify(data.user));

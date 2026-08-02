@@ -16,7 +16,7 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const { promoterUid, targetUserId, newRole, callingAllowed, allowedMenus, showWorkloadMetrics, canViewWorkspaceMonthlyTarget, canViewWorkspaceTeamDelivery } = await req.json();
+    const { promoterUid, targetUserId, newRole, status, callingAllowed, allowedMenus, showWorkloadMetrics, canViewWorkspaceMonthlyTarget, canViewWorkspaceTeamDelivery } = await req.json();
 
     if (!promoterUid || !targetUserId) {
       return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });
@@ -30,6 +30,12 @@ export async function POST(req: Request) {
     }
 
     const updateObj: any = {};
+    if (status !== undefined) {
+      if (!['pending', 'approved', 'rejected'].includes(status)) {
+        return NextResponse.json({ error: 'Invalid status value' }, { status: 400 });
+      }
+      updateObj.status = status;
+    }
     if (newRole) {
       if (promoter.role !== 'super_admin' && promoter.email !== 'refayethossenmd@gmail.com') {
         return NextResponse.json({ error: 'Only super_admin can change roles' }, { status: 403 });
