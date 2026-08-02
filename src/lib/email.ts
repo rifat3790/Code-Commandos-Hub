@@ -2,22 +2,10 @@ import nodemailer from 'nodemailer';
 
 export async function sendResetCodeEmail(toEmail: string, code: string) {
   try {
-    // Configure Nodemailer Transport
-    // Uses environment variables or fallback SMTP config
     const smtpHost = process.env.SMTP_HOST || 'smtp.gmail.com';
     const smtpPort = parseInt(process.env.SMTP_PORT || '587');
-    const smtpUser = process.env.SMTP_USER || process.env.GMAIL_USER || 'mdrifayethossen@gmail.com';
-    const smtpPass = process.env.SMTP_PASS || process.env.GMAIL_APP_PASSWORD || '';
-
-    const transporter = nodemailer.createTransport({
-      host: smtpHost,
-      port: smtpPort,
-      secure: smtpPort === 465,
-      auth: smtpPass ? {
-        user: smtpUser,
-        pass: smtpPass
-      } : undefined
-    });
+    const smtpUser = process.env.GMAIL_USER || process.env.SMTP_USER || 'mdrifayethossen@gmail.com';
+    const smtpPass = process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASS || '';
 
     const htmlContent = `
       <!DOCTYPE html>
@@ -71,10 +59,20 @@ export async function sendResetCodeEmail(toEmail: string, code: string) {
       </html>
     `;
 
-    if (!smtpPass && process.env.NODE_ENV === 'development') {
-      console.log(`[DEVELOPMENT MAIL LOG] Code for ${toEmail}: ${code}`);
-      return { success: true, mode: 'log' };
+    if (!smtpPass) {
+      console.warn(`[GMAIL SMTP WARNING] GMAIL_APP_PASSWORD is missing in .env.local. Code ${code} is saved in Admin Panel for ${toEmail}.`);
+      return { success: false, reason: 'NO_APP_PASSWORD', code };
     }
+
+    const transporter = nodemailer.createTransport({
+      host: smtpHost,
+      port: smtpPort,
+      secure: smtpPort === 465,
+      auth: {
+        user: smtpUser,
+        pass: smtpPass
+      }
+    });
 
     const info = await transporter.sendMail({
       from: `"Code Commandos Security" <${smtpUser}>`,
@@ -83,10 +81,10 @@ export async function sendResetCodeEmail(toEmail: string, code: string) {
       html: htmlContent
     });
 
-    console.log(`Email successfully sent to ${toEmail}:`, info.messageId);
+    console.log(`[GMAIL SENT] Successfully sent code ${code} to ${toEmail}:`, info.messageId);
     return { success: true, messageId: info.messageId };
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error sending reset email via Nodemailer:', error);
-    return { success: false, error };
+    return { success: false, error: error?.message || error };
   }
 }
