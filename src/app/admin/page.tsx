@@ -20,7 +20,7 @@ export default function AdminDashboard() {
   const { startCall } = useCall();
   const router = useRouter();
   
-  const [activeTab, setActiveTab] = useState<'user-approvals' | 'pending' | 'shopify' | 'users' | 'menus' | 'storage' | 'active-users' | 'styles' | 'usage' | 'super-console'>('user-approvals');
+  const [activeTab, setActiveTab] = useState<'user-approvals' | 'declined-approvals' | 'pending' | 'shopify' | 'users' | 'menus' | 'storage' | 'active-users' | 'styles' | 'usage' | 'super-console'>('user-approvals');
   const [userStatusFilter, setUserStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected' | 'banned'>('all');
   const [selectedUserUsage, setSelectedUserUsage] = useState<any>(null);
   const [isUsageModalOpen, setIsUsageModalOpen] = useState(false);
@@ -329,7 +329,7 @@ export default function AdminDashboard() {
       const tickInterval = setInterval(() => setVisitorTick(t => t + 1), 1000);
       return () => { clearInterval(interval); clearInterval(tickInterval); };
     }
-    if (activeTab === 'usage' || activeTab === 'users') {
+    if (activeTab === 'usage' || activeTab === 'users' || activeTab === 'user-approvals' || activeTab === 'declined-approvals') {
       fetchUsers();
     }
   }, [activeTab, user]);
@@ -531,6 +531,8 @@ export default function AdminDashboard() {
 
   const pendingUsers = allUsers.filter(u => (u.status || 'approved') === 'pending');
   const pendingUsersCount = pendingUsers.length;
+  const rejectedUsers = allUsers.filter(u => u.status === 'rejected');
+  const rejectedUsersCount = rejectedUsers.length;
 
   if (loading || !dbUser) return null;
 
@@ -550,6 +552,18 @@ export default function AdminDashboard() {
           {pendingUsersCount > 0 && (
             <span className="px-1.5 py-0.5 text-[10px] bg-green-500 text-black font-black rounded-full shadow-[0_0_8px_rgba(34,197,94,0.5)] animate-pulse">
               {pendingUsersCount}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => setActiveTab('declined-approvals')}
+          className={`px-5 py-3 text-xs uppercase font-extrabold flex items-center gap-2 transition-all shrink-0 ${activeTab === 'declined-approvals' ? 'text-red-400 border-b-2 border-red-500' : 'text-gray-500 hover:text-white'}`}
+        >
+          <UserX className="w-3.5 h-3.5" />
+          <span>Declined Approvals</span>
+          {rejectedUsersCount > 0 && (
+            <span className="px-1.5 py-0.5 text-[10px] bg-red-500 text-white font-black rounded-full shadow-[0_0_8px_rgba(239,68,68,0.5)]">
+              {rejectedUsersCount}
             </span>
           )}
         </button>
@@ -613,7 +627,118 @@ export default function AdminDashboard() {
         )}
       </div>
 
-      {activeTab === 'user-approvals' ? (
+      {activeTab === 'declined-approvals' ? (
+        <div className="space-y-6">
+          {/* Declined Approval Statistics */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-[#0a0f1d]/50 border border-red-500/20 rounded-xl p-4 flex flex-col justify-between shadow-lg relative overflow-hidden group">
+              <div className="absolute top-0 left-0 w-full h-[2px] bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)] animate-pulse" />
+              <span className="text-[10px] font-mono text-red-400 uppercase tracking-widest block mb-1">Declined Requests</span>
+              <div className="flex items-baseline justify-between mt-2">
+                <span className="text-2xl font-black font-mono text-red-400 leading-none">{rejectedUsersCount}</span>
+                <span className="text-[9px] bg-red-500/10 text-red-400 px-1.5 py-0.5 rounded font-bold uppercase">Restricted</span>
+              </div>
+            </div>
+
+            <div className="bg-[#0a0f1d]/50 border border-glass-border rounded-xl p-4 flex flex-col justify-between shadow-lg relative overflow-hidden group">
+              <div className="absolute top-0 left-0 w-full h-[2px] bg-green-500" />
+              <span className="text-[10px] font-mono text-gray-400 uppercase tracking-widest block mb-1">Pending Approval</span>
+              <div className="flex items-baseline justify-between mt-2">
+                <span className="text-2xl font-black font-mono text-green-400 leading-none">{pendingUsersCount}</span>
+                <span className="text-[9px] bg-green-500/10 text-green-400 px-1.5 py-0.5 rounded font-bold uppercase">In Queue</span>
+              </div>
+            </div>
+
+            <div className="bg-[#0a0f1d]/50 border border-glass-border rounded-xl p-4 flex flex-col justify-between shadow-lg relative overflow-hidden group">
+              <div className="absolute top-0 left-0 w-full h-[2px] bg-emerald-500" />
+              <span className="text-[10px] font-mono text-gray-400 uppercase tracking-widest block mb-1">Approved Users</span>
+              <div className="flex items-baseline justify-between mt-2">
+                <span className="text-2xl font-black font-mono text-emerald-400 leading-none">{allUsers.filter(u => (!u.status || u.status === 'approved') && u.role !== 'banned').length}</span>
+                <span className="text-[9px] bg-emerald-500/10 text-emerald-400 px-1.5 py-0.5 rounded font-bold uppercase">Active</span>
+              </div>
+            </div>
+
+            <div className="bg-[#0a0f1d]/50 border border-glass-border rounded-xl p-4 flex flex-col justify-between shadow-lg relative overflow-hidden group">
+              <div className="absolute top-0 left-0 w-full h-[2px] bg-purple-500" />
+              <span className="text-[10px] font-mono text-gray-400 uppercase tracking-widest block mb-1">Total Accounts</span>
+              <div className="flex items-baseline justify-between mt-2">
+                <span className="text-2xl font-black font-mono text-white leading-none">{allUsers.length}</span>
+                <span className="text-[9px] bg-purple-500/10 text-purple-400 px-1.5 py-0.5 rounded font-bold uppercase">Database</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Declined Requests List */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-white font-extrabold text-sm uppercase tracking-wider font-mono flex items-center gap-2">
+                <UserX className="w-4 h-4 text-red-500" /> Declined Registration Requests ({rejectedUsersCount})
+              </h2>
+            </div>
+
+            {rejectedUsers.length === 0 ? (
+              <div className="p-8 bg-gray-900/60 border border-glass-border rounded-2xl text-center space-y-3">
+                <div className="w-12 h-12 rounded-full bg-green-500/10 text-green-400 flex items-center justify-center mx-auto border border-green-500/20">
+                  <UserCheck className="w-6 h-6" />
+                </div>
+                <h3 className="text-white font-bold text-sm">No Declined Requests</h3>
+                <p className="text-gray-400 text-xs">There are currently no declined user accounts. All user requests are either pending or approved.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {rejectedUsers.map((u) => {
+                  const initials = (u.name || u.email || 'U').substring(0, 2).toUpperCase();
+                  return (
+                    <div key={u._id} className="p-5 bg-gray-900 border border-red-500/30 rounded-2xl flex flex-col justify-between space-y-4 shadow-xl relative overflow-hidden group">
+                      <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-red-500 via-rose-400 to-red-600 animate-pulse" />
+                      
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 rounded-2xl border-2 border-red-500 text-red-400 bg-red-500/10 shadow-[0_0_15px_rgba(239,68,68,0.2)] flex items-center justify-center font-black font-mono text-sm shrink-0">
+                            {initials}
+                          </div>
+                          <div className="min-w-0">
+                            <h3 className="font-extrabold text-white text-sm truncate leading-tight">{u.email}</h3>
+                            <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                              {u.name && <span className="text-[10px] text-gray-300 font-bold px-2 py-0.5 rounded bg-white/5 border border-white/5">{u.name}</span>}
+                              {u.teamName && <span className="text-[10px] text-purple-400 font-bold px-2 py-0.5 rounded bg-purple-500/5 border border-purple-500/10 uppercase tracking-wider">Team: {u.teamName}</span>}
+                              <span className="text-[10px] bg-red-500/10 text-red-400 border border-red-500/20 px-2 py-0.5 rounded font-bold uppercase font-mono">DECLINED</span>
+                            </div>
+                            <p className="text-[10px] text-gray-500 font-mono mt-1">Requested: {new Date(u.createdAt).toLocaleString()}</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Re-approval Action Controls */}
+                      <div className="pt-3 border-t border-white/10 flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] text-gray-400 font-mono uppercase font-bold">Role:</span>
+                          <select
+                            value={u.role || 'user'}
+                            onChange={(e) => handlePromote(u._id, e.target.value)}
+                            className="bg-[#030712] border border-glass-border rounded-lg px-2 py-1 text-xs text-white outline-none focus:border-green-500 font-extrabold font-mono cursor-pointer"
+                          >
+                            <option value="user">User</option>
+                            <option value="admin">Admin</option>
+                            <option value="super_admin">Super Admin</option>
+                          </select>
+                        </div>
+
+                        <button
+                          onClick={() => handleUpdateUserStatus(u._id, 'approved')}
+                          className="px-4 py-1.5 rounded-xl bg-green-500 hover:bg-green-400 text-black text-xs font-black uppercase tracking-wider flex items-center gap-1.5 shadow-[0_0_15px_rgba(34,197,94,0.3)] transition-all cursor-pointer"
+                        >
+                          <UserCheck className="w-4 h-4" /> Re-Approve & Grant Access
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      ) : activeTab === 'user-approvals' ? (
         <div className="space-y-6">
           {/* User Approval Statistics */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
