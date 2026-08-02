@@ -158,41 +158,41 @@ export default function LoginPage() {
         initial={{ opacity: 0, y: 25, scale: 0.96 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ type: 'spring', stiffness: 200, damping: 20, delay: 0.15 }}
-        className={`w-full transition-all duration-300 ${statusNotice === 'pending' ? 'max-w-lg border-amber-500/30 shadow-[0_0_50px_rgba(245,158,11,0.15)] bg-[#070c18]/80' : 'max-w-md border-glass-border bg-gray-900/40'} backdrop-blur-3xl border rounded-3xl p-8 sm:p-10 relative z-10 shadow-2xl overflow-hidden`}
+        className={`w-full transition-all duration-300 ${statusNotice === 'pending' ? 'max-w-lg border-green-500/30 shadow-[0_0_60px_rgba(34,197,94,0.18)] bg-[#030712]/90' : 'max-w-md border-glass-border bg-gray-900/40'} backdrop-blur-3xl border rounded-3xl p-8 sm:p-10 relative z-10 shadow-2xl overflow-hidden`}
       >
         {statusNotice === 'pending' ? (
           <div className="flex flex-col items-center text-center relative z-10">
             {/* Ambient Background Glows inside Card */}
-            <div className="absolute -top-16 -left-16 w-56 h-56 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
-            <div className="absolute -bottom-16 -right-16 w-56 h-56 bg-yellow-500/10 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute -top-16 -left-16 w-56 h-56 bg-green-500/10 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute -bottom-16 -right-16 w-56 h-56 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
 
             {/* Status Beacon Badge */}
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-[10px] font-extrabold uppercase font-mono tracking-widest mb-6 shadow-[0_0_20px_rgba(245,158,11,0.25)]">
-              <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-green-500/10 border border-green-500/30 text-green-400 text-[10px] font-extrabold uppercase font-mono tracking-widest mb-6 shadow-[0_0_20px_rgba(34,197,94,0.25)]">
+              <span className="w-2 h-2 rounded-full bg-green-400 animate-ping" />
               <span>Awaiting Administrator Clearance</span>
             </div>
 
             {/* Glowing Emblem with Orbital Ring Effect */}
             <div className="relative mb-6">
-              <div className="absolute -inset-3 rounded-full bg-gradient-to-r from-amber-500 to-yellow-400 opacity-20 blur-xl animate-pulse" />
-              <div className="w-20 h-20 rounded-3xl bg-gradient-to-b from-gray-900 via-gray-950 to-black border border-amber-500/40 flex items-center justify-center relative shadow-[0_0_35px_rgba(245,158,11,0.3)]">
-                <Clock className="w-9 h-9 text-amber-400 stroke-[1.75]" />
+              <div className="absolute -inset-3 rounded-full bg-gradient-to-r from-green-500 to-emerald-400 opacity-25 blur-xl animate-pulse" />
+              <div className="w-20 h-20 rounded-3xl bg-gradient-to-b from-gray-900 via-gray-950 to-black border border-green-500/40 flex items-center justify-center relative shadow-[0_0_35px_rgba(34,197,94,0.3)]">
+                <Clock className="w-9 h-9 text-green-400 stroke-[1.75]" />
               </div>
             </div>
 
             {/* Luxury Headline & Subtitle */}
-            <h2 className="text-2xl sm:text-3xl font-black text-white tracking-widest uppercase font-mono mb-1 bg-gradient-to-r from-amber-200 via-amber-400 to-yellow-500 bg-clip-text text-transparent">
+            <h2 className="text-2xl sm:text-3xl font-black text-white tracking-widest uppercase font-mono mb-1 bg-gradient-to-r from-green-200 via-green-400 to-emerald-400 bg-clip-text text-transparent">
               Verification Pending
             </h2>
             <p className="text-gray-400 text-xs tracking-widest uppercase font-mono mb-6 flex items-center gap-1.5 justify-center">
-              <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-pulse" /> Code Commandos Security Clearance
+              <Sparkles className="w-3.5 h-3.5 text-green-400 animate-pulse" /> Code Commandos Security Clearance
             </p>
 
             {/* Premium Narrative Box */}
-            <div className="w-full bg-black/60 border border-amber-500/20 p-5 sm:p-6 rounded-2xl text-left space-y-3.5 mb-6 shadow-2xl relative overflow-hidden backdrop-blur-md">
-              <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-600" />
+            <div className="w-full bg-black/60 border border-green-500/20 p-5 sm:p-6 rounded-2xl text-left space-y-3.5 mb-6 shadow-2xl relative overflow-hidden backdrop-blur-md">
+              <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-green-500 via-emerald-400 to-green-600" />
               
-              <div className="flex items-center justify-between text-amber-400 font-extrabold text-xs uppercase font-mono tracking-wider">
+              <div className="flex items-center justify-between text-green-400 font-extrabold text-xs uppercase font-mono tracking-wider">
                 <span className="flex items-center gap-2">
                   <ShieldCheck className="w-4 h-4" /> Account Under Review
                 </span>
@@ -210,7 +210,7 @@ export default function LoginPage() {
               <div className="pt-3 border-t border-white/10 grid grid-cols-2 gap-3 text-[10px] font-mono">
                 <div className="bg-white/5 p-2.5 rounded-xl border border-white/5">
                   <span className="text-gray-500 block uppercase">Review Status</span>
-                  <span className="text-amber-400 font-bold text-xs flex items-center gap-1 mt-0.5">
+                  <span className="text-green-400 font-bold text-xs flex items-center gap-1 mt-0.5">
                     <Activity className="w-3 h-3 animate-spin" /> Pending Approval
                   </span>
                 </div>
@@ -228,7 +228,7 @@ export default function LoginPage() {
                 onClick={() => {
                   if (typeof window !== 'undefined') window.location.href = '/login';
                 }}
-                className="w-full bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-black font-black rounded-xl py-3.5 text-xs uppercase tracking-widest shadow-[0_0_25px_rgba(245,158,11,0.35)] transition-all flex items-center justify-center gap-2 cursor-pointer font-mono active:scale-[0.99]"
+                className="w-full bg-green-500 hover:bg-green-400 text-black font-black rounded-xl py-3.5 text-xs uppercase tracking-widest shadow-[0_0_25px_rgba(34,197,94,0.4)] transition-all flex items-center justify-center gap-2 cursor-pointer font-mono active:scale-[0.99]"
               >
                 <RefreshCw className="w-4 h-4" /> Re-Check Clearance Status
               </button>

@@ -543,12 +543,12 @@ export default function AdminDashboard() {
       <div className="flex border-b border-glass-border overflow-x-auto">
         <button
           onClick={() => setActiveTab('user-approvals')}
-          className={`px-5 py-3 text-xs uppercase font-extrabold flex items-center gap-2 transition-all shrink-0 ${activeTab === 'user-approvals' ? 'text-amber-400 border-b-2 border-amber-500' : 'text-gray-500 hover:text-white'}`}
+          className={`px-5 py-3 text-xs uppercase font-extrabold flex items-center gap-2 transition-all shrink-0 ${activeTab === 'user-approvals' ? 'text-green-400 border-b-2 border-green-500' : 'text-gray-500 hover:text-white'}`}
         >
           <Clock className="w-3.5 h-3.5" />
           <span>User Approvals</span>
           {pendingUsersCount > 0 && (
-            <span className="px-1.5 py-0.5 text-[10px] bg-amber-500 text-black font-black rounded-full shadow-[0_0_8px_rgba(245,158,11,0.5)] animate-pulse">
+            <span className="px-1.5 py-0.5 text-[10px] bg-green-500 text-black font-black rounded-full shadow-[0_0_8px_rgba(34,197,94,0.5)] animate-pulse">
               {pendingUsersCount}
             </span>
           )}
@@ -617,21 +617,21 @@ export default function AdminDashboard() {
         <div className="space-y-6">
           {/* User Approval Statistics */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="bg-[#0a0f1d]/50 border border-amber-500/20 rounded-xl p-4 flex flex-col justify-between shadow-lg relative overflow-hidden group">
-              <div className="absolute top-0 left-0 w-full h-[2px] bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)] animate-pulse" />
-              <span className="text-[10px] font-mono text-amber-400 uppercase tracking-widest block mb-1">Pending Approval</span>
+            <div className="bg-[#0a0f1d]/50 border border-green-500/20 rounded-xl p-4 flex flex-col justify-between shadow-lg relative overflow-hidden group">
+              <div className="absolute top-0 left-0 w-full h-[2px] bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)] animate-pulse" />
+              <span className="text-[10px] font-mono text-green-400 uppercase tracking-widest block mb-1">Pending Approval</span>
               <div className="flex items-baseline justify-between mt-2">
-                <span className="text-2xl font-black font-mono text-amber-400 leading-none">{pendingUsersCount}</span>
-                <span className="text-[9px] bg-amber-500/10 text-amber-400 px-1.5 py-0.5 rounded font-bold uppercase">Requires Action</span>
+                <span className="text-2xl font-black font-mono text-green-400 leading-none">{pendingUsersCount}</span>
+                <span className="text-[9px] bg-green-500/10 text-green-400 px-1.5 py-0.5 rounded font-bold uppercase">Requires Action</span>
               </div>
             </div>
 
             <div className="bg-[#0a0f1d]/50 border border-glass-border rounded-xl p-4 flex flex-col justify-between shadow-lg relative overflow-hidden group">
-              <div className="absolute top-0 left-0 w-full h-[2px] bg-green-500" />
+              <div className="absolute top-0 left-0 w-full h-[2px] bg-emerald-500" />
               <span className="text-[10px] font-mono text-gray-400 uppercase tracking-widest block mb-1">Approved Users</span>
               <div className="flex items-baseline justify-between mt-2">
-                <span className="text-2xl font-black font-mono text-green-400 leading-none">{allUsers.filter(u => (!u.status || u.status === 'approved') && u.role !== 'banned').length}</span>
-                <span className="text-[9px] bg-green-500/10 text-green-400 px-1.5 py-0.5 rounded font-bold uppercase">Active</span>
+                <span className="text-2xl font-black font-mono text-emerald-400 leading-none">{allUsers.filter(u => (!u.status || u.status === 'approved') && u.role !== 'banned').length}</span>
+                <span className="text-[9px] bg-emerald-500/10 text-emerald-400 px-1.5 py-0.5 rounded font-bold uppercase">Active</span>
               </div>
             </div>
 
@@ -658,7 +658,7 @@ export default function AdminDashboard() {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-white font-extrabold text-sm uppercase tracking-wider font-mono flex items-center gap-2">
-                <Clock className="w-4 h-4 text-amber-400" /> Pending Approval Queue ({pendingUsersCount})
+                <Clock className="w-4 h-4 text-green-400" /> Pending Approval Queue ({pendingUsersCount})
               </h2>
             </div>
 
@@ -675,12 +675,12 @@ export default function AdminDashboard() {
                 {pendingUsers.map((u) => {
                   const initials = (u.name || u.email || 'U').substring(0, 2).toUpperCase();
                   return (
-                    <div key={u._id} className="p-5 bg-gray-900 border border-amber-500/30 rounded-2xl flex flex-col justify-between space-y-4 shadow-xl relative overflow-hidden group">
-                      <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-600 animate-pulse" />
+                    <div key={u._id} className="p-5 bg-gray-900 border border-green-500/30 rounded-2xl flex flex-col justify-between space-y-4 shadow-xl relative overflow-hidden group">
+                      <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-green-500 via-emerald-400 to-green-600 animate-pulse" />
                       
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 rounded-2xl border-2 border-amber-500 text-amber-400 bg-amber-500/10 shadow-[0_0_15px_rgba(245,158,11,0.2)] flex items-center justify-center font-black font-mono text-sm shrink-0">
+                          <div className="w-12 h-12 rounded-2xl border-2 border-green-500 text-green-400 bg-green-500/10 shadow-[0_0_15px_rgba(34,197,94,0.2)] flex items-center justify-center font-black font-mono text-sm shrink-0">
                             {initials}
                           </div>
                           <div className="min-w-0">
@@ -702,7 +702,7 @@ export default function AdminDashboard() {
                           <select
                             value={u.role || 'user'}
                             onChange={(e) => handlePromote(u._id, e.target.value)}
-                            className="bg-[#030712] border border-glass-border rounded-lg px-2 py-1 text-xs text-white outline-none focus:border-amber-500 font-extrabold font-mono cursor-pointer"
+                            className="bg-[#030712] border border-glass-border rounded-lg px-2 py-1 text-xs text-white outline-none focus:border-green-500 font-extrabold font-mono cursor-pointer"
                           >
                             <option value="user">User</option>
                             <option value="admin">Admin</option>
