@@ -66,19 +66,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const userStatus = data.user.status || 'approved';
             if (data.user.role === 'banned') {
               localStorage.removeItem('cached_db_user');
-              await signOut(auth);
               setDbUser(null);
-              router.push('/login?error=account_suspended');
+              await signOut(auth);
+              if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+                window.location.href = '/login?error=account_suspended';
+              }
             } else if (userStatus === 'pending') {
               localStorage.removeItem('cached_db_user');
-              await signOut(auth);
               setDbUser(null);
-              router.push('/login?error=pending_approval');
+              await signOut(auth);
+              if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+                window.location.href = '/login?error=pending_approval';
+              }
             } else if (userStatus === 'rejected') {
               localStorage.removeItem('cached_db_user');
-              await signOut(auth);
               setDbUser(null);
-              router.push('/login?error=account_rejected');
+              await signOut(auth);
+              if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+                window.location.href = '/login?error=account_rejected';
+              }
             } else {
               setDbUser(data.user);
               localStorage.setItem('cached_db_user', JSON.stringify(data.user));

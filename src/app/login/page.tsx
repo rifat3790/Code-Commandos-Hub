@@ -6,7 +6,7 @@ import dynamic from 'next/dynamic';
 import { auth } from '@/lib/firebase';
 
 
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, sendPasswordResetEmail } from 'firebase/auth';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, sendPasswordResetEmail, signOut } from 'firebase/auth';
 import { Terminal, Lock, Mail, LogIn, CheckCircle, Clock, ShieldAlert, XCircle, RefreshCw, ShieldCheck, Sparkles, Activity } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
@@ -33,6 +33,44 @@ export default function LoginPage() {
     }
   }, []);
 
+  const checkUserStatusAndProceed = async (firebaseUid: string) => {
+    try {
+      const res = await fetch(`/api/users/me?uid=${firebaseUid}`);
+      const data = await res.json();
+      if (data.success && data.user) {
+        const userStatus = data.user.status || 'approved';
+        if (data.user.role === 'banned') {
+          await signOut(auth);
+          setStatusNotice('suspended');
+          if (typeof window !== 'undefined') {
+            window.history.replaceState(null, '', '/login?error=account_suspended');
+          }
+          return false;
+        }
+        if (userStatus === 'pending') {
+          await signOut(auth);
+          setStatusNotice('pending');
+          if (typeof window !== 'undefined') {
+            window.history.replaceState(null, '', '/login?error=pending_approval');
+          }
+          return false;
+        }
+        if (userStatus === 'rejected') {
+          await signOut(auth);
+          setStatusNotice('rejected');
+          if (typeof window !== 'undefined') {
+            window.history.replaceState(null, '', '/login?error=account_rejected');
+          }
+          return false;
+        }
+      }
+      return true;
+    } catch (err) {
+      console.error("Error verifying user approval status:", err);
+      return true;
+    }
+  };
+
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -53,23 +91,30 @@ export default function LoginPage() {
     e.preventDefault();
     setError('');
     try {
+      let uid = '';
       if (isRegistering) {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        uid = userCredential.user.uid;
         await fetch('/api/users', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            firebaseUid: userCredential.user.uid,
+            firebaseUid: uid,
             email: email,
             teamName: teamName,
             phoneNumber: phoneNumber
           })
         });
       } else {
-        await signInWithEmailAndPassword(auth, email, password);
+        const userCredential = await signInWithEmailAndPassword(auth, email, password);
+        uid = userCredential.user.uid;
       }
-      setShowSuccess(true);
-      setTimeout(() => router.push('/'), 1500);
+
+      const isApproved = await checkUserStatusAndProceed(uid);
+      if (isApproved) {
+        setShowSuccess(true);
+        setTimeout(() => router.push('/'), 1500);
+      }
     } catch (err: any) {
       setError(err.message || 'Authentication failed');
     }
@@ -91,8 +136,11 @@ export default function LoginPage() {
         })
       });
       
-      setShowSuccess(true);
-      setTimeout(() => router.push('/'), 1500);
+      const isApproved = await checkUserStatusAndProceed(userCredential.user.uid);
+      if (isApproved) {
+        setShowSuccess(true);
+        setTimeout(() => router.push('/'), 1500);
+      }
     } catch (err: any) {
       setError(err.message || 'Google authentication failed');
     }
