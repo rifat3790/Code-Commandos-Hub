@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import connectDB from '@/lib/mongodb';
 import User from '@/models/User';
 import PasswordReset from '@/models/PasswordReset';
+import { sendResetCodeEmail } from '@/lib/email';
 
 export async function POST(req: Request) {
   try {
@@ -30,7 +31,7 @@ export async function POST(req: Request) {
     // Delete existing reset codes for this email
     await PasswordReset.deleteMany({ email: normalizedEmail });
 
-    // Store new code
+    // Store new code in MongoDB (Synced to Admin Panel)
     await PasswordReset.create({
       email: normalizedEmail,
       code,
@@ -38,9 +39,12 @@ export async function POST(req: Request) {
       used: false
     });
 
+    // Dispatch 6-digit OTP email to Gmail
+    await sendResetCodeEmail(normalizedEmail, code);
+
     return NextResponse.json({
       success: true,
-      message: 'A 6-digit verification code has been generated and synced to email & Admin Panel.',
+      message: 'A 6-digit verification code has been generated and dispatched to your email & Admin Panel.',
       email: normalizedEmail,
       expiresInMinutes: 15
     });
