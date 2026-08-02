@@ -31,7 +31,7 @@ export async function sendResetCodeEmail(toEmail: string, code: string) {
           </div>
 
           <!-- Code Box -->
-          <div style="background: #000000; border: 1px solid rgba(34, 197, 94, 0.4); border-radius: 16px; padding: 24px; text-align: center; margin-bottom: 24px; box-shadow: 0 0 25px rgba(34, 197, 94, 0.2);">
+          <div style="background: #000000; border: 1px solid rgba(34, 197, 94, 0.4); border-radius: 16px; padding: 24px; text-align: center; margin-bottom: 24px; shadow: 0 0 25px rgba(34, 197, 94, 0.2);">
             <div style="font-size: 11px; color: #9ca3af; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 12px;">
               YOUR 6-DIGIT VERIFICATION CODE
             </div>
@@ -60,7 +60,7 @@ export async function sendResetCodeEmail(toEmail: string, code: string) {
     `;
 
     if (!smtpPass) {
-      console.warn(`[GMAIL SMTP WARNING] GMAIL_APP_PASSWORD is missing in .env.local. Code ${code} is saved in Admin Panel for ${toEmail}.`);
+      console.warn(`[SMTP NOTICE] GMAIL_APP_PASSWORD not set in environment. Code ${code} is saved in Admin Panel for ${toEmail}.`);
       return { success: false, reason: 'NO_APP_PASSWORD', code };
     }
 
