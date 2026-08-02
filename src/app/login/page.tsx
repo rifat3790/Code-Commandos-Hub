@@ -7,13 +7,25 @@ import { auth } from '@/lib/firebase';
 
 
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, sendPasswordResetEmail, signOut } from 'firebase/auth';
-import { Terminal, Lock, Mail, LogIn, CheckCircle, Clock, ShieldAlert, XCircle, RefreshCw, ShieldCheck, Sparkles, Activity, UserX } from 'lucide-react';
+import { Terminal, Lock, Mail, LogIn, CheckCircle, Clock, ShieldAlert, XCircle, RefreshCw, ShieldCheck, Sparkles, Activity, UserX, KeyRound, Eye, EyeOff, Check, ArrowLeft } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
   const [isRegistering, setIsRegistering] = useState(false);
   const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [statusNotice, setStatusNotice] = useState<'pending' | 'rejected' | 'suspended' | null>(null);
+  
+  // Multi-step OTP Password Reset State
+  const [resetStep, setResetStep] = useState<'email' | 'code' | 'password' | 'success'>('email');
+  const [resetEmail, setResetEmail] = useState('');
+  const [otpDigits, setOtpDigits] = useState<string[]>(['', '', '', '', '', '']);
+  const [verifiedCode, setVerifiedCode] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [isResetLoading, setIsResetLoading] = useState(false);
+  const [otpTimer, setOtpTimer] = useState(900);
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [teamName, setTeamName] = useState('');
@@ -22,6 +34,40 @@ export default function LoginPage() {
   const [successMessage, setSuccessMessage] = useState('');
   const [showSuccess, setShowSuccess] = useState(false);
   const router = useRouter();
+
+  const handleOtpChange = (index: number, value: string) => {
+    if (value.length > 1) {
+      const pasted = value.replace(/\D/g, '').slice(0, 6);
+      if (pasted.length > 0) {
+        const newOtp = [...otpDigits];
+        for (let i = 0; i < 6; i++) {
+          newOtp[i] = pasted[i] || '';
+        }
+        setOtpDigits(newOtp);
+        const nextIdx = Math.min(pasted.length, 5);
+        const el = document.getElementById(`otp-input-${nextIdx}`);
+        if (el) el.focus();
+      }
+      return;
+    }
+
+    const cleanVal = value.replace(/\D/g, '');
+    const newOtp = [...otpDigits];
+    newOtp[index] = cleanVal;
+    setOtpDigits(newOtp);
+
+    if (cleanVal && index < 5) {
+      const el = document.getElementById(`otp-input-${index + 1}`);
+      if (el) el.focus();
+    }
+  };
+
+  const handleOtpKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Backspace' && !otpDigits[index] && index > 0) {
+      const el = document.getElementById(`otp-input-${index - 1}`);
+      if (el) el.focus();
+    }
+  };
 
   React.useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -339,61 +385,344 @@ export default function LoginPage() {
           </div>
         ) : isForgotPassword ? (
           <div>
-            <div className="flex flex-col items-center mb-8">
-              <div className="w-16 h-16 rounded-2xl bg-green-500/10 border border-green-500/30 flex items-center justify-center mb-4 glow-green">
-                <Terminal className="w-8 h-8 text-green-500" />
-              </div>
-              <h1 className="text-2xl font-bold text-white tracking-wide">RESET PASSWORD</h1>
-              <p className="text-gray-400 text-sm mt-2 text-center">Receive a password recovery email</p>
-            </div>
-
-            {error && (
-              <div className="mb-6 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-sm rounded-lg text-center">
-                {error}
-              </div>
-            )}
-
-            {successMessage && (
-              <div className="mb-6 p-3 bg-green-500/10 border border-green-500/20 text-green-400 text-sm rounded-lg text-center font-medium">
-                {successMessage}
-              </div>
-            )}
-
-            <form onSubmit={handleResetPassword} className="space-y-4">
+            {/* Step 1: Request Email */}
+            {resetStep === 'email' && (
               <div>
-                <label className="block text-xs font-medium text-gray-400 mb-1.5 ml-1">Email Address</label>
-                <div className="relative">
-                  <Mail className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
-                  <input 
-                    type="email" 
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="w-full bg-gray-950/50 border border-glass-border rounded-xl py-2.5 pl-10 pr-4 text-white focus:outline-none focus:border-green-500/50 focus:ring-1 focus:ring-green-500/50 transition-all placeholder:text-gray-600"
-                    placeholder="developer@example.com"
-                    required
-                  />
+                <div className="flex flex-col items-center mb-6">
+                  <div className="w-16 h-16 rounded-2xl bg-green-500/10 border border-green-500/30 flex items-center justify-center mb-4 shadow-[0_0_25px_rgba(34,197,94,0.2)]">
+                    <KeyRound className="w-8 h-8 text-green-400" />
+                  </div>
+                  <h1 className="text-2xl font-black text-white tracking-widest uppercase font-mono">Reset Password</h1>
+                  <p className="text-gray-400 text-xs mt-1.5 text-center font-mono">Generate a 6-digit verification code synced to your email & Admin Panel</p>
+                </div>
+
+                {error && (
+                  <div className="mb-5 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-xl text-center font-medium">
+                    {error}
+                  </div>
+                )}
+
+                <form onSubmit={async (e) => {
+                  e.preventDefault();
+                  setError('');
+                  if (!email.trim()) {
+                    setError('Please enter your registered email address.');
+                    return;
+                  }
+                  setIsResetLoading(true);
+                  try {
+                    const res = await fetch('/api/auth/forgot-password', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ email: email.trim() })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                      setResetEmail(email.trim());
+                      setResetStep('code');
+                      setOtpTimer(900);
+                      try { await sendPasswordResetEmail(auth, email.trim()); } catch(e){}
+                    } else {
+                      setError(data.message || 'Failed to generate reset code.');
+                    }
+                  } catch (err: any) {
+                    setError('Network error. Please try again.');
+                  } finally {
+                    setIsResetLoading(false);
+                  }
+                }} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-mono text-gray-400 mb-1.5 ml-1 uppercase">Account Email</label>
+                    <div className="relative">
+                      <Mail className="w-5 h-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500" />
+                      <input 
+                        type="email" 
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className="w-full bg-black/60 border border-glass-border rounded-xl py-3 pl-11 pr-4 text-white focus:outline-none focus:border-green-500 font-mono text-sm placeholder:text-gray-600"
+                        placeholder="your-email@domain.com"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <button 
+                    type="submit"
+                    disabled={isResetLoading}
+                    className="w-full bg-green-500 hover:bg-green-400 text-black font-black rounded-xl py-3.5 text-xs uppercase tracking-widest shadow-[0_0_25px_rgba(34,197,94,0.35)] transition-all flex items-center justify-center gap-2 cursor-pointer font-mono active:scale-[0.99]"
+                  >
+                    {isResetLoading ? (
+                      <Activity className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <KeyRound className="w-4 h-4" />
+                    )}
+                    <span>Generate 6-Digit Verification Code</span>
+                  </button>
+
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      setIsForgotPassword(false);
+                      setResetStep('email');
+                      setError('');
+                    }}
+                    className="w-full text-gray-400 hover:text-white text-xs font-mono py-2 transition-all flex items-center justify-center gap-1 cursor-pointer"
+                  >
+                    <ArrowLeft className="w-3.5 h-3.5" /> Return to Sign In
+                  </button>
+                </form>
+              </div>
+            )}
+
+            {/* Step 2: 6-Digit OTP Verification */}
+            {resetStep === 'code' && (
+              <div>
+                <div className="flex flex-col items-center mb-6">
+                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-green-500/10 border border-green-500/30 text-green-400 text-[10px] font-extrabold uppercase font-mono tracking-widest mb-3 shadow-[0_0_15px_rgba(34,197,94,0.2)]">
+                    <span className="w-2 h-2 rounded-full bg-green-400 animate-ping" />
+                    <span>Live OTP Synced with Admin Panel</span>
+                  </div>
+                  <h1 className="text-xl sm:text-2xl font-black text-white tracking-widest uppercase font-mono">Verification Code</h1>
+                  <p className="text-gray-400 text-xs mt-1 text-center font-mono">
+                    Enter the 6-digit code for <span className="text-green-400 font-bold">{resetEmail}</span>
+                  </p>
+                </div>
+
+                {error && (
+                  <div className="mb-5 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-xl text-center font-medium">
+                    {error}
+                  </div>
+                )}
+
+                <div className="space-y-6">
+                  {/* 6 Individual Cyber OTP Boxes */}
+                  <div className="flex items-center justify-center gap-2 sm:gap-2.5">
+                    {otpDigits.map((digit, index) => (
+                      <input
+                        key={index}
+                        id={`otp-input-${index}`}
+                        type="text"
+                        maxLength={6}
+                        value={digit}
+                        onChange={(e) => handleOtpChange(index, e.target.value)}
+                        onKeyDown={(e) => handleOtpKeyDown(index, e)}
+                        className="w-10 h-13 sm:w-12 sm:h-14 bg-black/70 border border-glass-border focus:border-green-500 focus:shadow-[0_0_15px_rgba(34,197,94,0.4)] rounded-xl text-center text-xl font-black font-mono text-green-400 focus:outline-none transition-all"
+                      />
+                    ))}
+                  </div>
+
+                  <div className="bg-black/50 border border-white/10 p-3.5 rounded-xl text-left space-y-1.5 font-mono text-[11px]">
+                    <div className="flex items-center justify-between text-gray-400">
+                      <span className="flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5 text-green-400" /> Code Expires In:
+                      </span>
+                      <span className="text-green-400 font-bold">14m 59s</span>
+                    </div>
+                    <p className="text-gray-500 text-[10px] leading-relaxed pt-1 border-t border-white/5">
+                      💡 <strong>Can't access your email?</strong> You can ask your System Administrator to provide your 6-digit code directly from the Admin Panel.
+                    </p>
+                  </div>
+
+                  <button 
+                    type="button"
+                    disabled={isResetLoading}
+                    onClick={async () => {
+                      const codeStr = otpDigits.join('');
+                      setError('');
+                      if (codeStr.length !== 6) {
+                        setError('Please enter all 6 digits of your verification code.');
+                        return;
+                      }
+                      setIsResetLoading(true);
+                      try {
+                        const res = await fetch('/api/auth/verify-reset-code', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ email: resetEmail, code: codeStr })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                          setVerifiedCode(codeStr);
+                          setResetStep('password');
+                        } else {
+                          setError(data.message || 'Invalid verification code.');
+                        }
+                      } catch (err) {
+                        setError('Failed to verify code.');
+                      } finally {
+                        setIsResetLoading(false);
+                      }
+                    }}
+                    className="w-full bg-green-500 hover:bg-green-400 text-black font-black rounded-xl py-3.5 text-xs uppercase tracking-widest shadow-[0_0_25px_rgba(34,197,94,0.35)] transition-all flex items-center justify-center gap-2 cursor-pointer font-mono active:scale-[0.99]"
+                  >
+                    {isResetLoading ? <Activity className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
+                    <span>Verify Code & Continue</span>
+                  </button>
+
+                  <div className="flex items-center justify-between text-xs font-mono pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setResetStep('email')}
+                      className="text-gray-400 hover:text-white transition-all cursor-pointer"
+                    >
+                      ← Change Email
+                    </button>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        setError('');
+                        setIsResetLoading(true);
+                        try {
+                          await fetch('/api/auth/forgot-password', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ email: resetEmail })
+                          });
+                          setError('New 6-digit code generated and synced!');
+                        } catch (e) {
+                          setError('Error resending code.');
+                        } finally {
+                          setIsResetLoading(false);
+                        }
+                      }}
+                      className="text-green-400 hover:underline cursor-pointer font-bold"
+                    >
+                      Resend Code
+                    </button>
+                  </div>
                 </div>
               </div>
+            )}
 
-              <button 
-                type="submit"
-                className="w-full bg-green-500 hover:bg-green-600 text-black font-semibold rounded-xl py-2.5 mt-2 transition-all flex items-center justify-center gap-2"
-              >
-                Send Recovery Email
-              </button>
+            {/* Step 3: Set New Password */}
+            {resetStep === 'password' && (
+              <div>
+                <div className="flex flex-col items-center mb-6">
+                  <div className="w-14 h-14 rounded-2xl bg-green-500/10 border border-green-500/30 flex items-center justify-center mb-3 glow-green">
+                    <Lock className="w-7 h-7 text-green-400" />
+                  </div>
+                  <h1 className="text-xl sm:text-2xl font-black text-white tracking-widest uppercase font-mono">Set New Password</h1>
+                  <p className="text-gray-400 text-xs mt-1 text-center font-mono">Verification confirmed for {resetEmail}</p>
+                </div>
 
-              <button 
-                type="button"
-                onClick={() => {
-                  setIsForgotPassword(false);
+                {error && (
+                  <div className="mb-5 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-xl text-center font-medium">
+                    {error}
+                  </div>
+                )}
+
+                <form onSubmit={async (e) => {
+                  e.preventDefault();
                   setError('');
-                  setSuccessMessage('');
-                }}
-                className="w-full bg-transparent text-gray-400 hover:text-white text-xs font-semibold py-2 transition-all block text-center"
-              >
-                Back to Sign In
-              </button>
-            </form>
+                  if (newPassword.length < 6) {
+                    setError('Password must be at least 6 characters long.');
+                    return;
+                  }
+                  if (newPassword !== confirmPassword) {
+                    setError('Passwords do not match.');
+                    return;
+                  }
+                  setIsResetLoading(true);
+                  try {
+                    const res = await fetch('/api/auth/reset-password', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        email: resetEmail,
+                        code: verifiedCode,
+                        newPassword: newPassword
+                      })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                      setResetStep('success');
+                    } else {
+                      setError(data.message || 'Failed to update password.');
+                    }
+                  } catch (err) {
+                    setError('Error updating password.');
+                  } finally {
+                    setIsResetLoading(false);
+                  }
+                }} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-mono text-gray-400 mb-1.5 ml-1 uppercase">New Password</label>
+                    <div className="relative">
+                      <Lock className="w-5 h-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500" />
+                      <input 
+                        type={showPassword ? 'text' : 'password'}
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        className="w-full bg-black/60 border border-glass-border rounded-xl py-3 pl-11 pr-11 text-white focus:outline-none focus:border-green-500 font-mono text-sm placeholder:text-gray-600"
+                        placeholder="••••••••••••"
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white"
+                      >
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-mono text-gray-400 mb-1.5 ml-1 uppercase">Confirm New Password</label>
+                    <div className="relative">
+                      <Lock className="w-5 h-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500" />
+                      <input 
+                        type={showPassword ? 'text' : 'password'}
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        className="w-full bg-black/60 border border-glass-border rounded-xl py-3 pl-11 pr-4 text-white focus:outline-none focus:border-green-500 font-mono text-sm placeholder:text-gray-600"
+                        placeholder="••••••••••••"
+                        required
+                      />
+                    </div>
+                    {confirmPassword && (
+                      <p className={`text-[10px] font-mono mt-1 ml-1 font-bold ${newPassword === confirmPassword ? 'text-green-400' : 'text-red-400'}`}>
+                        {newPassword === confirmPassword ? '✓ Passwords match verified' : '✕ Passwords do not match'}
+                      </p>
+                    )}
+                  </div>
+
+                  <button 
+                    type="submit"
+                    disabled={isResetLoading}
+                    className="w-full bg-green-500 hover:bg-green-400 text-black font-black rounded-xl py-3.5 text-xs uppercase tracking-widest shadow-[0_0_25px_rgba(34,197,94,0.35)] transition-all flex items-center justify-center gap-2 cursor-pointer font-mono active:scale-[0.99]"
+                  >
+                    {isResetLoading ? <Activity className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                    <span>Update Password & Access Account</span>
+                  </button>
+                </form>
+              </div>
+            )}
+
+            {/* Step 4: Success */}
+            {resetStep === 'success' && (
+              <div className="flex flex-col items-center text-center space-y-4">
+                <div className="w-16 h-16 rounded-3xl bg-green-500/10 border border-green-500/40 flex items-center justify-center shadow-[0_0_30px_rgba(34,197,94,0.3)]">
+                  <CheckCircle className="w-9 h-9 text-green-400" />
+                </div>
+                <h2 className="text-2xl font-black text-white tracking-widest uppercase font-mono">Password Updated</h2>
+                <p className="text-gray-300 text-xs leading-relaxed font-mono bg-green-500/5 border border-green-500/20 p-4 rounded-xl">
+                  Your account password authorization for <strong className="text-white">{resetEmail}</strong> has been updated successfully. You can now sign in with your new password.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsForgotPassword(false);
+                    setResetStep('email');
+                    setEmail(resetEmail);
+                    setError('');
+                  }}
+                  className="w-full bg-green-500 hover:bg-green-400 text-black font-black rounded-xl py-3.5 text-xs uppercase tracking-widest shadow-[0_0_25px_rgba(34,197,94,0.35)] transition-all cursor-pointer font-mono"
+                >
+                  Proceed to Sign In
+                </button>
+              </div>
+            )}
           </div>
         ) : (
           <>

@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { ShieldAlert, Check, X, Database, Phone, Video, Palette, Type, Square, Calendar, Sparkles, Trash2, Shield, User as UserIcon, Clock, UserCheck, UserX, AlertTriangle, Filter } from 'lucide-react';
+import { ShieldAlert, Check, X, Database, Phone, Video, Palette, Type, Square, Calendar, Sparkles, Trash2, Shield, User as UserIcon, Clock, UserCheck, UserX, AlertTriangle, Filter, KeyRound, Copy } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useWorkspaceStore } from '@/store/workspaceStore';
 import { useCall } from '@/context/CallContext';
@@ -20,7 +20,11 @@ export default function AdminDashboard() {
   const { startCall } = useCall();
   const router = useRouter();
   
-  const [activeTab, setActiveTab] = useState<'user-approvals' | 'declined-approvals' | 'pending' | 'shopify' | 'users' | 'menus' | 'storage' | 'active-users' | 'styles' | 'usage' | 'super-console'>('user-approvals');
+  const [activeTab, setActiveTab] = useState<'user-approvals' | 'declined-approvals' | 'reset-codes' | 'pending' | 'shopify' | 'users' | 'menus' | 'storage' | 'active-users' | 'styles' | 'usage' | 'super-console'>('user-approvals');
+  const [resetCodes, setResetCodes] = useState<any[]>([]);
+  const [manualResetEmail, setManualResetEmail] = useState('');
+  const [isGeneratingResetCode, setIsGeneratingResetCode] = useState(false);
+  const [copiedCodeId, setCopiedCodeId] = useState<string | null>(null);
   const [userStatusFilter, setUserStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected' | 'banned'>('all');
   const [selectedUserUsage, setSelectedUserUsage] = useState<any>(null);
   const [isUsageModalOpen, setIsUsageModalOpen] = useState(false);
@@ -332,7 +336,20 @@ export default function AdminDashboard() {
     if (activeTab === 'usage' || activeTab === 'users' || activeTab === 'user-approvals' || activeTab === 'declined-approvals') {
       fetchUsers();
     }
+    if (activeTab === 'reset-codes') {
+      fetchResetCodes();
+    }
   }, [activeTab, user]);
+
+  const fetchResetCodes = async () => {
+    try {
+      const res = await fetch('/api/admin/reset-codes');
+      const data = await res.json();
+      if (data.success) setResetCodes(data.codes);
+    } catch (e) {
+      console.error("Error fetching reset codes:", e);
+    }
+  };
 
   const fetchUsers = async () => {
     try {
@@ -568,6 +585,18 @@ export default function AdminDashboard() {
           )}
         </button>
         <button
+          onClick={() => setActiveTab('reset-codes')}
+          className={`px-5 py-3 text-xs uppercase font-extrabold flex items-center gap-2 transition-all shrink-0 ${activeTab === 'reset-codes' ? 'text-amber-400 border-b-2 border-amber-500' : 'text-gray-500 hover:text-white'}`}
+        >
+          <KeyRound className="w-3.5 h-3.5" />
+          <span>Reset Codes</span>
+          {resetCodes.length > 0 && (
+            <span className="px-1.5 py-0.5 text-[10px] bg-amber-500 text-black font-black rounded-full shadow-[0_0_8px_rgba(245,158,11,0.5)]">
+              {resetCodes.length}
+            </span>
+          )}
+        </button>
+        <button
           onClick={() => setActiveTab('pending')}
           className={`px-5 py-3 text-xs uppercase font-extrabold shrink-0 ${activeTab === 'pending' ? 'text-green-400 border-b-2 border-green-500' : 'text-gray-500 hover:text-white'}`}
         >
@@ -627,7 +656,147 @@ export default function AdminDashboard() {
         )}
       </div>
 
-      {activeTab === 'declined-approvals' ? (
+      {activeTab === 'reset-codes' ? (
+        <div className="space-y-6">
+          {/* Top Control Bar: Manual Emergency Code Generator */}
+          <div className="p-5 bg-[#0a0f1d]/70 border border-green-500/20 rounded-2xl shadow-xl space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="text-white font-extrabold text-sm uppercase tracking-wider font-mono flex items-center gap-2">
+                <KeyRound className="w-4 h-4 text-green-400" /> Generate Emergency Reset Code
+              </h2>
+              <span className="text-[10px] text-green-400 font-mono bg-green-500/10 border border-green-500/30 px-2 py-0.5 rounded uppercase font-bold">Admin Privileges</span>
+            </div>
+            <p className="text-gray-400 text-xs font-mono">
+              Generate an instant 6-digit OTP verification code for any user unable to access their email.
+            </p>
+
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!manualResetEmail.trim()) return;
+                setIsGeneratingResetCode(true);
+                try {
+                  const res = await fetch('/api/admin/reset-codes', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: manualResetEmail.trim() })
+                  });
+                  const data = await res.json();
+                  if (data.success) {
+                    toast.success(`Code ${data.record.code} generated!`);
+                    setManualResetEmail('');
+                    fetchResetCodes();
+                  } else {
+                    toast.error(data.message || 'Error generating code');
+                  }
+                } catch (err) {
+                  toast.error('Network error');
+                } finally {
+                  setIsGeneratingResetCode(false);
+                }
+              }}
+              className="flex flex-col sm:flex-row gap-3 pt-1"
+            >
+              <input
+                type="email"
+                value={manualResetEmail}
+                onChange={(e) => setManualResetEmail(e.target.value)}
+                placeholder="Enter user email (e.g. user@gmail.com)"
+                className="flex-1 bg-black/60 border border-glass-border rounded-xl px-3.5 py-2.5 text-xs text-white outline-none focus:border-green-500 font-mono"
+                required
+              />
+              <button
+                type="submit"
+                disabled={isGeneratingResetCode}
+                className="px-5 py-2.5 rounded-xl bg-green-500 hover:bg-green-400 text-black text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(34,197,94,0.3)] transition-all cursor-pointer font-mono shrink-0"
+              >
+                {isGeneratingResetCode ? <Sparkles className="w-4 h-4 animate-spin" /> : <KeyRound className="w-4 h-4" />}
+                Generate 6-Digit Code
+              </button>
+            </form>
+          </div>
+
+          {/* Active Codes List */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-white font-extrabold text-sm uppercase tracking-wider font-mono flex items-center gap-2">
+                <Clock className="w-4 h-4 text-amber-400" /> Active Password Reset OTP Codes ({resetCodes.length})
+              </h2>
+              <button
+                onClick={fetchResetCodes}
+                className="text-xs text-gray-400 hover:text-white font-mono flex items-center gap-1 cursor-pointer"
+              >
+                <Sparkles className="w-3.5 h-3.5" /> Refresh List
+              </button>
+            </div>
+
+            {resetCodes.length === 0 ? (
+              <div className="p-8 bg-gray-900/60 border border-glass-border rounded-2xl text-center space-y-3">
+                <div className="w-12 h-12 rounded-full bg-green-500/10 text-green-400 flex items-center justify-center mx-auto border border-green-500/20">
+                  <KeyRound className="w-6 h-6" />
+                </div>
+                <h3 className="text-white font-bold text-sm">No Active Reset Requests</h3>
+                <p className="text-gray-400 text-xs">There are currently no active 6-digit password verification codes requested by users.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {resetCodes.map((rc) => {
+                  const codeDigits = rc.code.split('');
+                  return (
+                    <div key={rc._id} className="p-5 bg-gray-900 border border-amber-500/30 rounded-2xl flex flex-col justify-between space-y-4 shadow-xl relative overflow-hidden group">
+                      <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-600 animate-pulse" />
+                      
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] text-amber-400 font-mono font-bold uppercase tracking-widest bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded">
+                            ACTIVE RESET CODE
+                          </span>
+                          <span className="text-[10px] text-gray-400 font-mono">
+                            Requested: {new Date(rc.createdAt).toLocaleTimeString()}
+                          </span>
+                        </div>
+
+                        <div>
+                          <h3 className="font-extrabold text-white text-sm truncate">{rc.email}</h3>
+                        </div>
+
+                        {/* Large 6-Digit Code Display */}
+                        <div className="bg-black/80 border border-amber-500/30 p-3 rounded-xl flex items-center justify-between">
+                          <div className="flex items-center gap-1.5 font-mono font-black text-xl text-amber-400 tracking-wider">
+                            {codeDigits.map((d: string, idx: number) => (
+                              <span key={idx} className="w-7 h-9 bg-white/5 border border-amber-500/30 rounded flex items-center justify-center">
+                                {d}
+                              </span>
+                            ))}
+                          </div>
+
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(rc.code);
+                              setCopiedCodeId(rc._id);
+                              toast.success(`Copied code ${rc.code}`);
+                              setTimeout(() => setCopiedCodeId(null), 2000);
+                            }}
+                            className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-bold font-mono flex items-center gap-1 transition-all cursor-pointer"
+                          >
+                            {copiedCodeId === rc._id ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+                            <span>{copiedCodeId === rc._id ? 'Copied' : 'Copy'}</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="pt-2 border-t border-white/10 flex items-center justify-between text-[10px] font-mono text-gray-400">
+                        <span>Expires: {new Date(rc.expiresAt).toLocaleTimeString()}</span>
+                        <span className="text-green-400 font-bold">STATUS: READY TO USE</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      ) : activeTab === 'declined-approvals' ? (
         <div className="space-y-6">
           {/* Declined Approval Statistics */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
