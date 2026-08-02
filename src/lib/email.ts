@@ -4,7 +4,7 @@ export async function sendResetCodeEmail(toEmail: string, code: string) {
   try {
     const smtpHost = process.env.SMTP_HOST || 'smtp.gmail.com';
     const smtpPort = parseInt(process.env.SMTP_PORT || '587');
-    const smtpUser = process.env.GMAIL_USER || process.env.SMTP_USER || 'mdrifayethossen@gmail.com';
+    const smtpUser = process.env.GMAIL_USER || process.env.SMTP_USER || 'rifayet.cse@gmail.com';
     const smtpPass = process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASS || '';
 
     const htmlContent = `
