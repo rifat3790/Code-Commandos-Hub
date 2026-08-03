@@ -61,9 +61,18 @@ export async function POST(req: Request) {
     }
 
     const successCount = results.filter(r => r.success).length;
+    const firstError = results.find(r => !r.success)?.error;
+
+    if (successCount === 0) {
+      return NextResponse.json({
+        success: false,
+        error: firstError || 'Failed to send message to Telegram chat(s).',
+        details: results
+      }, { status: 400 });
+    }
 
     return NextResponse.json({
-      success: successCount > 0,
+      success: true,
       deliveredCount: successCount,
       totalCount: targetIds.length,
       details: results
