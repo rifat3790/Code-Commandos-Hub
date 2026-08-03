@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import connectToDatabase from '@/lib/mongodb';
 import TelegramConfig from '@/models/TelegramConfig';
+import TimelineItem from '@/models/TimelineItem';
 
 const DEFAULT_TOKEN = '8792351236:AAEycnhs_elMuMxSyUF1E85U4h-bhaQNlwo';
 
@@ -58,7 +59,6 @@ export async function sendTelegramPhoto(
   const token = getTelegramToken();
   const url = `https://api.telegram.org/bot${token}/sendPhoto`;
 
-  // Strip data URL prefix if present
   const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
   const buffer = Buffer.from(base64Data, 'base64');
 
@@ -162,6 +162,70 @@ function getAssignNameFromRow(row: Record<string, string>): string {
   return '';
 }
 
+export async function checkAndNotifyTimelines() {
+  await connectToDatabase();
+  const config = await getOrCreateTelegramConfig();
+  const groupChatIds: string[] = config.groupChatIds || [];
+  if (groupChatIds.length === 0) return;
+
+  const rawMentions = config.userMentions;
+  const userMentionsMap: Record<string, string> = { ...DEFAULT_USER_MENTIONS };
+  if (rawMentions instanceof Map) {
+    rawMentions.forEach((val, key) => { userMentionsMap[key.toLowerCase()] = val; });
+  } else if (rawMentions && typeof rawMentions === 'object') {
+    Object.entries(rawMentions).forEach(([key, val]) => { userMentionsMap[key.toLowerCase()] = String(val); });
+  }
+
+  const runningItems = await TimelineItem.find({ status: 'running' });
+  const now = new Date().getTime();
+
+  for (const item of runningItems) {
+    const target = new Date(item.targetEndDate).getTime();
+    const hoursLeft = (target - now) / (1000 * 60 * 60);
+    const empLower = (item.memberName || '').toLowerCase();
+    const mentionTag = userMentionsMap[empLower] || `@${item.memberName}`;
+    const endDateStr = new Date(item.targetEndDate).toLocaleString();
+
+    // 72 Hours Warning (Extension advice)
+    if (hoursLeft <= 72 && hoursLeft > 48 && !item.notified72h) {
+      const msg = [
+        `⏳ <b>PROJECT TIMELINE WARNING (<= 72 Hours Left)</b> ⏳\n`,
+        `👤 <b>Client:</b> ${item.clientName}`,
+        `👥 <b>Assignee:</b> ${item.memberName} (${mentionTag})`,
+        `⏳ <b>Time Remaining:</b> ${Math.round(hoursLeft)} Hours (Target: ${endDateStr})\n`,
+        `⚠️ <i>Please check project progress and request a delivery date extension from the client if needed!</i>`
+      ].join('\n');
+
+      for (const cid of groupChatIds) {
+        try { await sendTelegramMessage(cid, msg, 'HTML'); } catch (e) {}
+      }
+
+      item.notified72h = true;
+      await item.save();
+    }
+
+    // 48 Hours Warning (Urgent Dangerous Critical Alert)
+    if (hoursLeft <= 48 && !item.notified48h) {
+      const msg = [
+        `🚨 <b>DANGER WARNING: <= 48 HOURS DEADLINE CRITICAL!</b> 🚨\n`,
+        `👤 <b>Client:</b> ${item.clientName}`,
+        `👥 <b>Assignee:</b> ${item.memberName} (${mentionTag})`,
+        `⏳ <b>Time Remaining:</b> ${Math.max(0, Math.round(hoursLeft))} Hours (Target: ${endDateStr})`,
+        `🔥 <b>URGENT:</b> Immediate action required or request delivery extension!\n`,
+        `⚠️ <i>High Priority Warning | Code Commandos Hub</i>`
+      ].join('\n');
+
+      for (const cid of groupChatIds) {
+        try { await sendTelegramMessage(cid, msg, 'HTML'); } catch (e) {}
+      }
+
+      item.notified72h = true;
+      item.notified48h = true;
+      await item.save();
+    }
+  }
+}
+
 export async function checkAndNotifyCCIssues() {
   await connectToDatabase();
   const config = await getOrCreateTelegramConfig();
@@ -197,7 +261,6 @@ export async function checkAndNotifyCCIssues() {
   const sentSlots: string[] = (config.lastSummarySentDate === todayStr) ? (config.lastSummarySlots || []) : [];
 
   if (groupChatIds.length > 0) {
-    // Check if scheduled daily alert slots (8 AM, 3 PM, 5 PM) should trigger
     if (currentHour >= 8 && currentHour < 15 && !sentSlots.includes('8am')) {
       await sendCCSummaryReport('8am');
       sentSlots.push('8am');
@@ -217,6 +280,13 @@ export async function checkAndNotifyCCIssues() {
       config.lastSummarySlots = sentSlots;
       await config.save();
     }
+  }
+
+  // Also check project timelines for 72h & 48h warnings
+  try {
+    await checkAndNotifyTimelines();
+  } catch (err) {
+    console.error('Error checking timeline warnings:', err);
   }
 
   if (groupChatIds.length === 0) {

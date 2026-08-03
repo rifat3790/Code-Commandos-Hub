@@ -25,10 +25,10 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const { clientName, memberName, projectTitle, orderId, targetEndDate, notes, createdBy } = await req.json();
+    const { clientName, memberName, projectTitle, targetEndDate, notes, createdBy } = await req.json();
 
-    if (!clientName || !memberName || !projectTitle || !targetEndDate) {
-      return NextResponse.json({ error: 'Client Name, Member Name, Project Title, and Target End Date are required.' }, { status: 400 });
+    if (!clientName || !memberName || !targetEndDate) {
+      return NextResponse.json({ error: 'Client Name, Member Name, and Target End Date are required.' }, { status: 400 });
     }
 
     await connectToDatabase();
@@ -36,11 +36,12 @@ export async function POST(req: Request) {
     const newItem = await TimelineItem.create({
       clientName: clientName.trim(),
       memberName: memberName.trim(),
-      projectTitle: projectTitle.trim(),
-      orderId: (orderId || '').trim(),
+      projectTitle: (projectTitle || '').trim(),
       targetEndDate: new Date(targetEndDate),
       status: 'running',
       notes: (notes || '').trim(),
+      notified72h: false,
+      notified48h: false,
       createdBy: (createdBy || '').trim()
     });
 
@@ -52,7 +53,7 @@ export async function POST(req: Request) {
 
 export async function PUT(req: Request) {
   try {
-    const { id, status, clientName, memberName, projectTitle, orderId, targetEndDate, notes } = await req.json();
+    const { id, status, clientName, memberName, projectTitle, targetEndDate, notes } = await req.json();
 
     if (!id) {
       return NextResponse.json({ error: 'Timeline Item ID is required.' }, { status: 400 });
@@ -80,8 +81,11 @@ export async function PUT(req: Request) {
     if (clientName !== undefined) item.clientName = clientName.trim();
     if (memberName !== undefined) item.memberName = memberName.trim();
     if (projectTitle !== undefined) item.projectTitle = projectTitle.trim();
-    if (orderId !== undefined) item.orderId = orderId.trim();
-    if (targetEndDate !== undefined) item.targetEndDate = new Date(targetEndDate);
+    if (targetEndDate !== undefined) {
+      item.targetEndDate = new Date(targetEndDate);
+      item.notified72h = false;
+      item.notified48h = false;
+    }
     if (notes !== undefined) item.notes = notes.trim();
 
     item.updatedAt = new Date();
