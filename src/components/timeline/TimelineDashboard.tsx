@@ -278,6 +278,10 @@ export default function TimelineDashboard() {
   };
 
   const handleStatusChange = async (item: ITimeline, newStatus: 'running' | 'delivered') => {
+    if (!canUserEditItem(item)) {
+      toast.error('🔒 Access Denied: You can only change status for projects created by or assigned to you.');
+      return;
+    }
     if (newStatus === 'running' && item.status === 'delivered' && !isAdmin) {
       toast.error('🔒 Access Denied: Only Admins can reopen delivered projects.');
       return;
@@ -603,12 +607,22 @@ export default function TimelineDashboard() {
 
                       <td className="py-3 px-4 whitespace-nowrap text-right space-x-2">
                         {item.status === 'running' ? (
-                          <button
-                            onClick={() => handleStatusChange(item, 'delivered')}
-                            className="px-3 py-1 bg-green-600 hover:bg-green-500 text-white text-[11px] font-bold rounded-lg transition-colors cursor-pointer"
-                          >
-                            Mark Delivered
-                          </button>
+                          canUserEditItem(item) ? (
+                            <button
+                              onClick={() => handleStatusChange(item, 'delivered')}
+                              className="px-3 py-1 bg-green-600 hover:bg-green-500 text-white text-[11px] font-bold rounded-lg transition-colors cursor-pointer"
+                            >
+                              Mark Delivered
+                            </button>
+                          ) : (
+                            <span
+                              onClick={() => toast.error('🔒 Access Denied: You can only mark delivered projects created by or assigned to you.')}
+                              className="px-2.5 py-1 bg-gray-800 text-gray-500 rounded-lg text-[10px] font-bold cursor-not-allowed border border-white/5 inline-block"
+                              title="Only creator, assignee or admin can mark delivered"
+                            >
+                              🔒 Mark Delivered
+                            </span>
+                          )
                         ) : isAdmin ? (
                           <button
                             onClick={() => handleStatusChange(item, 'running')}
@@ -714,12 +728,22 @@ export default function TimelineDashboard() {
                 </div>
 
                 {item.status === 'running' ? (
-                  <button
-                    onClick={() => handleStatusChange(item, 'delivered')}
-                    className="w-full py-2 bg-green-600 text-white font-bold text-xs uppercase rounded-xl cursor-pointer"
-                  >
-                    Mark Delivered
-                  </button>
+                  canUserEditItem(item) ? (
+                    <button
+                      onClick={() => handleStatusChange(item, 'delivered')}
+                      className="w-full py-2 bg-green-600 text-white font-bold text-xs uppercase rounded-xl cursor-pointer"
+                    >
+                      Mark Delivered
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => toast.error('🔒 Access Denied: You can only mark delivered projects created by or assigned to you.')}
+                      className="w-full py-2 bg-gray-800 text-gray-500 font-bold text-xs uppercase rounded-xl border border-white/5 cursor-not-allowed"
+                      title="Only creator, assignee or admin can mark delivered"
+                    >
+                      🔒 Mark Delivered
+                    </button>
+                  )
                 ) : isAdmin ? (
                   <button
                     onClick={() => handleStatusChange(item, 'running')}
