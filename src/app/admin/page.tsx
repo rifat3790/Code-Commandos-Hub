@@ -2,12 +2,13 @@
 
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { ShieldAlert, Check, X, Database, Phone, Video, Palette, Type, Square, Calendar, Sparkles, Trash2, Shield, User as UserIcon, Clock, UserCheck, UserX, AlertTriangle, Filter, KeyRound, Copy } from 'lucide-react';
+import { ShieldAlert, Check, X, Database, Phone, Video, Palette, Type, Square, Calendar, Sparkles, Trash2, Shield, User as UserIcon, Clock, UserCheck, UserX, AlertTriangle, Filter, KeyRound, Copy, Send, Bot } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useWorkspaceStore } from '@/store/workspaceStore';
 import { useCall } from '@/context/CallContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
+import TelegramBotTab from '@/components/admin/TelegramBotTab';
 
 const allAvailableMenus = [
   'Home', 'Workspace', 'Meetings', 'Order Tracker', 'Issues', 'Personal Projects', 'Message Helper', 'Templates', 'Schema Builder',
@@ -20,7 +21,7 @@ export default function AdminDashboard() {
   const { startCall } = useCall();
   const router = useRouter();
   
-  const [activeTab, setActiveTab] = useState<'user-approvals' | 'declined-approvals' | 'reset-codes' | 'pending' | 'shopify' | 'users' | 'menus' | 'storage' | 'active-users' | 'styles' | 'usage' | 'super-console'>('user-approvals');
+  const [activeTab, setActiveTab] = useState<'user-approvals' | 'declined-approvals' | 'reset-codes' | 'pending' | 'shopify' | 'users' | 'menus' | 'storage' | 'active-users' | 'styles' | 'usage' | 'super-console' | 'telegram'>('user-approvals');
   const [resetCodes, setResetCodes] = useState<any[]>([]);
   const [manualResetEmail, setManualResetEmail] = useState('');
   const [isGeneratingResetCode, setIsGeneratingResetCode] = useState(false);
@@ -651,6 +652,13 @@ export default function AdminDashboard() {
               className={`px-5 py-3 text-xs uppercase font-extrabold shrink-0 ${activeTab === 'super-console' ? 'text-green-400 border-b-2 border-green-500' : 'text-gray-500 hover:text-white'}`}
             >
               Super Console
+            </button>
+            <button
+              onClick={() => setActiveTab('telegram')}
+              className={`px-5 py-3 text-xs uppercase font-extrabold flex items-center gap-1.5 shrink-0 ${activeTab === 'telegram' ? 'text-blue-400 border-b-2 border-blue-500' : 'text-gray-500 hover:text-white'}`}
+            >
+              <Send className="w-3.5 h-3.5" />
+              <span>Telegram Bot</span>
             </button>
           </>
         )}
@@ -2540,6 +2548,8 @@ export default function AdminDashboard() {
             </div>
           </div>
         </div>
+      ) : activeTab === 'telegram' ? (
+        <TelegramBotTab />
       ) : null}
 
       {/* Usage History Modal – Premium Timeline */}
