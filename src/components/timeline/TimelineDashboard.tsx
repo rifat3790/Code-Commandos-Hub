@@ -106,7 +106,8 @@ function LiveCountdownText({ targetEndDate }: { targetEndDate: string }) {
 }
 
 export default function TimelineDashboard() {
-  const { user } = useAuth();
+  const { user, dbUser } = useAuth();
+  const isAdmin = Boolean(dbUser?.role === 'super_admin' || dbUser?.role === 'admin' || (user?.email && user.email.toLowerCase().includes('admin')));
   const tableRef = useRef<HTMLDivElement>(null);
 
   const [items, setItems] = useState<ITimeline[]>([]);
@@ -258,6 +259,10 @@ export default function TimelineDashboard() {
   };
 
   const handleStatusChange = async (item: ITimeline, newStatus: 'running' | 'delivered') => {
+    if (newStatus === 'running' && item.status === 'delivered' && !isAdmin) {
+      toast.error('🔒 Access Denied: Only Admins can reopen delivered projects.');
+      return;
+    }
     try {
       const res = await fetch('/api/timeline', {
         method: 'PUT',
@@ -570,13 +575,21 @@ export default function TimelineDashboard() {
                           >
                             Mark Delivered
                           </button>
-                        ) : (
+                        ) : isAdmin ? (
                           <button
                             onClick={() => handleStatusChange(item, 'running')}
                             className="px-3 py-1 bg-purple-600/30 hover:bg-purple-600/50 text-purple-300 text-[11px] font-bold rounded-lg border border-purple-500/40 transition-colors cursor-pointer"
                           >
                             Reopen
                           </button>
+                        ) : (
+                          <span
+                            onClick={() => toast.error('🔒 Only Admins can reopen delivered projects.')}
+                            className="px-2.5 py-1 bg-gray-800 text-gray-500 rounded-lg text-[10px] font-bold cursor-not-allowed border border-white/5 inline-block"
+                            title="Only Admins can reopen delivered projects"
+                          >
+                            🔒 Reopen (Admin Only)
+                          </span>
                         )}
 
                         <button
@@ -659,12 +672,20 @@ export default function TimelineDashboard() {
                   >
                     Mark Delivered
                   </button>
-                ) : (
+                ) : isAdmin ? (
                   <button
                     onClick={() => handleStatusChange(item, 'running')}
                     className="w-full py-2 bg-purple-600/30 text-purple-300 font-bold text-xs uppercase rounded-xl border border-purple-500/40 cursor-pointer"
                   >
                     Reopen
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => toast.error('🔒 Only Admins can reopen delivered projects.')}
+                    className="w-full py-2 bg-gray-800 text-gray-500 font-bold text-xs uppercase rounded-xl border border-white/5 cursor-not-allowed"
+                    title="Only Admins can reopen delivered projects"
+                  >
+                    🔒 Reopen (Admin Only)
                   </button>
                 )}
               </div>
@@ -738,13 +759,15 @@ export default function TimelineDashboard() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div>
-                    <span className="text-[10px] text-gray-400 font-bold block mb-1">Calendar Date:</span>
+                    <span className="text-[10px] text-gray-400 font-bold block mb-1">Calendar Date (Click to Open):</span>
                     <input
                       type="date"
                       required
                       value={formDate}
+                      onClick={(e) => { try { (e.target as any).showPicker?.(); } catch (err) {} }}
+                      onFocus={(e) => { try { (e.target as any).showPicker?.(); } catch (err) {} }}
                       onChange={(e) => setFormDate(e.target.value)}
-                      className="w-full px-3 py-2 bg-black/60 border border-glass-border rounded-xl text-purple-300 font-mono focus:outline-none focus:border-purple-500"
+                      className="w-full px-3 py-2 bg-black/60 border border-glass-border rounded-xl text-purple-300 font-mono focus:outline-none focus:border-purple-500 cursor-pointer"
                     />
                   </div>
 
@@ -766,7 +789,7 @@ export default function TimelineDashboard() {
                         onChange={(e) => setFormMinute(e.target.value)}
                         className="px-2.5 py-2 bg-black/60 border border-glass-border rounded-xl text-white font-mono focus:outline-none"
                       >
-                        {['00', '15', '30', '45'].map(m => (
+                        {Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0')).map(m => (
                           <option key={m} value={m}>{m}</option>
                         ))}
                       </select>
