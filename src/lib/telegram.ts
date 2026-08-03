@@ -481,8 +481,7 @@ export async function sendCCSummaryReport(slotType?: '8am' | '3pm' | '5pm' | 'co
 
   for (const [empName, issues] of Object.entries(grouped)) {
     const theme = THEMES[idx % THEMES.length];
-    const mention = userMentionsMap[empName.toLowerCase()] || `@${empName}`;
-    text += `${theme} <b>Assignee: ${empName} (${mention})</b> <i>(Total: ${issues.length})</i>\n<blockquote>`;
+    text += `${theme} <b>Assignee: ${empName}</b> <i>(Total: ${issues.length})</i>\n<blockquote>`;
 
     issues.forEach((iss, i) => {
       const clientName = iss["Client's Name"] || iss['Client Name'] || iss['Client'] || 'N/A';
