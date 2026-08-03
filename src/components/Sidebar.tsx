@@ -84,6 +84,7 @@ export default function Sidebar({ isMobileOpen = false, onCloseMobile }: Sidebar
     { name: 'Workspace', path: '/workspace', icon: LayoutDashboard },
     { name: 'Meetings', path: '/meetings', icon: Video },
     { name: 'Order Tracker', path: '/tracker', icon: LayoutDashboard },
+    { name: 'Timeline', path: '/timeline', icon: Clock },
     { name: 'Issues', path: '/issues', icon: AlertCircle },
     { name: 'Personal Projects', path: '/personal-projects', icon: FolderKanban },
     { name: 'Message Helper', path: '/message-helper', icon: ShieldAlert },

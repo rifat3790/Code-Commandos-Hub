@@ -24,6 +24,7 @@ import {
   User,
   Cpu,
   AlertCircle,
+  Clock,
   Moon,
   CloudRain,
   Volume2
@@ -143,6 +144,7 @@ export default function CommandMenu() {
     { name: 'Workspace Board', path: '/workspace', icon: Command, category: 'Navigation', shortcut: '⌘2' },
     { name: 'Meetings Room', path: '/meetings', icon: Video, category: 'Navigation', shortcut: '⌘3' },
     { name: 'Order Tracker', path: '/tracker', icon: Briefcase, category: 'Navigation', shortcut: '⌘4' },
+    { name: 'Timeline Tracker', path: '/timeline', icon: Clock, category: 'Navigation', shortcut: '⌘T' },
     { name: 'Issues Tracker', path: '/issues', icon: AlertCircle, category: 'Navigation', shortcut: '⌘I' },
     { name: 'Personal Projects', path: '/personal-projects', icon: FileCode, category: 'Navigation', shortcut: '⌘5' },
     { name: 'Team Notes', path: '/notes', icon: StickyNote, category: 'Navigation', shortcut: '⌘6' },

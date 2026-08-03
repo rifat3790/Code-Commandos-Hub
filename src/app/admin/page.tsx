@@ -11,7 +11,7 @@ import toast from 'react-hot-toast';
 import TelegramBotTab from '@/components/admin/TelegramBotTab';
 
 const allAvailableMenus = [
-  'Home', 'Workspace', 'Meetings', 'Order Tracker', 'Issues', 'Personal Projects', 'Message Helper', 'Templates', 'Schema Builder',
+  'Home', 'Workspace', 'Meetings', 'Order Tracker', 'Timeline', 'Issues', 'Personal Projects', 'Message Helper', 'Templates', 'Schema Builder',
   'Audit Suite', 'Projects', 'Mockup Studio', 'Focus Studio', 'AI Assistant', 
   'Team Notes', 'Downloads', 'Member Profile', 'Shopify Codes', 'Settings'
 ];
