@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import Papa from 'papaparse';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, CheckCircle2, FileSpreadsheet, ExternalLink, Filter, ChevronDown, Columns, Save, Download } from 'lucide-react';
+import { Search, CheckCircle2, FileSpreadsheet, ExternalLink, Filter, ChevronDown, Columns, Save, Download, Send } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import toast from 'react-hot-toast';
@@ -508,6 +508,52 @@ export default function IssuesDashboard({ csvData, activeLayout }: { csvData: st
     }
   };
 
+  const [isSendingTelegramPhoto, setIsSendingTelegramPhoto] = useState(false);
+
+  const handleSendPNGToTelegram = async () => {
+    if (!tableRef.current) return;
+    setIsSendingTelegramPhoto(true);
+    const toastId = toast.loading("Capturing & sending PNG to Telegram...");
+    try {
+      const dataUrl = await toPng(tableRef.current, { backgroundColor: '#111827' });
+
+      const memberNames = new Set<string>();
+      filteredData.forEach((r: any) => {
+        const assign = r['Assign Name'] || r['Assign Team'] || '';
+        if (/\/cc/i.test(assign)) {
+          const clean = assign.replace(/\/(cc|cm|cw)/gi, '').trim();
+          clean.split('/').forEach((n: string) => {
+            if (n.trim()) memberNames.add(n.trim());
+          });
+        }
+      });
+
+      const res = await fetch('/api/telegram/send-photo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          imageBase64: dataUrl,
+          customCaption: '📊 <b>PROJECT ISSUES SUMMARY TABLE</b>',
+          memberNames: Array.from(memberNames)
+        })
+      });
+
+      const data = await res.json();
+      toast.dismiss(toastId);
+      if (data.success) {
+        toast.success(`Photo sent to ${data.deliveredCount || 1} Telegram group(s)!`);
+      } else {
+        toast.error(data.error || 'Failed to send photo to Telegram');
+      }
+    } catch (err: any) {
+      console.error(err);
+      toast.dismiss(toastId);
+      toast.error(err.message || 'Failed to send photo');
+    } finally {
+      setIsSendingTelegramPhoto(false);
+    }
+  };
+
   const handleDownloadPNG = async () => {
     if (tableRef.current) {
       try {
@@ -656,6 +702,14 @@ export default function IssuesDashboard({ csvData, activeLayout }: { csvData: st
         />
 
         <div className="ml-auto flex gap-2">
+          <button
+            onClick={handleSendPNGToTelegram}
+            disabled={isSendingTelegramPhoto}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-semibold transition-colors border border-blue-500/50 glow-blue cursor-pointer disabled:opacity-50"
+          >
+            <Send className="w-4 h-4" />
+            {isSendingTelegramPhoto ? 'Sending...' : 'Send PNG to Telegram'}
+          </button>
           <button
             onClick={handleDownloadPNG}
             className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl text-sm font-semibold transition-colors border border-glass-border"

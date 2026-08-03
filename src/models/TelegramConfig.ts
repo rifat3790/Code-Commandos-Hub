@@ -16,6 +16,8 @@ export interface ITelegramConfig extends Document {
   notifiedIssueHashes: string[];
   autoAlertsEnabled: boolean;
   lastCheckedAt?: Date;
+  lastSummarySentDate?: string;
+  lastSummarySlots?: string[];
   notificationLogs: INotificationLog[];
   updatedAt: Date;
 }
@@ -42,6 +44,8 @@ const TelegramConfigSchema: Schema = new Schema({
   notifiedIssueHashes: { type: [String], default: [] },
   autoAlertsEnabled: { type: Boolean, default: true },
   lastCheckedAt: { type: Date },
+  lastSummarySentDate: { type: String, default: '' },
+  lastSummarySlots: { type: [String], default: [] },
   notificationLogs: [
     {
       timestamp: { type: Date, default: Date.now },

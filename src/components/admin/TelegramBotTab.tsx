@@ -280,6 +280,66 @@ export default function TelegramBotTab() {
           </div>
         </div>
 
+        {/* Scheduled Daily Alert Manual Triggers */}
+        <div className="pt-3 border-t border-white/5 space-y-2">
+          <div className="text-[11px] font-bold text-gray-300 uppercase tracking-wider">
+            Daily Scheduled Reports Manual Triggers (8 AM, 3 PM, 5 PM BD Time):
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => {
+                fetch('/api/telegram/send', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ isSummaryReport: true, slotType: '8am' })
+                }).then(res => res.json()).then(d => d.success ? toast.success('Sent 8 AM Morning Alert!') : toast.error('Failed to send'));
+              }}
+              className="px-3 py-1.5 bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-lg text-xs font-bold hover:bg-amber-500/30 transition-colors cursor-pointer flex items-center gap-1.5"
+            >
+              🌅 Send 8 AM Morning Alert
+            </button>
+
+            <button
+              onClick={() => {
+                fetch('/api/telegram/send', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ isSummaryReport: true, slotType: '3pm' })
+                }).then(res => res.json()).then(d => d.success ? toast.success('Sent 3 PM Afternoon Alert!') : toast.error('Failed to send'));
+              }}
+              className="px-3 py-1.5 bg-blue-500/20 text-blue-300 border border-blue-500/30 rounded-lg text-xs font-bold hover:bg-blue-500/30 transition-colors cursor-pointer flex items-center gap-1.5"
+            >
+              ☀️ Send 3 PM Afternoon Alert
+            </button>
+
+            <button
+              onClick={() => {
+                fetch('/api/telegram/send', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ isSummaryReport: true, slotType: '5pm' })
+                }).then(res => res.json()).then(d => d.success ? toast.success('Sent 5 PM End-of-Day Alert!') : toast.error('Failed to send'));
+              }}
+              className="px-3 py-1.5 bg-purple-500/20 text-purple-300 border border-purple-500/30 rounded-lg text-xs font-bold hover:bg-purple-500/30 transition-colors cursor-pointer flex items-center gap-1.5"
+            >
+              🌆 Send 5 PM End-of-Day Alert
+            </button>
+
+            <button
+              onClick={() => {
+                fetch('/api/telegram/send', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ isSummaryReport: true, slotType: 'congrats' })
+                }).then(res => res.json()).then(d => d.success ? toast.success('Sent Congratulations Alert!') : toast.error('Failed to send'));
+              }}
+              className="px-3 py-1.5 bg-green-500/20 text-green-300 border border-green-500/30 rounded-lg text-xs font-bold hover:bg-green-500/30 transition-colors cursor-pointer flex items-center gap-1.5"
+            >
+              🎉 Send Congrats (0 Issues)
+            </button>
+          </div>
+        </div>
+
         {lastCheckedAt && (
           <div className="text-[11px] text-gray-400 pt-2 border-t border-white/5 flex items-center justify-between">
             <span>Last Automated Sheet Check: <strong className="text-white">{new Date(lastCheckedAt).toLocaleString()}</strong></span>

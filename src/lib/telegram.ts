@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import connectToDatabase from '@/lib/mongodb';
-import TelegramConfig, { ITelegramConfig } from '@/models/TelegramConfig';
+import TelegramConfig from '@/models/TelegramConfig';
 
 const DEFAULT_TOKEN = '8792351236:AAEycnhs_elMuMxSyUF1E85U4h-bhaQNlwo';
 
@@ -44,6 +44,43 @@ export async function sendTelegramMessage(
   const data = await res.json();
   if (!res.ok || !data.ok) {
     throw new Error(data.description || 'Failed to send Telegram message');
+  }
+
+  return data;
+}
+
+export async function sendTelegramPhoto(
+  chatId: string | number,
+  imageBase64: string,
+  caption?: string,
+  parseMode: 'HTML' | 'Markdown' = 'HTML'
+) {
+  const token = getTelegramToken();
+  const url = `https://api.telegram.org/bot${token}/sendPhoto`;
+
+  // Strip data URL prefix if present
+  const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
+  const buffer = Buffer.from(base64Data, 'base64');
+
+  const formData = new FormData();
+  formData.append('chat_id', String(chatId));
+
+  const blob = new Blob([buffer], { type: 'image/png' });
+  formData.append('photo', blob, 'issues-table.png');
+
+  if (caption) {
+    formData.append('caption', caption);
+    formData.append('parse_mode', parseMode);
+  }
+
+  const res = await fetch(url, {
+    method: 'POST',
+    body: formData
+  });
+
+  const data = await res.json();
+  if (!res.ok || !data.ok) {
+    throw new Error(data.description || 'Failed to send Telegram photo');
   }
 
   return data;
@@ -127,11 +164,7 @@ function getAssignNameFromRow(row: Record<string, string>): string {
 
 export async function checkAndNotifyCCIssues() {
   await connectToDatabase();
-  const config = await TelegramConfig.findOne({});
-
-  if (!config) {
-    return { success: false, message: 'Telegram configuration not initialized.' };
-  }
+  const config = await getOrCreateTelegramConfig();
 
   const groupChatIds: string[] = config.groupChatIds || [];
   const rawMentions = config.userMentions;
@@ -153,6 +186,38 @@ export async function checkAndNotifyCCIssues() {
       userMentionsMap[k.toLowerCase()] = v;
     }
   });
+
+  // Calculate current BD Time (UTC+6)
+  const now = new Date();
+  const bdTime = new Date(now.getTime() + 6 * 60 * 60 * 1000); // UTC+6
+  const todayStr = bdTime.toISOString().slice(0, 10); // "YYYY-MM-DD"
+  const currentHour = bdTime.getUTCHours();
+
+  let sentScheduledReport = false;
+  const sentSlots: string[] = (config.lastSummarySentDate === todayStr) ? (config.lastSummarySlots || []) : [];
+
+  if (groupChatIds.length > 0) {
+    // Check if scheduled daily alert slots (8 AM, 3 PM, 5 PM) should trigger
+    if (currentHour >= 8 && currentHour < 15 && !sentSlots.includes('8am')) {
+      await sendCCSummaryReport('8am');
+      sentSlots.push('8am');
+      sentScheduledReport = true;
+    } else if (currentHour >= 15 && currentHour < 17 && !sentSlots.includes('3pm')) {
+      await sendCCSummaryReport('3pm');
+      sentSlots.push('3pm');
+      sentScheduledReport = true;
+    } else if (currentHour >= 17 && !sentSlots.includes('5pm')) {
+      await sendCCSummaryReport('5pm');
+      sentSlots.push('5pm');
+      sentScheduledReport = true;
+    }
+
+    if (sentScheduledReport) {
+      config.lastSummarySentDate = todayStr;
+      config.lastSummarySlots = sentSlots;
+      await config.save();
+    }
+  }
 
   if (groupChatIds.length === 0) {
     return { 
@@ -186,19 +251,15 @@ export async function checkAndNotifyCCIssues() {
     const profileName = r['Profile Name'] || r['Profile'] || 'N/A';
     const note = r['Special Notes'] || r['Note'] || 'N/A';
 
-    // Extract employee names (e.g., "Refayet/CC" -> ["refayet"], "Ashfak/Sajjad/CC" -> ["ashfak", "sajjad"])
     const cleanAssign = assignRaw.replace(/\/(cc|cm|cw)/gi, '').trim();
     const names = cleanAssign.split('/').map(n => n.trim()).filter(n => n.length > 0);
 
     for (const empName of names) {
       const empLower = empName.toLowerCase();
-
-      // Check hash
       const rawString = `${clientName}|${profileName}|${assignRaw}|${empLower}`;
       const issueHash = crypto.createHash('md5').update(rawString).digest('hex');
 
       if (!notifiedSet.has(issueHash)) {
-        // Resolve Telegram mention tag
         const mentionTag = userMentionsMap[empLower] || `@${empName}`;
 
         const otherNames = names.filter(n => n.toLowerCase() !== empLower);
@@ -258,13 +319,14 @@ export async function checkAndNotifyCCIssues() {
     success: true,
     newIssuesNotified: newNotifiedCount,
     lastCheckedAt: config.lastCheckedAt,
+    scheduledReportSent: sentScheduledReport,
     message: newNotifiedCount > 0 ? `Alerted ${newNotifiedCount} new CC issue(s).` : 'No new CC issues found.'
   };
 }
 
-export async function sendCCSummaryReport(title?: string, banner?: string) {
+export async function sendCCSummaryReport(slotType?: '8am' | '3pm' | '5pm' | 'congrats') {
   await connectToDatabase();
-  const config = await TelegramConfig.findOne({});
+  const config = await getOrCreateTelegramConfig();
   if (!config || !config.groupChatIds || config.groupChatIds.length === 0) {
     return { success: false, message: 'No Group Chat IDs configured' };
   }
@@ -281,23 +343,46 @@ export async function sendCCSummaryReport(title?: string, banner?: string) {
     return assign && /\/cc/i.test(assign);
   });
 
-  const customTitle = title || '📋 <b>CURRENT PENDING /CC ISSUES REPORT</b> 📋';
-  const customBanner = banner || '📢 <i>Please review and resolve all assigned issues.</i>';
-
-  if (ccRows.length === 0) {
-    const emptyMsg = `${customTitle}\n\n${customBanner}\n\n🎉 <i>No pending /CC issues found right now! Great job team!</i>`;
-    for (const cid of config.groupChatIds) {
-      await sendTelegramMessage(cid, emptyMsg, 'HTML');
-    }
-    return { success: true, count: 0 };
-  }
-
   const rawMentions = config.userMentions;
   const userMentionsMap: Record<string, string> = {};
   if (rawMentions instanceof Map) {
     rawMentions.forEach((val, key) => { userMentionsMap[key.toLowerCase()] = val; });
   } else if (rawMentions && typeof rawMentions === 'object') {
     Object.entries(rawMentions).forEach(([key, val]) => { userMentionsMap[key.toLowerCase()] = String(val); });
+  }
+
+  // If 0 active CC issues (or explicitly congrats requested)
+  if (ccRows.length === 0 || slotType === 'congrats') {
+    const congratsMsg = [
+      `🎉 <b>CONGRATULATIONS TEAM! ALL ISSUES CLEARED!</b> 🎉\n`,
+      `✨ <i>Outstanding work everyone! All pending /CC issues have been successfully resolved for today.</i>\n`,
+      `🏆 <b>Daily Milestone Achieved:</b>`,
+      `• <b>Status:</b> 100% Cleared (0 Pending Issues)`,
+      `• <b>Team Effort:</b> Exceptional`,
+      `• <b>Office Wrap-Up:</b> Ready to sign off!\n`,
+      `<i>"Great teamwork turns challenges into achievements. Have a wonderful evening!"</i>\n`,
+      `👏 <b>Kudos to Code Commandos Team!</b> 🚀`
+    ].join('\n');
+
+    for (const cid of config.groupChatIds) {
+      await sendTelegramMessage(cid, congratsMsg, 'HTML');
+    }
+    return { success: true, count: 0, type: 'congrats' };
+  }
+
+  // Determine headers based on slot
+  let customTitle = '📋 <b>CURRENT PENDING /CC ISSUES REPORT</b> 📋';
+  let customBanner = '📢 <i>Please review and resolve all assigned issues.</i>';
+
+  if (slotType === '8am') {
+    customTitle = '🌅 <b>MORNING ISSUES ALERT (08:00 AM BD TIME)</b> 🌅';
+    customBanner = '📢 <i>Good morning team! Please review and clear all your assigned issues for today.</i>';
+  } else if (slotType === '3pm') {
+    customTitle = '☀️ <b>AFTERNOON ISSUES UPDATE (03:00 PM BD TIME)</b> ☀️';
+    customBanner = '⚠️ <i>Attention team! The following issues are still pending. Please resolve them as soon as possible.</i>';
+  } else if (slotType === '5pm') {
+    customTitle = '🌆 <b>END-OF-DAY FINAL ISSUES ALERT (05:00 PM BD TIME)</b> 🌆';
+    customBanner = '🚨 <i>Final Reminder! The following issues are still pending. Everyone must clear all assigned issues before leaving the office today!</i>';
   }
 
   const grouped: Record<string, any[]> = {};
@@ -347,5 +432,5 @@ export async function sendCCSummaryReport(title?: string, banner?: string) {
     await sendTelegramMessage(cid, text, 'HTML');
   }
 
-  return { success: true, count: ccRows.length };
+  return { success: true, count: ccRows.length, type: slotType || 'summary' };
 }

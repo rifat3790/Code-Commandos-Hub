@@ -7,10 +7,10 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
   try {
-    const { targetChatId, message, isSummaryReport, title, banner } = await req.json();
+    const { targetChatId, message, isSummaryReport, slotType } = await req.json();
 
     if (isSummaryReport) {
-      const result = await sendCCSummaryReport(title, banner);
+      const result = await sendCCSummaryReport(slotType);
       return NextResponse.json({ success: true, result }, { status: 200 });
     }
 
