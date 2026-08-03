@@ -615,6 +615,13 @@ export default function AdminDashboard() {
         >
           Active Visitors
         </button>
+        <button
+          onClick={() => setActiveTab('telegram')}
+          className={`px-5 py-3 text-xs uppercase font-extrabold flex items-center gap-1.5 shrink-0 ${activeTab === 'telegram' ? 'text-blue-400 border-b-2 border-blue-500' : 'text-gray-500 hover:text-white'}`}
+        >
+          <Send className="w-3.5 h-3.5" />
+          <span>Telegram Bot</span>
+        </button>
         {(dbUser.role === 'super_admin' || dbUser.email === 'refayethossenmd@gmail.com') && (
           <>
             <button
@@ -652,13 +659,6 @@ export default function AdminDashboard() {
               className={`px-5 py-3 text-xs uppercase font-extrabold shrink-0 ${activeTab === 'super-console' ? 'text-green-400 border-b-2 border-green-500' : 'text-gray-500 hover:text-white'}`}
             >
               Super Console
-            </button>
-            <button
-              onClick={() => setActiveTab('telegram')}
-              className={`px-5 py-3 text-xs uppercase font-extrabold flex items-center gap-1.5 shrink-0 ${activeTab === 'telegram' ? 'text-blue-400 border-b-2 border-blue-500' : 'text-gray-500 hover:text-white'}`}
-            >
-              <Send className="w-3.5 h-3.5" />
-              <span>Telegram Bot</span>
             </button>
           </>
         )}
