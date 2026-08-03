@@ -53,6 +53,7 @@ const ROUTE_TO_MENU_MAP: Record<string, string> = {
   '/workspace': 'Workspace',
   '/meetings': 'Meetings',
   '/tracker': 'Order Tracker',
+  '/issues': 'Issues',
   '/personal-projects': 'Personal Projects',
   '/message-helper': 'Message Helper',
   '/templates': 'Templates',

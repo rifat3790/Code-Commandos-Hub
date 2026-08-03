@@ -10,7 +10,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 
 const allAvailableMenus = [
-  'Home', 'Workspace', 'Meetings', 'Order Tracker', 'Personal Projects', 'Message Helper', 'Templates', 'Schema Builder',
+  'Home', 'Workspace', 'Meetings', 'Order Tracker', 'Issues', 'Personal Projects', 'Message Helper', 'Templates', 'Schema Builder',
   'Audit Suite', 'Projects', 'Mockup Studio', 'Focus Studio', 'AI Assistant', 
   'Team Notes', 'Downloads', 'Member Profile', 'Shopify Codes', 'Settings'
 ];
