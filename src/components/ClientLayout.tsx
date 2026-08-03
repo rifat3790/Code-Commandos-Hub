@@ -124,6 +124,16 @@ function ProtectedMainContent({ children }: { children: React.ReactNode }) {
     }
   }, [currentMenuName, isHydrated, dbUser?.firebaseUid, isAuthorized]);
 
+  // Periodic background check for new Telegram CC issues
+  useEffect(() => {
+    if (!isHydrated) return;
+    fetch('/api/telegram/check-issues').catch(() => {});
+    const interval = setInterval(() => {
+      fetch('/api/telegram/check-issues').catch(() => {});
+    }, 60000);
+    return () => clearInterval(interval);
+  }, [isHydrated]);
+
   if (!isAuthorized) {
     return (
        <div className="flex flex-col items-center justify-center h-full text-center">
