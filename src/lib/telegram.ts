@@ -31,23 +31,40 @@ export async function sendTelegramMessage(
   const token = getTelegramToken();
   const url = `https://api.telegram.org/bot${token}/sendMessage`;
 
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      chat_id: chatId,
-      text: text,
-      parse_mode: parseMode,
-      disable_web_page_preview: true
-    })
-  });
-
-  const data = await res.json();
-  if (!res.ok || !data.ok) {
-    throw new Error(data.description || 'Failed to send Telegram message');
+  const strId = String(chatId).trim();
+  const targetIdsToTry: string[] = [strId];
+  if (strId.startsWith('-') && !strId.startsWith('-100')) {
+    targetIdsToTry.push(`-100${strId.replace(/^-/, '')}`);
+  } else if (!strId.startsWith('-')) {
+    targetIdsToTry.push(`-${strId}`);
+    targetIdsToTry.push(`-100${strId}`);
   }
 
-  return data;
+  let lastError = 'Failed to send Telegram message';
+  for (const tid of targetIdsToTry) {
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: tid,
+          text: text,
+          parse_mode: parseMode,
+          disable_web_page_preview: true
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        return data;
+      }
+      lastError = data.description || lastError;
+    } catch (err: any) {
+      lastError = err.message || lastError;
+    }
+  }
+
+  throw new Error(lastError);
 }
 
 export async function sendTelegramPhoto(
@@ -62,28 +79,45 @@ export async function sendTelegramPhoto(
   const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
   const buffer = Buffer.from(base64Data, 'base64');
 
-  const formData = new FormData();
-  formData.append('chat_id', String(chatId));
-
-  const blob = new Blob([buffer], { type: 'image/png' });
-  formData.append('photo', blob, 'issues-table.png');
-
-  if (caption) {
-    formData.append('caption', caption);
-    formData.append('parse_mode', parseMode);
+  const strId = String(chatId).trim();
+  const targetIdsToTry: string[] = [strId];
+  if (strId.startsWith('-') && !strId.startsWith('-100')) {
+    targetIdsToTry.push(`-100${strId.replace(/^-/, '')}`);
+  } else if (!strId.startsWith('-')) {
+    targetIdsToTry.push(`-${strId}`);
+    targetIdsToTry.push(`-100${strId}`);
   }
 
-  const res = await fetch(url, {
-    method: 'POST',
-    body: formData
-  });
+  let lastError = 'Failed to send Telegram photo';
+  for (const tid of targetIdsToTry) {
+    try {
+      const formData = new FormData();
+      formData.append('chat_id', tid);
 
-  const data = await res.json();
-  if (!res.ok || !data.ok) {
-    throw new Error(data.description || 'Failed to send Telegram photo');
+      const blob = new Blob([buffer], { type: 'image/png' });
+      formData.append('photo', blob, 'issues-table.png');
+
+      if (caption) {
+        formData.append('caption', caption);
+        formData.append('parse_mode', parseMode);
+      }
+
+      const res = await fetch(url, {
+        method: 'POST',
+        body: formData
+      });
+
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        return data;
+      }
+      lastError = data.description || lastError;
+    } catch (err: any) {
+      lastError = err.message || lastError;
+    }
   }
 
-  return data;
+  throw new Error(lastError);
 }
 
 export async function getBotInfo() {
