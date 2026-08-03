@@ -78,7 +78,7 @@ function LiveCountdownText({ targetEndDate }: { targetEndDate: string }) {
   if (timeLeft.isOverdue) {
     return (
       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-red-500/20 text-red-400 border border-red-500/40 rounded-lg text-xs font-black animate-pulse">
-        <AlertCircle className="w-3.5 h-3.5" /> OVERDUE
+        <AlertCircle className="w-3.5 h-3.5" /> Order Late
       </span>
     );
   }
