@@ -175,7 +175,26 @@ export default function TimelineDashboard() {
     setIsModalOpen(true);
   };
 
+  const canUserEditItem = (item: ITimeline): boolean => {
+    if (isAdmin) return true; // Admin can edit everything!
+
+    const currentUserEmail = (user?.email || '').toLowerCase().trim();
+    const currentUserName = (dbUser?.name || user?.displayName || '').toLowerCase().trim();
+    const itemCreator = (item.createdBy || '').toLowerCase().trim();
+    const itemMember = (item.memberName || '').toLowerCase().trim();
+
+    if (currentUserEmail && itemCreator && itemCreator === currentUserEmail) return true;
+    if (currentUserName && itemCreator && (itemCreator.includes(currentUserName) || currentUserName.includes(itemCreator))) return true;
+    if (currentUserName && itemMember && (itemMember.includes(currentUserName) || currentUserName.includes(itemMember))) return true;
+
+    return false;
+  };
+
   const handleOpenEditModal = (item: ITimeline) => {
+    if (!canUserEditItem(item)) {
+      toast.error('🔒 Access Denied: You can only edit projects created by or assigned to you.');
+      return;
+    }
     setEditingItem(item);
     setFormClientName(item.clientName);
     setFormMemberName(item.memberName);
@@ -308,8 +327,12 @@ export default function TimelineDashboard() {
     }
   };
 
-  const handleDeleteItem = (id: string) => {
-    setDeletingId(id);
+  const handleDeleteItem = (item: ITimeline) => {
+    if (!canUserEditItem(item)) {
+      toast.error('🔒 Access Denied: You can only delete projects created by or assigned to you.');
+      return;
+    }
+    setDeletingId(item._id);
   };
 
   const handleDownloadPNG = async () => {
@@ -603,20 +626,28 @@ export default function TimelineDashboard() {
                           </span>
                         )}
 
-                        <button
-                          onClick={() => handleOpenEditModal(item)}
-                          className="p-1.5 text-gray-400 hover:text-white hover:bg-black/40 rounded-lg transition-colors cursor-pointer"
-                          title="Edit"
-                        >
-                          <Edit3 className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteItem(item._id)}
-                          className="p-1.5 text-gray-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer"
-                          title="Delete"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                        {canUserEditItem(item) ? (
+                          <>
+                            <button
+                              onClick={() => handleOpenEditModal(item)}
+                              className="p-1.5 text-gray-400 hover:text-white hover:bg-black/40 rounded-lg transition-colors cursor-pointer"
+                              title="Edit Timeline"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteItem(item)}
+                              className="p-1.5 text-gray-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer"
+                              title="Delete Timeline"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </>
+                        ) : (
+                          <span className="p-1 text-gray-600 text-[11px] cursor-not-allowed" title="🔒 Only creator or admin can edit/delete">
+                            🔒 Locked
+                          </span>
+                        )}
                       </td>
                     </tr>
                   );
@@ -645,8 +676,14 @@ export default function TimelineDashboard() {
                   <div className="flex items-center justify-between border-b border-white/5 pb-3">
                     <h3 className="text-base font-extrabold text-white">{item.clientName}</h3>
                     <div className="flex items-center gap-1">
-                      <button onClick={() => handleOpenEditModal(item)} className="p-1 text-gray-400 hover:text-white"><Edit3 className="w-3.5 h-3.5" /></button>
-                      <button onClick={() => handleDeleteItem(item._id)} className="p-1 text-gray-400 hover:text-red-400"><Trash2 className="w-3.5 h-3.5" /></button>
+                      {canUserEditItem(item) ? (
+                        <>
+                          <button onClick={() => handleOpenEditModal(item)} className="p-1 text-gray-400 hover:text-white" title="Edit Timeline"><Edit3 className="w-3.5 h-3.5" /></button>
+                          <button onClick={() => handleDeleteItem(item)} className="p-1 text-gray-400 hover:text-red-400" title="Delete Timeline"><Trash2 className="w-3.5 h-3.5" /></button>
+                        </>
+                      ) : (
+                        <span className="text-xs text-gray-600 cursor-not-allowed" title="🔒 Only creator or admin can edit/delete">🔒 Locked</span>
+                      )}
                     </div>
                   </div>
 
