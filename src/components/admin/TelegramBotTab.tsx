@@ -223,6 +223,29 @@ export default function TelegramBotTab() {
     }
   };
 
+  const handleSendTestMention = async (memberName: string, mentionTag: string) => {
+    if (groupChatIds.length === 0) {
+      toast.error('No Group Chat IDs configured yet!');
+      return;
+    }
+    const testMsg = `🧪 <b>TELEGRAM MENTION TEST DISPATCH</b> 🧪\n\nHello ${memberName} (${mentionTag})! This is a test mention alert dispatched from Code Commandos Hub Admin Console.`;
+    try {
+      const res = await fetch('/api/telegram/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetChatId: 'all', message: testMsg })
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success(`Sent test mention for ${memberName} (${mentionTag})!`);
+      } else {
+        toast.error(data.error || 'Failed to send test mention');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to send test mention');
+    }
+  };
+
   if (loading) {
     return (
       <div className="p-8 text-center text-gray-400 flex items-center justify-center gap-3">
@@ -242,7 +265,7 @@ export default function TelegramBotTab() {
               <Bot className="w-6 h-6 text-blue-400" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <h2 className="text-lg font-bold text-white uppercase tracking-wider">Telegram Alert Bot</h2>
                 {botInfo?.username ? (
                   <span className="px-2.5 py-0.5 text-[11px] font-bold bg-green-500/20 text-green-400 border border-green-500/30 rounded-full flex items-center gap-1">
@@ -253,6 +276,22 @@ export default function TelegramBotTab() {
                     <XCircle className="w-3 h-3" /> Token Configured
                   </span>
                 )}
+
+                {/* Auto Alert Toggle */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const newVal = !autoAlertsEnabled;
+                    setAutoAlertsEnabled(newVal);
+                    handleSaveSettings(undefined, undefined, newVal);
+                  }}
+                  className={`px-3 py-0.5 rounded-full text-[11px] font-bold border transition-all cursor-pointer ${
+                    autoAlertsEnabled ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' : 'bg-gray-800 text-gray-400 border-gray-700'
+                  }`}
+                  title="Toggle Automatic Telegram Alerts"
+                >
+                  {autoAlertsEnabled ? '● Auto-Alerts ON' : '○ Auto-Alerts OFF'}
+                </button>
               </div>
               <p className="text-xs text-gray-400 mt-0.5">
                 Automated CC Team Issue Detector & Mention Dispatcher for Code Commandos Hub
@@ -413,7 +452,7 @@ export default function TelegramBotTab() {
         <div className="bg-gray-900 border border-glass-border p-6 rounded-2xl space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
-              <MessageSquare className="w-4 h-4 text-green-400" /> CC Team Member Mentions
+              <MessageSquare className="w-4 h-4 text-green-400" /> CC Team Member Mentions & Test Dispatcher
             </h3>
             <button
               onClick={handleSaveMentions}
@@ -423,22 +462,35 @@ export default function TelegramBotTab() {
             </button>
           </div>
           <p className="text-xs text-gray-400">
-            Map spreadsheet member names to their exact Telegram username tags for instant notification mentions.
+            Map spreadsheet member names to Telegram handle tags and click <strong>Test Ping</strong> to verify mentions.
           </p>
 
-          <div className="grid grid-cols-2 gap-3 max-h-60 overflow-y-auto pr-1">
-            {Object.keys(DEFAULT_USER_MENTIONS).map((memberKey) => (
-              <div key={memberKey} className="space-y-1 bg-black/30 border border-glass-border p-2.5 rounded-xl">
-                <label className="text-[11px] font-bold text-gray-300 capitalize">{memberKey}</label>
-                <input
-                  type="text"
-                  value={userMentions[memberKey] ?? DEFAULT_USER_MENTIONS[memberKey]}
-                  onChange={(e) => handleMentionChange(memberKey, e.target.value)}
-                  placeholder="@telegram_handle"
-                  className="w-full px-2.5 py-1.5 bg-black/50 border border-glass-border rounded-lg text-xs text-green-400 font-mono placeholder-gray-600 focus:outline-none focus:border-green-500"
-                />
-              </div>
-            ))}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-60 overflow-y-auto pr-1">
+            {Object.keys(DEFAULT_USER_MENTIONS).map((memberKey) => {
+              const currentTag = userMentions[memberKey] ?? DEFAULT_USER_MENTIONS[memberKey];
+              return (
+                <div key={memberKey} className="space-y-1 bg-black/30 border border-glass-border p-2.5 rounded-xl">
+                  <div className="flex justify-between items-center">
+                    <label className="text-[11px] font-bold text-gray-300 capitalize">{memberKey}</label>
+                    <button
+                      type="button"
+                      onClick={() => handleSendTestMention(memberKey, currentTag)}
+                      className="text-[9px] font-extrabold text-blue-400 hover:text-blue-300 underline cursor-pointer"
+                      title="Send test mention ping to Telegram group"
+                    >
+                      🧪 Test Ping
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    value={currentTag}
+                    onChange={(e) => handleMentionChange(memberKey, e.target.value)}
+                    placeholder="@telegram_handle"
+                    className="w-full px-2.5 py-1.5 bg-black/50 border border-glass-border rounded-lg text-xs text-green-400 font-mono placeholder-gray-600 focus:outline-none focus:border-green-500"
+                  />
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -485,7 +537,7 @@ export default function TelegramBotTab() {
           </div>
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-3">
           <textarea
             rows={4}
             value={customMessage}
@@ -493,6 +545,16 @@ export default function TelegramBotTab() {
             placeholder="Type your message here (supports HTML formatting: <b>bold</b>, <i>italic</i>, <code>code</code>)..."
             className="w-full px-4 py-3 bg-black/50 border border-glass-border rounded-xl text-xs text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 font-mono"
           />
+
+          {customMessage && (
+            <div className="p-3 bg-black/70 border border-blue-500/30 rounded-xl space-y-1">
+              <span className="text-[10px] font-bold text-blue-400 uppercase tracking-wider block">Live Telegram Message HTML Preview:</span>
+              <div 
+                className="text-xs text-gray-200 font-mono whitespace-pre-wrap leading-relaxed"
+                dangerouslySetInnerHTML={{ __html: customMessage }}
+              />
+            </div>
+          )}
 
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2">
             <div className="flex items-center gap-2">

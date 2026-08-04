@@ -260,172 +260,196 @@ export async function checkAndNotifyTimelines() {
   }
 }
 
+let isCheckingCCIssues = false;
+
 export async function checkAndNotifyCCIssues() {
-  await connectToDatabase();
-  const config = await getOrCreateTelegramConfig();
-
-  const groupChatIds: string[] = config.groupChatIds || [];
-  const rawMentions = config.userMentions;
-  const userMentionsMap: Record<string, string> = {};
-
-  if (rawMentions instanceof Map) {
-    rawMentions.forEach((val, key) => {
-      userMentionsMap[key.toLowerCase()] = val;
-    });
-  } else if (rawMentions && typeof rawMentions === 'object') {
-    Object.entries(rawMentions).forEach(([key, val]) => {
-      userMentionsMap[key.toLowerCase()] = String(val);
-    });
-  }
-
-  // Merge defaults if missing
-  Object.entries(DEFAULT_USER_MENTIONS).forEach(([k, v]) => {
-    if (!userMentionsMap[k.toLowerCase()]) {
-      userMentionsMap[k.toLowerCase()] = v;
-    }
-  });
-
-  // Calculate current BD Time (UTC+6)
-  const now = new Date();
-  const bdTime = new Date(now.getTime() + 6 * 60 * 60 * 1000); // UTC+6
-  const todayStr = bdTime.toISOString().slice(0, 10); // "YYYY-MM-DD"
-  const currentHour = bdTime.getUTCHours();
-
-  let sentScheduledReport = false;
-  const sentSlots: string[] = (config.lastSummarySentDate === todayStr) ? (config.lastSummarySlots || []) : [];
-
-  if (groupChatIds.length > 0) {
-    if (currentHour >= 8 && currentHour < 15 && !sentSlots.includes('8am')) {
-      await sendCCSummaryReport('8am');
-      sentSlots.push('8am');
-      sentScheduledReport = true;
-    } else if (currentHour >= 15 && currentHour < 17 && !sentSlots.includes('3pm')) {
-      await sendCCSummaryReport('3pm');
-      sentSlots.push('3pm');
-      sentScheduledReport = true;
-    } else if (currentHour >= 17 && !sentSlots.includes('5pm')) {
-      await sendCCSummaryReport('5pm');
-      sentSlots.push('5pm');
-      sentScheduledReport = true;
-    }
-
-    if (sentScheduledReport) {
-      config.lastSummarySentDate = todayStr;
-      config.lastSummarySlots = sentSlots;
-      await config.save();
-    }
-  }
-
-  // Also check project timelines for 72h & 48h warnings
-  try {
-    await checkAndNotifyTimelines();
-  } catch (err) {
-    console.error('Error checking timeline warnings:', err);
-  }
-
-  if (groupChatIds.length === 0) {
-    return { 
-      success: true, 
-      message: 'No Telegram Group Chat IDs configured yet.',
-      newIssuesNotified: 0 
+  if (isCheckingCCIssues) {
+    return {
+      success: true,
+      message: 'An issue check is already in progress.',
+      newIssuesNotified: 0
     };
   }
 
-  // Fetch Issues spreadsheet CSV
-  const sheetUrl = 'https://docs.google.com/spreadsheets/d/1ic9UMVX0FFsAyz0TZ-_lGKj_D9NornoGhq38KTRtM54/export?format=csv&gid=1412843338';
-  const response = await fetch(sheetUrl, { cache: 'no-store' });
-  if (!response.ok) {
-    throw new Error('Failed to fetch Issues spreadsheet CSV.');
-  }
+  isCheckingCCIssues = true;
 
-  const csvText = await response.text();
-  const rows = parseCSVRows(csvText);
+  try {
+    await connectToDatabase();
+    const config = await getOrCreateTelegramConfig();
 
-  const notifiedSet = new Set(config.notifiedIssueHashes || []);
-  let newNotifiedCount = 0;
-  const logsToAppend: any[] = [];
-
-  for (const r of rows) {
-    const assignRaw = getAssignNameFromRow(r);
-    if (!assignRaw || !/\/cc/i.test(assignRaw)) {
-      continue;
+    if (config.autoAlertsEnabled === false) {
+      return {
+        success: true,
+        message: 'Auto alerts are currently disabled in Telegram Bot config.',
+        newIssuesNotified: 0
+      };
     }
 
-    const clientName = r["Client's Name"] || r['Client Name'] || r['Client'] || 'N/A';
-    const profileName = r['Profile Name'] || r['Profile'] || 'N/A';
-    const note = r['Special Notes'] || r['Note'] || 'N/A';
+    const groupChatIds: string[] = Array.from(new Set((config.groupChatIds || []).map((id: string) => String(id).trim()).filter(Boolean)));
+    const rawMentions = config.userMentions;
+    const userMentionsMap: Record<string, string> = {};
 
-    const cleanAssign = assignRaw.replace(/\/(cc|cm|cw)/gi, '').trim();
-    const names = cleanAssign.split('/').map(n => n.trim()).filter(n => n.length > 0);
+    if (rawMentions instanceof Map) {
+      rawMentions.forEach((val, key) => {
+        userMentionsMap[key.toLowerCase()] = val;
+      });
+    } else if (rawMentions && typeof rawMentions === 'object') {
+      Object.entries(rawMentions).forEach(([key, val]) => {
+        userMentionsMap[key.toLowerCase()] = String(val);
+      });
+    }
 
-    for (const empName of names) {
-      const empLower = empName.toLowerCase();
-      const rawString = `${clientName}|${profileName}|${assignRaw}|${empLower}`;
-      const issueHash = crypto.createHash('md5').update(rawString).digest('hex');
+    // Merge defaults if missing
+    Object.entries(DEFAULT_USER_MENTIONS).forEach(([k, v]) => {
+      if (!userMentionsMap[k.toLowerCase()]) {
+        userMentionsMap[k.toLowerCase()] = v;
+      }
+    });
 
-      if (!notifiedSet.has(issueHash)) {
-        const mentionTag = userMentionsMap[empLower] || `@${empName}`;
+    // Calculate current BD Time (UTC+6)
+    const now = new Date();
+    const bdTime = new Date(now.getTime() + 6 * 60 * 60 * 1000); // UTC+6
+    const todayStr = bdTime.toISOString().slice(0, 10); // "YYYY-MM-DD"
+    const currentHour = bdTime.getUTCHours();
 
-        const otherNames = names.filter(n => n.toLowerCase() !== empLower);
-        let clientDisplay = clientName;
-        if (otherNames.length > 0) {
-          clientDisplay += ` (+${otherNames.join(',')})`;
-        }
+    let sentScheduledReport = false;
+    const sentSlots: string[] = (config.lastSummarySentDate === todayStr) ? (config.lastSummarySlots || []) : [];
 
-        const noteLower = note.toLowerCase().trim();
-        const noteDisplay = (noteLower && noteLower !== 'need to check' && noteLower !== 'n/a')
-          ? `\n🚨 <b>Special Note:</b> ${note}`
-          : '';
+    if (groupChatIds.length > 0) {
+      if (currentHour >= 8 && currentHour < 15 && !sentSlots.includes('8am')) {
+        await sendCCSummaryReport('8am');
+        sentSlots.push('8am');
+        sentScheduledReport = true;
+      } else if (currentHour >= 15 && currentHour < 17 && !sentSlots.includes('3pm')) {
+        await sendCCSummaryReport('3pm');
+        sentSlots.push('3pm');
+        sentScheduledReport = true;
+      } else if (currentHour >= 17 && !sentSlots.includes('5pm')) {
+        await sendCCSummaryReport('5pm');
+        sentSlots.push('5pm');
+        sentScheduledReport = true;
+      }
 
-        const msg = [
-          `⚡ <b>NEW ISSUE ASSIGNED!</b> ⚡\n`,
-          `👤 <b>Assignee:</b> ${empName} (${mentionTag})`,
-          `🏢 <b>Client:</b> ${clientDisplay}${noteDisplay}\n`,
-          `<i>Automated Alert | Code Commandos Hub</i>`
-        ].join('\n');
+      if (sentScheduledReport) {
+        config.lastSummarySentDate = todayStr;
+        config.lastSummarySlots = sentSlots;
+        await config.save();
+      }
+    }
 
-        let sentSuccess = false;
-        for (const chatId of groupChatIds) {
-          try {
-            await sendTelegramMessage(chatId, msg, 'HTML');
-            sentSuccess = true;
-          } catch (err: any) {
-            console.error(`Error sending Telegram alert to ${chatId}:`, err.message);
+    // Also check project timelines for 72h & 48h warnings
+    try {
+      await checkAndNotifyTimelines();
+    } catch (err) {
+      console.error('Error checking timeline warnings:', err);
+    }
+
+    if (groupChatIds.length === 0) {
+      return { 
+        success: true, 
+        message: 'No Telegram Group Chat IDs configured yet.',
+        newIssuesNotified: 0 
+      };
+    }
+
+    // Fetch Issues spreadsheet CSV
+    const sheetUrl = 'https://docs.google.com/spreadsheets/d/1ic9UMVX0FFsAyz0TZ-_lGKj_D9NornoGhq38KTRtM54/export?format=csv&gid=1412843338';
+    const response = await fetch(sheetUrl, { cache: 'no-store' });
+    if (!response.ok) {
+      throw new Error('Failed to fetch Issues spreadsheet CSV.');
+    }
+
+    const csvText = await response.text();
+    const rows = parseCSVRows(csvText);
+
+    const notifiedSet = new Set(config.notifiedIssueHashes || []);
+    let newNotifiedCount = 0;
+    const logsToAppend: any[] = [];
+
+    for (const r of rows) {
+      const assignRaw = getAssignNameFromRow(r);
+      if (!assignRaw || !/\/cc/i.test(assignRaw)) {
+        continue;
+      }
+
+      const clientName = (r["Client's Name"] || r['Client Name'] || r['Client'] || 'N/A').trim();
+      const profileName = (r['Profile Name'] || r['Profile'] || 'N/A').trim();
+      const note = (r['Special Notes'] || r['Note'] || 'N/A').trim();
+
+      const cleanAssign = assignRaw.replace(/\/(cc|cm|cw)/gi, '').trim();
+      const names = cleanAssign.split('/').map(n => n.trim()).filter(n => n.length > 0);
+
+      for (const empName of names) {
+        const empLower = empName.toLowerCase();
+        const rawString = `${clientName.toLowerCase()}|${profileName.toLowerCase()}|${empLower}`;
+        const issueHash = crypto.createHash('md5').update(rawString).digest('hex');
+
+        if (!notifiedSet.has(issueHash)) {
+          const mentionTag = userMentionsMap[empLower] || `@${empName}`;
+
+          const otherNames = names.filter(n => n.toLowerCase() !== empLower);
+          let clientDisplay = clientName;
+          if (otherNames.length > 0) {
+            clientDisplay += ` (+${otherNames.join(',')})`;
           }
-        }
 
-        if (sentSuccess) {
-          notifiedSet.add(issueHash);
-          newNotifiedCount++;
+          const noteLower = note.toLowerCase().trim();
+          const noteDisplay = (noteLower && noteLower !== 'need to check' && noteLower !== 'n/a')
+            ? `\n🚨 <b>Special Note:</b> ${note}`
+            : '';
 
-          logsToAppend.push({
-            timestamp: new Date(),
-            clientName,
-            assignee: empName,
-            mention: mentionTag,
-            status: 'sent',
-            message: `Notified for client ${clientName}`
-          });
+          const msg = [
+            `⚡ <b>NEW ISSUE ASSIGNED!</b> ⚡\n`,
+            `👤 <b>Assignee:</b> ${empName} (${mentionTag})`,
+            `🏢 <b>Client:</b> ${clientDisplay}${noteDisplay}\n`,
+            `<i>Automated Alert | Code Commandos Hub</i>`
+          ].join('\n');
+
+          let sentSuccess = false;
+          for (const chatId of groupChatIds) {
+            try {
+              await sendTelegramMessage(chatId, msg, 'HTML');
+              sentSuccess = true;
+            } catch (err: any) {
+              console.error(`Error sending Telegram alert to ${chatId}:`, err.message);
+            }
+          }
+
+          if (sentSuccess) {
+            notifiedSet.add(issueHash);
+            newNotifiedCount++;
+
+            logsToAppend.push({
+              timestamp: new Date(),
+              clientName,
+              assignee: empName,
+              mention: mentionTag,
+              status: 'sent',
+              message: `Notified for client ${clientName}`
+            });
+          }
         }
       }
     }
-  }
 
-  // Update DB with new notified hashes and timestamp
-  config.notifiedIssueHashes = Array.from(notifiedSet);
-  config.lastCheckedAt = new Date();
-  if (logsToAppend.length > 0) {
-    config.notificationLogs = [...logsToAppend, ...(config.notificationLogs || [])].slice(0, 50);
-  }
-  await config.save();
+    // Update DB with new notified hashes and timestamp
+    config.notifiedIssueHashes = Array.from(notifiedSet);
+    config.lastCheckedAt = new Date();
+    if (logsToAppend.length > 0) {
+      config.notificationLogs = [...logsToAppend, ...(config.notificationLogs || [])].slice(0, 50);
+    }
+    await config.save();
 
-  return {
-    success: true,
-    newIssuesNotified: newNotifiedCount,
-    lastCheckedAt: config.lastCheckedAt,
-    scheduledReportSent: sentScheduledReport,
-    message: newNotifiedCount > 0 ? `Alerted ${newNotifiedCount} new CC issue(s).` : 'No new CC issues found.'
-  };
+    return {
+      success: true,
+      newIssuesNotified: newNotifiedCount,
+      lastCheckedAt: config.lastCheckedAt,
+      scheduledReportSent: sentScheduledReport,
+      message: newNotifiedCount > 0 ? `Alerted ${newNotifiedCount} new CC issue(s).` : 'No new CC issues found.'
+    };
+  } finally {
+    isCheckingCCIssues = false;
+  }
 }
 
 export async function sendCCSummaryReport(slotType?: '8am' | '3pm' | '5pm' | 'congrats') {
