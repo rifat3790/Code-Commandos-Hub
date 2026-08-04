@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import connectToDatabase from '@/lib/mongodb';
 import TelegramConfig from '@/models/TelegramConfig';
+import TelegramSubscriber from '@/models/TelegramSubscriber';
 import { sendTelegramMessage, sendCCSummaryReport } from '@/lib/telegram';
 
 export const dynamic = 'force-dynamic';
@@ -22,15 +23,22 @@ export async function POST(req: Request) {
     const config = await TelegramConfig.findOne({});
 
     let targetIds: string[] = [];
-    if (targetChatId && targetChatId !== 'all') {
-      targetIds = [String(targetChatId)];
+    
+    if (targetChatId === 'all_subscribers') {
+      // Broadcast DM to all registered individual bot subscribers
+      const subscribers = await TelegramSubscriber.find({ isSubscribed: true });
+      targetIds = subscribers.map(s => s.telegramUserId);
+    } else if (targetChatId && targetChatId !== 'all') {
+      // Individual DM target or single group
+      targetIds = [String(targetChatId).replace(/^user_/, '').trim()];
     } else {
+      // All registered group chats
       targetIds = config?.groupChatIds || [];
     }
 
     if (targetIds.length === 0) {
       return NextResponse.json({ 
-        error: 'No target Chat IDs available. Please configure Group Chat IDs in settings or specify a Chat ID.' 
+        error: 'No target Chat/User IDs available for dispatch. Please sync subscribers or add Chat IDs.' 
       }, { status: 400 });
     }
 
@@ -44,7 +52,7 @@ export async function POST(req: Request) {
           config.notificationLogs = [
             {
               timestamp: new Date(),
-              clientName: 'Broadcast / Admin Test',
+              clientName: 'Direct / Broadcast Message',
               assignee: 'Admin',
               mention: 'Admin',
               status: 'sent',

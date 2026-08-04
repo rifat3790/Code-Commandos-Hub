@@ -132,6 +132,86 @@ export async function getBotInfo() {
   }
 }
 
+export async function syncTelegramUpdates() {
+  const token = getTelegramToken();
+  const url = `https://api.telegram.org/bot${token}/getUpdates?allowed_updates=["message","edited_message","callback_query"]`;
+  try {
+    await connectToDatabase();
+    const TelegramSubscriber = (await import('@/models/TelegramSubscriber')).default;
+    const config = await getOrCreateTelegramConfig();
+
+    const res = await fetch(url, { cache: 'no-store' });
+    const data = await res.json();
+
+    if (!data.ok || !Array.isArray(data.result)) {
+      return { success: false, error: data.description || 'Failed to fetch updates from Telegram' };
+    }
+
+    let newSubscribersCount = 0;
+    let newGroupsCount = 0;
+    const existingGroupIds = new Set(config.groupChatIds || []);
+
+    for (const update of data.result) {
+      const msg = update.message || update.edited_message || update.callback_query?.message;
+      if (!msg) continue;
+
+      const chat = msg.chat;
+      const user = update.message?.from || update.callback_query?.from || msg.from;
+
+      if (chat && (chat.type === 'private' || user)) {
+        const userId = String(user?.id || chat.id);
+        const username = user?.username || chat.username || '';
+        const firstName = user?.first_name || chat.first_name || '';
+        const lastName = user?.last_name || chat.last_name || '';
+
+        const existingSub = await TelegramSubscriber.findOne({ telegramUserId: userId });
+        if (!existingSub) {
+          newSubscribersCount++;
+        }
+
+        await TelegramSubscriber.findOneAndUpdate(
+          { telegramUserId: userId },
+          {
+            username: username,
+            firstName: firstName,
+            lastName: lastName,
+            isSubscribed: true,
+            lastActiveAt: new Date()
+          },
+          { upsert: true, new: true }
+        );
+      }
+
+      // Auto-discover group chat IDs if user added bot to a group
+      if (chat && (chat.type === 'group' || chat.type === 'supergroup')) {
+        const groupIdStr = String(chat.id).trim();
+        if (!existingGroupIds.has(groupIdStr)) {
+          existingGroupIds.add(groupIdStr);
+          newGroupsCount++;
+        }
+      }
+    }
+
+    if (newGroupsCount > 0) {
+      config.groupChatIds = Array.from(existingGroupIds);
+      await config.save();
+    }
+
+    const allSubscribers = await TelegramSubscriber.find({}).sort({ lastActiveAt: -1 });
+
+    return {
+      success: true,
+      syncedCount: data.result.length,
+      newSubscribersCount,
+      newGroupsCount,
+      subscribers: allSubscribers
+    };
+  } catch (error: any) {
+    console.error('Error syncing Telegram updates:', error);
+    return { success: false, error: error.message };
+  }
+}
+
 export async function getOrCreateTelegramConfig() {
   await connectToDatabase();
   let config = await TelegramConfig.findOne({});

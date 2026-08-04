@@ -65,12 +65,28 @@ export default function TelegramBotTab() {
   const [userMentions, setUserMentions] = useState<Record<string, string>>({});
   const [autoAlertsEnabled, setAutoAlertsEnabled] = useState(true);
   const [lastCheckedAt, setLastCheckedAt] = useState<string | null>(null);
-  const [notificationLogs, setNotificationLogs] = useState<any[]>([]);
+  const [subscribers, setSubscribers] = useState<any[]>([]);
+  const [syncingSubscribers, setSyncingSubscribers] = useState(false);
+  const [newSubId, setNewSubId] = useState('');
+  const [newSubName, setNewSubName] = useState('');
+  const [newSubTag, setNewSubTag] = useState('');
 
   // Broadcast Console state
   const [targetChatId, setTargetChatId] = useState('all');
   const [customMessage, setCustomMessage] = useState('');
   const [isSummaryReport, setIsSummaryReport] = useState(false);
+
+  const fetchSubscribers = async () => {
+    try {
+      const res = await fetch('/api/telegram/subscribers');
+      const data = await res.json();
+      if (data.success) {
+        setSubscribers(data.subscribers || []);
+      }
+    } catch (e) {
+      console.error("Error fetching subscribers:", e);
+    }
+  };
 
   const fetchConfig = async () => {
     setLoading(true);
@@ -85,6 +101,7 @@ export default function TelegramBotTab() {
         setAutoAlertsEnabled(data.autoAlertsEnabled ?? true);
         setLastCheckedAt(data.lastCheckedAt || null);
         setNotificationLogs(data.notificationLogs || []);
+        fetchSubscribers();
       } else {
         toast.error(data.error || 'Failed to load Telegram configuration');
       }
@@ -92,6 +109,76 @@ export default function TelegramBotTab() {
       toast.error(err.message || 'Network error fetching Telegram config');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSyncSubscribers = async () => {
+    setSyncingSubscribers(true);
+    try {
+      const res = await fetch('/api/telegram/subscribers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'sync' })
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success(`Synced! ${data.newSubscribersCount || 0} new user(s) & ${data.newGroupsCount || 0} group(s) discovered.`);
+        setSubscribers(data.subscribers || []);
+      } else {
+        toast.error(data.error || 'Failed to sync updates');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Error syncing updates');
+    } finally {
+      setSyncingSubscribers(false);
+    }
+  };
+
+  const handleAddSubscriber = async () => {
+    if (!newSubId.trim()) {
+      toast.error('Please enter a Telegram User ID or Chat ID');
+      return;
+    }
+    try {
+      const res = await fetch('/api/telegram/subscribers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          telegramUserId: newSubId.trim(),
+          firstName: newSubName.trim(),
+          username: newSubTag.trim().replace(/^@/, '')
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success('Subscriber added successfully!');
+        setNewSubId('');
+        setNewSubName('');
+        setNewSubTag('');
+        fetchSubscribers();
+      } else {
+        toast.error(data.error || 'Failed to add subscriber');
+      }
+    } catch (err: any) {
+      toast.error('Failed to add subscriber');
+    }
+  };
+
+  const handleDeleteSubscriber = async (telegramUserId: string) => {
+    if (!confirm(`Are you sure you want to remove subscriber ${telegramUserId}?`)) return;
+    try {
+      const res = await fetch(`/api/telegram/subscribers?id=${telegramUserId}`, {
+        method: 'DELETE'
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success('Subscriber removed');
+        fetchSubscribers();
+      } else {
+        toast.error(data.error || 'Failed to delete subscriber');
+      }
+    } catch (e) {
+      toast.error('Failed to delete subscriber');
     }
   };
 
@@ -580,29 +667,177 @@ export default function TelegramBotTab() {
         </div>
       </div>
 
-      {/* 4. Broadcast & Custom Message Console */}
-      <div className="bg-gray-900 border border-glass-border p-6 rounded-2xl space-y-4">
-        <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
-          <Send className="w-4 h-4 text-blue-400" /> Send Custom Telegram Message / Broadcast
-        </h3>
-        <p className="text-xs text-gray-400">
-          Send custom announcements, preset client templates, or trigger daily issue summary reports directly from this dashboard.
-        </p>
+        {/* 4. Registered Bot Subscribers Directory (1-on-1 Private DMs) */}
+        <div className="bg-gray-900 border border-glass-border p-6 rounded-2xl space-y-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                  <Users className="w-4 h-4 text-blue-400" /> Registered Bot Subscribers Directory ({subscribers.length})
+                </h3>
+                <span className="px-2 py-0.5 bg-blue-500/20 text-blue-300 border border-blue-500/30 rounded-full text-[10px] font-bold font-mono">
+                  @code_commandos_bot Users
+                </span>
+              </div>
+              <p className="text-xs text-gray-400 mt-0.5">
+                Private 1-on-1 subscribers who have started or messaged <code>@code_commandos_bot</code> on Telegram.
+              </p>
+            </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="space-y-1">
-            <label className="text-xs font-bold text-gray-300">Target Chat:</label>
-            <select
-              value={targetChatId}
-              onChange={(e) => setTargetChatId(e.target.value)}
-              className="w-full px-3 py-2 bg-black/50 border border-glass-border rounded-xl text-xs text-white focus:outline-none focus:border-blue-500"
+            <button
+              onClick={handleSyncSubscribers}
+              disabled={syncingSubscribers}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shadow-md shadow-blue-600/20 disabled:opacity-50 shrink-0"
             >
-              <option value="all">All Registered Group Chats ({groupChatIds.length})</option>
-              {groupChatIds.map(cid => (
-                <option key={cid} value={cid}>Group: {cid}</option>
-              ))}
-            </select>
+              <RefreshCw className={`w-3.5 h-3.5 ${syncingSubscribers ? 'animate-spin' : ''}`} />
+              <span>{syncingSubscribers ? 'Syncing...' : 'Sync Bot Subscribers (/getUpdates)'}</span>
+            </button>
           </div>
+
+          {/* Add Subscriber Manual Form */}
+          <div className="p-4 bg-black/40 border border-glass-border rounded-xl space-y-2">
+            <span className="text-xs font-bold text-gray-300 block">Add / Register Individual User ID Manually:</span>
+            <div className="grid grid-cols-1 sm:grid-cols-6 gap-2">
+              <input
+                type="text"
+                placeholder="Telegram User ID (e.g. 123456789)"
+                value={newSubId}
+                onChange={(e) => setNewSubId(e.target.value)}
+                className="sm:col-span-2 px-3 py-2 bg-black/60 border border-glass-border rounded-xl text-xs text-white font-mono placeholder-gray-500 focus:outline-none focus:border-blue-500"
+              />
+              <input
+                type="text"
+                placeholder="First Name (e.g. Refayet)"
+                value={newSubName}
+                onChange={(e) => setNewSubName(e.target.value)}
+                className="sm:col-span-2 px-3 py-2 bg-black/60 border border-glass-border rounded-xl text-xs text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+              />
+              <input
+                type="text"
+                placeholder="Tag @ (optional)"
+                value={newSubTag}
+                onChange={(e) => setNewSubTag(e.target.value)}
+                className="sm:col-span-1 px-3 py-2 bg-black/60 border border-glass-border rounded-xl text-xs text-blue-300 font-mono placeholder-gray-500 focus:outline-none focus:border-blue-500"
+              />
+              <button
+                type="button"
+                onClick={handleAddSubscriber}
+                className="sm:col-span-1 px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl transition-all cursor-pointer shadow-md shadow-blue-600/20 flex items-center justify-center gap-1"
+              >
+                <Plus className="w-4 h-4" /> Add
+              </button>
+            </div>
+          </div>
+
+          {/* Subscribers Table */}
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs text-gray-300 border-collapse">
+              <thead>
+                <tr className="border-b border-glass-border text-gray-400 font-extrabold uppercase text-[10px]">
+                  <th className="py-2.5 px-3">Telegram User ID</th>
+                  <th className="py-2.5 px-3">First Name / Username</th>
+                  <th className="py-2.5 px-3">Last Active</th>
+                  <th className="py-2.5 px-3">Status</th>
+                  <th className="py-2.5 px-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {subscribers.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="py-8 text-center text-gray-500 italic">
+                      No individual bot subscribers found. Click "Sync Bot Subscribers (/getUpdates)" above or send <code>/start</code> to @code_commandos_bot.
+                    </td>
+                  </tr>
+                ) : (
+                  subscribers.map((sub) => (
+                    <tr key={sub.telegramUserId} className="hover:bg-black/30 transition-colors">
+                      <td className="py-2.5 px-3 font-mono font-bold text-blue-400 whitespace-nowrap">
+                        {sub.telegramUserId}
+                      </td>
+                      <td className="py-2.5 px-3 whitespace-nowrap">
+                        <div className="flex items-center gap-2">
+                          <div className="w-6 h-6 rounded-full bg-blue-500/20 border border-blue-500/30 flex items-center justify-center text-[10px] font-black text-blue-300">
+                            {(sub.firstName || sub.username || 'U').charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <span className="font-bold text-white block">{sub.firstName || 'Telegram User'} {sub.lastName || ''}</span>
+                            {sub.username && <span className="text-[10px] text-green-400 font-mono">@{sub.username}</span>}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-2.5 px-3 text-gray-400 font-mono text-[11px] whitespace-nowrap">
+                        {new Date(sub.lastActiveAt).toLocaleString()}
+                      </td>
+                      <td className="py-2.5 px-3 whitespace-nowrap">
+                        <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded text-[9px] font-black uppercase">
+                          Active DM
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-3 text-right whitespace-nowrap space-x-2">
+                        <button
+                          onClick={() => {
+                            setTargetChatId(sub.telegramUserId);
+                            toast.success(`Selected 1-on-1 DM target: ${sub.firstName || sub.telegramUserId}`);
+                          }}
+                          className="px-2.5 py-1 bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/40 rounded-lg text-[10px] font-bold cursor-pointer"
+                        >
+                          💬 Send 1-on-1 DM
+                        </button>
+                        <button
+                          onClick={() => handleDeleteSubscriber(sub.telegramUserId)}
+                          className="p-1 text-gray-500 hover:text-red-400 hover:bg-red-500/10 rounded cursor-pointer"
+                          title="Remove subscriber"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* 5. Broadcast & Custom Message Console */}
+        <div className="bg-gray-900 border border-glass-border p-6 rounded-2xl space-y-4">
+          <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+            <Send className="w-4 h-4 text-blue-400" /> Send Custom Telegram Message / Broadcast
+          </h3>
+          <p className="text-xs text-gray-400">
+            Send custom announcements, preset client templates, 1-on-1 private DMs, or trigger daily issue summary reports directly from this dashboard.
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-gray-300">Target Chat / User:</label>
+              <select
+                value={targetChatId}
+                onChange={(e) => setTargetChatId(e.target.value)}
+                className="w-full px-3 py-2 bg-black/50 border border-glass-border rounded-xl text-xs text-white focus:outline-none focus:border-blue-500 font-mono"
+              >
+                <option value="all">🌐 All Group Chats ({groupChatIds.length})</option>
+                <option value="all_subscribers">📣 All Subscribed Individual Users (Global DM Broadcast) ({subscribers.length})</option>
+
+                {groupChatIds.length > 0 && (
+                  <optgroup label="👥 Registered Telegram Groups">
+                    {groupChatIds.map(cid => (
+                      <option key={cid} value={cid}>Group ID: {cid}</option>
+                    ))}
+                  </optgroup>
+                )}
+
+                {subscribers.length > 0 && (
+                  <optgroup label="👤 Individual 1-on-1 Direct Messages (DMs)">
+                    {subscribers.map(sub => (
+                      <option key={sub.telegramUserId} value={sub.telegramUserId}>
+                        👤 {sub.firstName || 'User'} {sub.username ? `(@${sub.username})` : ''} [ID: {sub.telegramUserId}]
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+              </select>
+            </div>
 
           <div className="md:col-span-2 space-y-1">
             <label className="text-xs font-bold text-gray-300">Quick Template Presets:</label>
