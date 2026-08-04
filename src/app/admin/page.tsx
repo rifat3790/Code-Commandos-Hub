@@ -1710,7 +1710,6 @@ export default function AdminDashboard() {
               </div>
             ) : null}
           </div>
-        </div>
       ) : activeTab === 'active-users' ? (
         <div className="space-y-4">
 
