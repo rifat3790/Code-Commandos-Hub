@@ -223,6 +223,40 @@ export default function TelegramBotTab() {
     }
   };
 
+  const [newMemberName, setNewMemberName] = useState('');
+  const [newMemberHandle, setNewMemberHandle] = useState('');
+
+  const handleAddMember = () => {
+    const nameKey = newMemberName.trim().toLowerCase();
+    let handleVal = newMemberHandle.trim();
+    if (!nameKey || !handleVal) {
+      toast.error('Please enter both Member Name and Telegram Handle (@tag)');
+      return;
+    }
+    if (!handleVal.startsWith('@')) {
+      handleVal = `@${handleVal}`;
+    }
+
+    const updated = {
+      ...userMentions,
+      [nameKey]: handleVal
+    };
+    setUserMentions(updated);
+    setNewMemberName('');
+    setNewMemberHandle('');
+    handleSaveSettings(undefined, updated);
+    toast.success(`Added member ${nameKey} (${handleVal})`);
+  };
+
+  const handleRemoveMember = (memberKey: string) => {
+    if (!confirm(`Are you sure you want to remove ${memberKey} from Telegram mentions?`)) return;
+    const updated = { ...userMentions };
+    delete updated[memberKey];
+    setUserMentions(updated);
+    handleSaveSettings(undefined, updated);
+    toast.success(`Removed member ${memberKey}`);
+  };
+
   const handleSendTestMention = async (memberName: string, mentionTag: string) => {
     if (groupChatIds.length === 0) {
       toast.error('No Group Chat IDs configured yet!');
@@ -450,47 +484,98 @@ export default function TelegramBotTab() {
 
         {/* 3. CC Team Member Mention Mappings */}
         <div className="bg-gray-900 border border-glass-border p-6 rounded-2xl space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
-              <MessageSquare className="w-4 h-4 text-green-400" /> CC Team Member Mentions & Test Dispatcher
-            </h3>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                <MessageSquare className="w-4 h-4 text-green-400" /> CC Team Member Mentions & Handles ({Object.keys(userMentions).length})
+              </h3>
+              <p className="text-xs text-gray-400 mt-0.5">
+                Add, update, or remove member names and Telegram `@handle` tags for automated mention alerts.
+              </p>
+            </div>
+
             <button
               onClick={handleSaveMentions}
-              className="px-3 py-1.5 bg-green-600 hover:bg-green-500 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-md shadow-green-600/20"
+              className="px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-md shadow-green-600/20 shrink-0"
             >
-              <Save className="w-3.5 h-3.5" /> Save Handles
+              <Save className="w-4 h-4" /> Save All Handles
             </button>
           </div>
-          <p className="text-xs text-gray-400">
-            Map spreadsheet member names to Telegram handle tags and click <strong>Test Ping</strong> to verify mentions.
-          </p>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-60 overflow-y-auto pr-1">
-            {Object.keys(DEFAULT_USER_MENTIONS).map((memberKey) => {
-              const currentTag = userMentions[memberKey] ?? DEFAULT_USER_MENTIONS[memberKey];
-              return (
-                <div key={memberKey} className="space-y-1 bg-black/30 border border-glass-border p-2.5 rounded-xl">
-                  <div className="flex justify-between items-center">
-                    <label className="text-[11px] font-bold text-gray-300 capitalize">{memberKey}</label>
-                    <button
-                      type="button"
-                      onClick={() => handleSendTestMention(memberKey, currentTag)}
-                      className="text-[9px] font-extrabold text-blue-400 hover:text-blue-300 underline cursor-pointer"
-                      title="Send test mention ping to Telegram group"
-                    >
-                      🧪 Test Ping
-                    </button>
+          {/* Add New Member Inline Form */}
+          <div className="p-4 bg-black/40 border border-glass-border rounded-xl space-y-2">
+            <span className="text-xs font-bold text-gray-300 block">Add New Team Member Handle:</span>
+            <div className="grid grid-cols-1 sm:grid-cols-5 gap-2">
+              <input
+                type="text"
+                placeholder="Member Name (e.g. Sumon)"
+                value={newMemberName}
+                onChange={(e) => setNewMemberName(e.target.value)}
+                className="sm:col-span-2 px-3 py-2 bg-black/60 border border-glass-border rounded-xl text-xs text-white placeholder-gray-500 focus:outline-none focus:border-green-500"
+              />
+              <input
+                type="text"
+                placeholder="Telegram Tag (e.g. @sumon_cc)"
+                value={newMemberHandle}
+                onChange={(e) => setNewMemberHandle(e.target.value)}
+                className="sm:col-span-2 px-3 py-2 bg-black/60 border border-glass-border rounded-xl text-xs text-green-400 font-mono placeholder-gray-500 focus:outline-none focus:border-green-500"
+              />
+              <button
+                type="button"
+                onClick={handleAddMember}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl transition-all cursor-pointer shadow-md shadow-emerald-600/20 flex items-center justify-center gap-1"
+              >
+                <Plus className="w-4 h-4" /> Add Member
+              </button>
+            </div>
+          </div>
+
+          {/* Member Mappings Cards Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-h-72 overflow-y-auto pr-1">
+            {Object.keys(userMentions).length === 0 ? (
+              <div className="col-span-full py-8 text-center text-gray-500 italic">
+                No member handles configured. Use the form above to add team members.
+              </div>
+            ) : (
+              Object.keys(userMentions).map((memberKey) => {
+                const currentTag = userMentions[memberKey];
+                return (
+                  <div key={memberKey} className="space-y-1.5 bg-black/40 border border-glass-border p-3 rounded-xl relative group">
+                    <div className="flex justify-between items-center">
+                      <label className="text-xs font-bold text-white capitalize flex items-center gap-1.5">
+                        <Users className="w-3.5 h-3.5 text-green-400" /> {memberKey}
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleSendTestMention(memberKey, currentTag)}
+                          className="text-[10px] font-extrabold text-blue-400 hover:text-blue-300 underline cursor-pointer"
+                          title="Send test mention ping to Telegram group"
+                        >
+                          🧪 Test Ping
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveMember(memberKey)}
+                          className="p-1 text-gray-500 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors cursor-pointer"
+                          title={`Remove ${memberKey}`}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    <input
+                      type="text"
+                      value={currentTag}
+                      onChange={(e) => handleMentionChange(memberKey, e.target.value)}
+                      placeholder="@telegram_handle"
+                      className="w-full px-2.5 py-1.5 bg-black/60 border border-glass-border rounded-lg text-xs text-green-400 font-mono placeholder-gray-600 focus:outline-none focus:border-green-500"
+                    />
                   </div>
-                  <input
-                    type="text"
-                    value={currentTag}
-                    onChange={(e) => handleMentionChange(memberKey, e.target.value)}
-                    placeholder="@telegram_handle"
-                    className="w-full px-2.5 py-1.5 bg-black/50 border border-glass-border rounded-lg text-xs text-green-400 font-mono placeholder-gray-600 focus:outline-none focus:border-green-500"
-                  />
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
         </div>
       </div>

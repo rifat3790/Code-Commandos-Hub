@@ -11,17 +11,21 @@ export async function GET() {
     const config = await getOrCreateTelegramConfig();
     const botInfo = await getBotInfo();
 
-    let userMentionsObj: Record<string, string> = { ...DEFAULT_USER_MENTIONS };
+    let userMentionsObj: Record<string, string> = {};
     if (config.userMentions) {
-      if (config.userMentions instanceof Map) {
+      if (config.userMentions instanceof Map && config.userMentions.size > 0) {
         config.userMentions.forEach((val: string, key: string) => {
           userMentionsObj[key] = val;
         });
-      } else if (typeof config.userMentions === 'object') {
+      } else if (typeof config.userMentions === 'object' && Object.keys(config.userMentions).length > 0) {
         Object.entries(config.userMentions).forEach(([k, v]) => {
           userMentionsObj[k] = String(v);
         });
       }
+    }
+
+    if (Object.keys(userMentionsObj).length === 0) {
+      userMentionsObj = { ...DEFAULT_USER_MENTIONS };
     }
 
     return NextResponse.json({
@@ -53,6 +57,7 @@ export async function POST(req: Request) {
     }
     if (userMentions !== undefined && typeof userMentions === 'object') {
       config.userMentions = userMentions;
+      config.markModified('userMentions');
     }
     if (autoAlertsEnabled !== undefined) {
       config.autoAlertsEnabled = Boolean(autoAlertsEnabled);
