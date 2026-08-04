@@ -718,7 +718,7 @@ export default function MonthlyTargetTab() {
   const timingInfo = getDaysRemainingInMonth(selectedMonth || '');
 
   return (
-    <div className="space-y-6">
+    <div className="w-full space-y-6 pb-12">
       {/* Month Selection View */}
       {!selectedMonth ? (
         <div className="space-y-6">
