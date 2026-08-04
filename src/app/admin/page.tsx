@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { ShieldAlert, Check, X, Database, Phone, Video, Palette, Type, Square, Calendar, Sparkles, Trash2, Shield, User as UserIcon, Clock, UserCheck, UserX, AlertTriangle, Filter, KeyRound, Copy, Send, Bot } from 'lucide-react';
+import { ShieldAlert, Check, X, Database, Phone, Video, Palette, Type, Square, Calendar, Sparkles, Trash2, Shield, User as UserIcon, Clock, UserCheck, UserX, AlertTriangle, Filter, KeyRound, Copy, Send, Bot, Layers } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useWorkspaceStore } from '@/store/workspaceStore';
 import { useCall } from '@/context/CallContext';
