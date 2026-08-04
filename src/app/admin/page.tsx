@@ -11,7 +11,7 @@ import toast from 'react-hot-toast';
 import TelegramBotTab from '@/components/admin/TelegramBotTab';
 
 const allAvailableMenus = [
-  'Home', 'Workspace', 'Meetings', 'Order Tracker', 'Timeline', 'Issues', 'Personal Projects', 'Message Helper', 'Templates', 'Schema Builder',
+  'Home', 'Workspace', 'Meetings', 'Order Tracker', 'Timeline', 'Monthly Target', 'Issues', 'Personal Projects', 'Message Helper', 'Templates', 'Schema Builder',
   'Audit Suite', 'Projects', 'Mockup Studio', 'Focus Studio', 'AI Assistant', 
   'Team Notes', 'Downloads', 'Member Profile', 'Shopify Codes', 'Settings'
 ];
@@ -1354,7 +1354,7 @@ export default function AdminDashboard() {
                         {(dbUser?.role === 'super_admin' || dbUser?.email === 'refayethossenmd@gmail.com') && (
                           <>
                             <div className="flex items-center justify-between text-[11px] text-gray-400 bg-black/20 border border-glass-border p-2 rounded-lg">
-                              <span>Workspace Monthly Target:</span>
+                              <span className="font-bold text-gray-300">Monthly Target Menu Access:</span>
                               <button
                                 onClick={() => handleToggleWorkspaceMonthlyTarget(u._id, u.canViewWorkspaceMonthlyTarget === true)}
                                 className={`px-2.5 py-1 rounded font-extrabold uppercase text-[9px] border transition-colors cursor-pointer ${u.canViewWorkspaceMonthlyTarget === true ? 'bg-green-500/15 border-green-500/25 text-green-400 hover:bg-green-500/25' : 'bg-red-500/15 border-red-500/25 text-red-400 hover:bg-red-500/25'}`}

@@ -20,6 +20,7 @@ import {
   ChevronRight,
   Terminal,
   Clock,
+  Target,
   X,
   Layers,
   Database,
@@ -85,6 +86,7 @@ export default function Sidebar({ isMobileOpen = false, onCloseMobile }: Sidebar
     { name: 'Meetings', path: '/meetings', icon: Video },
     { name: 'Order Tracker', path: '/tracker', icon: LayoutDashboard },
     { name: 'Timeline', path: '/timeline', icon: Clock },
+    { name: 'Monthly Target', path: '/monthly-target', icon: Target },
     { name: 'Issues', path: '/issues', icon: AlertCircle },
     { name: 'Personal Projects', path: '/personal-projects', icon: FolderKanban },
     { name: 'Message Helper', path: '/message-helper', icon: ShieldAlert },
@@ -108,11 +110,13 @@ export default function Sidebar({ isMobileOpen = false, onCloseMobile }: Sidebar
 
   // For non-super_admin users, filter out disabled menus
   const baseNavItems = baseNavItemsRaw.filter(item => {
-    if (dbUser?.role === 'super_admin') return true;
+    if (dbUser?.role === 'super_admin' || dbUser?.role === 'admin') return true;
+    if (item.name === 'Monthly Target') {
+      return Boolean(dbUser?.canViewWorkspaceMonthlyTarget || (dbUser?.allowedMenus && dbUser.allowedMenus.includes('Monthly Target')));
+    }
     if (dbUser?.allowedMenus && dbUser.allowedMenus.length > 0) {
       return dbUser.allowedMenus.includes(item.name);
     }
-    if (dbUser?.role === 'admin') return adminMenus.includes(item.name);
     return userMenus.includes(item.name);
   });
 
