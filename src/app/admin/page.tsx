@@ -1519,15 +1519,7 @@ export default function AdminDashboard() {
         </div>
       ) : activeTab === 'storage' ? (
         <div className="space-y-6">
-          <div className="bg-gray-900 border border-glass-border p-6 rounded-xl space-y-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-white font-bold text-sm uppercase tracking-wider text-green-400 flex items-center gap-2">
-                  <Database className="w-4 h-4" /> System Storage Stats
-                </h2>
-                <p className="text-xs text-gray-400 mt-1">Real-time database allocation & free space (Super Admin only)</p>
-              </div>
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-gray-900/80 border border-glass-border p-5 rounded-2xl">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-gray-900/80 border border-glass-border p-5 rounded-2xl">
               <div>
                 <div className="flex items-center gap-2">
                   <h2 className="text-white font-extrabold uppercase tracking-wide text-base flex items-center gap-2">
