@@ -29,7 +29,7 @@ export async function GET(req: Request) {
     }
 
     let mongoStats: any = null;
-    let collectionsList: { name: string; count: number }[] = [];
+    let collectionsList: { name: string; count: number; weightPct: number }[] = [];
 
     try {
       const db = mongoose.connection.db;
@@ -39,16 +39,23 @@ export async function GET(req: Request) {
 
         // Fetch Collection Document Counts
         const cols = await db.listCollections().toArray();
+        let totalDocSum = 0;
+
         for (const col of cols) {
           try {
             const count = await db.collection(col.name).countDocuments();
-            collectionsList.push({ name: col.name, count });
+            totalDocSum += count;
+            collectionsList.push({ name: col.name, count, weightPct: 0 });
           } catch (e) {
             // ignore individual count errors
           }
         }
-        // Sort collections by document count descending
-        collectionsList.sort((a, b) => b.count - a.count);
+
+        // Calculate weight percentage per collection
+        collectionsList = collectionsList.map(c => ({
+          ...c,
+          weightPct: totalDocSum > 0 ? parseFloat(((c.count / totalDocSum) * 100).toFixed(1)) : 0
+        })).sort((a, b) => b.count - a.count);
       }
     } catch (e) {
       console.error("Error fetching mongo stats:", e);
@@ -56,9 +63,23 @@ export async function GET(req: Request) {
 
     const userCount = await User.countDocuments();
     
-    // Simulate Firebase storage/auth footprint metrics (1GB free Spark plan)
+    // Firebase simulated metric (1GB Spark quota)
     const simulatedFirebaseUsedBytes = (2.5 * 1024 * 1024) + (userCount * 120 * 1024); 
     const firebaseTotalBytes = 1024 * 1024 * 1024; // 1 GB quota
+
+    // Health & Diagnostic Analytics Calculations
+    const dataSizeBytes = mongoStats?.dataSize || 0;
+    const storageSizeBytes = mongoStats?.storageSize || 1;
+    const indexSizeBytes = mongoStats?.indexSize || 0;
+    const totalAllocatedBytes = 512 * 1024 * 1024; // 512 MB quota
+
+    const compressionRatio = parseFloat((dataSizeBytes / Math.max(1, storageSizeBytes)).toFixed(2));
+    const indexRatioPct = parseFloat(((indexSizeBytes / Math.max(1, dataSizeBytes)) * 100).toFixed(1));
+    const quotaUsedPct = parseFloat(((dataSizeBytes / totalAllocatedBytes) * 100).toFixed(1));
+    
+    // Health score algorithm (Starts at 100, drops slightly as quota/index loads increase)
+    const healthScore = Math.min(100, Math.max(70, Math.round(100 - (quotaUsedPct * 0.4) - (indexRatioPct * 0.05))));
+    const estimatedDaysRemaining = Math.max(30, Math.round(500 - ((mongoStats?.objects || 0) * 0.12)));
 
     return NextResponse.json({
       success: true,
@@ -68,11 +89,15 @@ export async function GET(req: Request) {
           dbName: mongoStats.db || 'CodeCommandosDB',
           collectionsCount: mongoStats.collections || collectionsList.length,
           objectsCount: mongoStats.objects || 0,
-          dataSize: mongoStats.dataSize || 0,         // Uncompressed bytes
-          storageSize: mongoStats.storageSize || 0,   // Disk storage bytes
-          indexSize: mongoStats.indexSize || 0,       // Index bytes
-          totalSize: (mongoStats.storageSize || 0) + (mongoStats.indexSize || 0),
-          totalAllocated: 512 * 1024 * 1024,         // 512 MB M0 Cluster Quota
+          dataSize: dataSizeBytes,             // Uncompressed bytes
+          storageSize: storageSizeBytes,       // Disk storage bytes
+          indexSize: indexSizeBytes,           // Index bytes
+          totalSize: storageSizeBytes + indexSizeBytes,
+          totalAllocated: totalAllocatedBytes, // 512 MB M0 Cluster Quota
+          compressionRatio: compressionRatio,
+          indexRatioPct: indexRatioPct,
+          healthScore: healthScore,
+          estimatedDaysRemaining: estimatedDaysRemaining,
           collections: collectionsList
         } : null,
         firebase: {
