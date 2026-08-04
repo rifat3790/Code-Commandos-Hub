@@ -289,27 +289,34 @@ export default function AdminDashboard() {
     }
   };
 
-  const fetchStorageStats = async () => {
+  const [storageLastUpdated, setStorageLastUpdated] = useState<string | null>(null);
+
+  const fetchStorageStats = async (isBackground = false) => {
     if (!user) return;
-    setLoadingStorage(true);
+    if (!isBackground) setLoadingStorage(true);
     try {
       const res = await fetch(`/api/admin/storage?uid=${user.uid}`);
       const data = await res.json();
       if (data.success) {
         setStorageStats(data.data);
+        setStorageLastUpdated(new Date().toLocaleTimeString());
       }
     } catch (err) {
       console.error(err);
     } finally {
-      setLoadingStorage(false);
+      if (!isBackground) setLoadingStorage(false);
     }
   };
 
   useEffect(() => {
-    if (activeTab === 'storage' && !storageStats) {
+    if (activeTab === 'storage') {
       fetchStorageStats();
+      const interval = setInterval(() => {
+        fetchStorageStats(true);
+      }, 5000);
+      return () => clearInterval(interval);
     }
-  }, [activeTab]);
+  }, [activeTab, user]);
 
   const fetchActiveVisitors = async () => {
     if (!user) return;
@@ -1520,98 +1527,194 @@ export default function AdminDashboard() {
                 </h2>
                 <p className="text-xs text-gray-400 mt-1">Real-time database allocation & free space (Super Admin only)</p>
               </div>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-gray-900/80 border border-glass-border p-5 rounded-2xl">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-white font-extrabold uppercase tracking-wide text-base flex items-center gap-2">
+                    <Database className="w-5 h-5 text-emerald-400" /> SYSTEM STORAGE STATS
+                  </h2>
+                  <span className="px-2.5 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-mono text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 animate-pulse">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                    LIVE POLLING (5s)
+                  </span>
+                </div>
+                <p className="text-xs text-gray-400 mt-1 flex items-center gap-2">
+                  <span>Real-time database allocation & collection metrics</span>
+                  {storageLastUpdated && (
+                    <span className="text-[10px] text-gray-500 font-mono">Last updated: {storageLastUpdated}</span>
+                  )}
+                </p>
+              </div>
+              
               <button 
-                onClick={fetchStorageStats} 
+                onClick={() => fetchStorageStats(false)} 
                 disabled={loadingStorage}
-                className="px-4 py-2 bg-gray-800 border border-glass-border rounded-lg text-xs font-bold hover:bg-gray-700 disabled:opacity-50"
+                className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-200 border border-glass-border rounded-xl text-xs font-bold transition-all disabled:opacity-50 flex items-center gap-2 cursor-pointer shadow-md"
               >
-                {loadingStorage ? 'Refreshing...' : 'Refresh'}
+                <Clock className={`w-3.5 h-3.5 text-emerald-400 ${loadingStorage ? 'animate-spin' : ''}`} />
+                <span>{loadingStorage ? 'Updating...' : 'Refresh Now'}</span>
               </button>
             </div>
 
             {loadingStorage && !storageStats ? (
-              <div className="text-center py-8 text-gray-500 text-sm">Loading storage statistics...</div>
+              <div className="text-center py-12 text-gray-400 text-sm flex items-center justify-center gap-2">
+                <Clock className="w-5 h-5 text-emerald-400 animate-spin" />
+                <span>Fetching live database storage statistics...</span>
+              </div>
             ) : storageStats ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                
-                {/* MongoDB Card */}
-                <div className="bg-black/50 border border-glass-border p-5 rounded-lg space-y-4">
-                  <div className="flex justify-between items-center mb-2">
-                    <h3 className="text-white font-extrabold uppercase tracking-wide text-xs">MongoDB Database</h3>
-                    <span className="px-2 py-1 bg-green-500/20 text-green-400 rounded text-[9px] font-bold">Mongoose</span>
-                  </div>
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   
-                  {storageStats.mongodb ? (
-                    <>
-                      <div className="space-y-1">
-                        <div className="flex justify-between text-xs font-medium">
-                          <span className="text-gray-400">Used Space</span>
-                          <span className="text-white">{(storageStats.mongodb.dataSize / (1024 * 1024)).toFixed(2)} MB</span>
-                        </div>
-                        <div className="flex justify-between text-xs font-medium">
-                          <span className="text-gray-400">Allocated Total</span>
-                          <span className="text-white">{(storageStats.mongodb.totalAllocated / (1024 * 1024)).toFixed(0)} MB</span>
-                        </div>
-                        <div className="flex justify-between text-xs font-medium">
-                          <span className="text-gray-400">Free Space</span>
-                          <span className="text-green-400 font-bold">{((storageStats.mongodb.totalAllocated - storageStats.mongodb.dataSize) / (1024 * 1024)).toFixed(2)} MB</span>
-                        </div>
+                  {/* MongoDB Primary Card */}
+                  <div className="bg-gray-900/90 border border-glass-border p-5 rounded-2xl space-y-4 shadow-xl relative overflow-hidden">
+                    <div className="flex justify-between items-center border-b border-white/5 pb-3">
+                      <div>
+                        <h3 className="text-white font-extrabold uppercase tracking-wide text-xs">MongoDB Primary Database</h3>
+                        <span className="text-[10px] text-gray-400 font-mono mt-0.5 block">Database: {storageStats.mongodb?.dbName || 'CodeCommandosDB'}</span>
                       </div>
-                      
-                      <div className="w-full h-2.5 bg-gray-800 rounded-full overflow-hidden">
-                        <div 
-                          className="h-full bg-gradient-to-r from-green-600 to-green-400 rounded-full" 
-                          style={{ width: `${Math.min(100, (storageStats.mongodb.dataSize / storageStats.mongodb.totalAllocated) * 100)}%` }} 
-                        />
+                      <span className="px-2.5 py-1 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-lg text-[10px] font-bold font-mono">
+                        Mongo M0 (512MB Quota)
+                      </span>
+                    </div>
+                    
+                    {storageStats.mongodb ? (
+                      <>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                          <div className="p-2.5 bg-black/40 border border-glass-border rounded-xl">
+                            <span className="text-[9px] text-gray-400 font-bold uppercase block">Used Space</span>
+                            <span className="text-sm font-black text-white font-mono">
+                              {(storageStats.mongodb.dataSize / (1024 * 1024)).toFixed(2)} MB
+                            </span>
+                          </div>
+
+                          <div className="p-2.5 bg-black/40 border border-glass-border rounded-xl">
+                            <span className="text-[9px] text-gray-400 font-bold uppercase block">Disk Footprint</span>
+                            <span className="text-sm font-black text-purple-300 font-mono">
+                              {(storageStats.mongodb.storageSize / (1024 * 1024)).toFixed(2)} MB
+                            </span>
+                          </div>
+
+                          <div className="p-2.5 bg-black/40 border border-glass-border rounded-xl">
+                            <span className="text-[9px] text-gray-400 font-bold uppercase block">Doc Objects</span>
+                            <span className="text-sm font-black text-amber-300 font-mono">
+                              {storageStats.mongodb.objectsCount?.toLocaleString() || 0}
+                            </span>
+                          </div>
+
+                          <div className="p-2.5 bg-black/40 border border-glass-border rounded-xl">
+                            <span className="text-[9px] text-gray-400 font-bold uppercase block">Free Space</span>
+                            <span className="text-sm font-black text-emerald-400 font-mono">
+                              {((storageStats.mongodb.totalAllocated - storageStats.mongodb.dataSize) / (1024 * 1024)).toFixed(2)} MB
+                            </span>
+                          </div>
+                        </div>
+                        
+                        <div className="space-y-1 pt-1">
+                          <div className="flex justify-between text-[11px] font-bold">
+                            <span className="text-gray-400">Database Quota Usage</span>
+                            <span className="text-emerald-400 font-mono">
+                              {((storageStats.mongodb.dataSize / storageStats.mongodb.totalAllocated) * 100).toFixed(1)}% Used
+                            </span>
+                          </div>
+                          <div className="w-full h-3 bg-black/60 border border-glass-border rounded-full overflow-hidden p-0.5">
+                            <div 
+                              className="h-full bg-gradient-to-r from-emerald-600 via-teal-400 to-emerald-300 rounded-full transition-all duration-500 shadow-sm shadow-emerald-500/50" 
+                              style={{ width: `${Math.min(100, Math.max(1, (storageStats.mongodb.dataSize / storageStats.mongodb.totalAllocated) * 100))}%` }} 
+                            />
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <p className="text-xs text-red-400">Unable to fetch MongoDB database statistics.</p>
+                    )}
+                  </div>
+
+                  {/* Firebase Backend Card */}
+                  <div className="bg-gray-900/90 border border-glass-border p-5 rounded-2xl space-y-4 shadow-xl relative overflow-hidden">
+                    <div className="flex justify-between items-center border-b border-white/5 pb-3">
+                      <div>
+                        <h3 className="text-white font-extrabold uppercase tracking-wide text-xs">Firebase Realtime & Auth</h3>
+                        <span className="text-[10px] text-gray-400 font-mono mt-0.5 block">Firebase Spark Plan Quota</span>
                       </div>
-                      <p className="text-[10px] text-gray-500 text-right">
-                        {`${((storageStats.mongodb.dataSize / storageStats.mongodb.totalAllocated) * 100).toFixed(1)}% Used`}
-                      </p>
-                    </>
-                  ) : (
-                    <p className="text-xs text-red-400">Unable to fetch MongoDB stats</p>
-                  )}
+                      <span className="px-2.5 py-1 bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded-lg text-[10px] font-bold font-mono">
+                        Realtime / Auth (1GB)
+                      </span>
+                    </div>
+                    
+                    {storageStats.firebase ? (
+                      <>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+                          <div className="p-2.5 bg-black/40 border border-glass-border rounded-xl">
+                            <span className="text-[9px] text-gray-400 font-bold uppercase block">Used Space (Est)</span>
+                            <span className="text-sm font-black text-white font-mono">
+                              {(storageStats.firebase.usedSpace / (1024 * 1024)).toFixed(2)} MB
+                            </span>
+                          </div>
+
+                          <div className="p-2.5 bg-black/40 border border-glass-border rounded-xl">
+                            <span className="text-[9px] text-gray-400 font-bold uppercase block">Registered Users</span>
+                            <span className="text-sm font-black text-blue-300 font-mono">
+                              {storageStats.firebase.userCount || 0} Accounts
+                            </span>
+                          </div>
+
+                          <div className="p-2.5 bg-black/40 border border-glass-border rounded-xl">
+                            <span className="text-[9px] text-gray-400 font-bold uppercase block">Free Space</span>
+                            <span className="text-sm font-black text-blue-400 font-mono">
+                              {((storageStats.firebase.totalAllocated - storageStats.firebase.usedSpace) / (1024 * 1024)).toFixed(2)} MB
+                            </span>
+                          </div>
+                        </div>
+                        
+                        <div className="space-y-1 pt-1">
+                          <div className="flex justify-between text-[11px] font-bold">
+                            <span className="text-gray-400">Firebase Realtime Quota</span>
+                            <span className="text-blue-400 font-mono">
+                              {((storageStats.firebase.usedSpace / storageStats.firebase.totalAllocated) * 100).toFixed(1)}% Used
+                            </span>
+                          </div>
+                          <div className="w-full h-3 bg-black/60 border border-glass-border rounded-full overflow-hidden p-0.5">
+                            <div 
+                              className="h-full bg-gradient-to-r from-blue-600 via-cyan-400 to-blue-300 rounded-full transition-all duration-500 shadow-sm shadow-blue-500/50" 
+                              style={{ width: `${Math.min(100, Math.max(1, (storageStats.firebase.usedSpace / storageStats.firebase.totalAllocated) * 100))}%` }} 
+                            />
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <p className="text-xs text-red-400">Unable to fetch Firebase backend statistics.</p>
+                    )}
+                  </div>
+
                 </div>
 
-                {/* Firebase Card */}
-                <div className="bg-black/50 border border-glass-border p-5 rounded-lg space-y-4">
-                  <div className="flex justify-between items-center mb-2">
-                    <h3 className="text-white font-extrabold uppercase tracking-wide text-xs">Firebase Backend</h3>
-                    <span className="px-2 py-1 bg-blue-500/20 text-blue-400 rounded text-[9px] font-bold">Realtime / Auth</span>
-                  </div>
-                  
-                  {storageStats.firebase ? (
-                    <>
-                      <div className="space-y-1">
-                        <div className="flex justify-between text-xs font-medium">
-                          <span className="text-gray-400">Used Space (Est)</span>
-                          <span className="text-white">{(storageStats.firebase.usedSpace / (1024 * 1024)).toFixed(2)} MB</span>
-                        </div>
-                        <div className="flex justify-between text-xs font-medium">
-                          <span className="text-gray-400">Allocated Total</span>
-                          <span className="text-white">{(storageStats.firebase.totalAllocated / (1024 * 1024)).toFixed(0)} MB</span>
-                        </div>
-                        <div className="flex justify-between text-xs font-medium">
-                          <span className="text-gray-400">Free Space</span>
-                          <span className="text-blue-400 font-bold">{((storageStats.firebase.totalAllocated - storageStats.firebase.usedSpace) / (1024 * 1024)).toFixed(2)} MB</span>
-                        </div>
-                      </div>
-                      
-                      <div className="w-full h-2.5 bg-gray-800 rounded-full overflow-hidden">
-                        <div 
-                          className="h-full bg-gradient-to-r from-blue-600 to-blue-400 rounded-full" 
-                          style={{ width: `${Math.min(100, (storageStats.firebase.usedSpace / storageStats.firebase.totalAllocated) * 100)}%` }} 
-                        />
-                      </div>
-                      <p className="text-[10px] text-gray-500 text-right">
-                        {`${((storageStats.firebase.usedSpace / storageStats.firebase.totalAllocated) * 100).toFixed(1)}% Used`}
-                      </p>
-                    </>
-                  ) : (
-                    <p className="text-xs text-red-400">Unable to fetch Firebase stats</p>
-                  )}
-                </div>
+                {/* Collection Level Document Breakdown */}
+                {storageStats.mongodb?.collections && storageStats.mongodb.collections.length > 0 && (
+                  <div className="bg-gray-900/90 border border-glass-border p-5 rounded-2xl space-y-4 shadow-xl">
+                    <div className="flex justify-between items-center border-b border-white/5 pb-3">
+                      <h3 className="text-white font-extrabold uppercase tracking-wide text-xs flex items-center gap-2">
+                        <Layers className="w-4 h-4 text-amber-400" /> Database Collections Document Count Breakdown
+                      </h3>
+                      <span className="text-[10px] text-gray-400 font-mono font-bold">
+                        {storageStats.mongodb.collections.length} Total Collections
+                      </span>
+                    </div>
 
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                      {storageStats.mongodb.collections.map((col: any) => (
+                        <div key={col.name} className="p-3 bg-black/50 border border-glass-border rounded-xl flex flex-col justify-between space-y-1">
+                          <span className="text-[10px] text-gray-400 font-extrabold uppercase truncate font-mono" title={col.name}>
+                            {col.name}
+                          </span>
+                          <div className="flex items-baseline justify-between">
+                            <span className="text-base font-black text-amber-400 font-mono">{col.count.toLocaleString()}</span>
+                            <span className="text-[9px] text-gray-500 uppercase font-bold">Docs</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             ) : null}
           </div>
