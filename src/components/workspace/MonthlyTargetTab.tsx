@@ -1,20 +1,20 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { 
   Loader2, Plus, Save, Calendar, ChevronLeft, Trash2, Edit2, 
-  UserPlus, Target, TrendingUp, X, DollarSign, Award, Percent, 
+  Target, TrendingUp, X, DollarSign, Award, Percent, 
   Sliders, Info, Sparkles, AlertCircle, RefreshCw, Trophy, Star, 
-  Zap, TrendingDown, ChevronDown, ChevronUp, Copy, CheckCircle2,
-  FileSpreadsheet, ClipboardList, Inbox, ArrowUpRight
+  Zap, ChevronDown, ChevronUp, CheckCircle2, Search,
+  ClipboardList, Inbox, User, Layers, ArrowUpRight, Flame
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
 
-// Circular Progress Component for Premium Visualizations
-const ProgressRing = ({ percentage, size = 110, strokeWidth = 8, colorClass = "text-brand-green", glowColor = "rgba(0, 201, 80, 0.3)" }: any) => {
+// Circular Progress Ring Component
+const ProgressRing = ({ percentage, size = 100, strokeWidth = 8, colorClass = "text-emerald-400", glowColor = "rgba(16, 185, 129, 0.3)" }: any) => {
   const radius = (size - strokeWidth) / 2;
   const circumference = radius * 2 * Math.PI;
   const offset = circumference - (Math.min(100, Math.max(0, percentage)) / 100) * circumference;
@@ -43,13 +43,13 @@ const ProgressRing = ({ percentage, size = 110, strokeWidth = 8, colorClass = "t
           cx={size / 2}
           cy={size / 2}
           style={{
-            filter: `drop-shadow(0 0 5px ${glowColor})`
+            filter: `drop-shadow(0 0 6px ${glowColor})`
           }}
         />
       </svg>
       <div className="absolute flex flex-col items-center justify-center text-center">
-        <span className="text-xl font-black text-white">{percentage}%</span>
-        <span className="text-[8px] text-gray-500 font-bold uppercase tracking-widest mt-0.5">Achieved</span>
+        <span className="text-lg font-black text-white font-mono">{percentage}%</span>
+        <span className="text-[7px] text-gray-400 font-extrabold uppercase tracking-widest">Achieved</span>
       </div>
     </div>
   );
@@ -60,16 +60,15 @@ export default function MonthlyTargetTab() {
   const [targets, setTargets] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Active navigation states
+  // Active Month & Navigation
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
-  
-  // Custom sub-tabs within Month Details
-  const [activeSubTab, setActiveSubTab] = useState<'overview' | 'simulator' | 'ledger'>('ledger');
+  const [activeSubTab, setActiveSubTab] = useState<'ledger' | 'overview' | 'simulator'>('ledger');
+  const [memberSearch, setMemberSearch] = useState<string>('');
   
   // Target Multiplier Slider for simulator
   const [simulatorMultiplier, setSimulatorMultiplier] = useState<number>(100);
 
-  // Accordions for Team cards in the Ledger Tab
+  // Accordions for Team cards
   const [expandedTeams, setExpandedTeams] = useState<Record<string, boolean>>({});
 
   // Modals state
@@ -77,7 +76,7 @@ export default function MonthlyTargetTab() {
   const [newMonthName, setNewMonthName] = useState('');
   const [isCreatingMonth, setIsCreatingMonth] = useState(false);
   
-  // Carry Over States for Month Creation
+  // Carry Over States
   const [carryOverChecked, setCarryOverChecked] = useState(false);
   const [sourceMonthSelect, setSourceMonthSelect] = useState('');
   const [selectedTeamsChecklist, setSelectedTeamsChecklist] = useState<Record<string, boolean>>({});
@@ -108,20 +107,7 @@ export default function MonthlyTargetTab() {
 
   const isAdmin = dbUser?.role === 'super_admin' || dbUser?.role === 'admin';
   const activeUid = user?.uid || dbUser?.firebaseUid;
-  const lastFetchedUid = React.useRef<string | null>(null);
-
-  // Autofill mapping of Employee ID -> Name
-  const knownMembersMap = React.useMemo(() => {
-    const map: Record<string, string> = {};
-    targets.forEach(t => {
-      t.members.forEach((m: any) => {
-        if (m.employeeId && m.name) {
-          map[m.employeeId.trim().toUpperCase()] = m.name.trim();
-        }
-      });
-    });
-    return map;
-  }, [targets]);
+  const lastFetchedUid = useRef<string | null>(null);
 
   const fetchPendingChanges = async () => {
     try {
@@ -137,53 +123,41 @@ export default function MonthlyTargetTab() {
   };
 
   useEffect(() => {
-    console.log("[MonthlyTargetTab Debug] activeUid evaluated:", activeUid, "user:", user?.uid, "dbUser:", dbUser?.firebaseUid);
     if (activeUid) {
       if (activeUid !== lastFetchedUid.current) {
-        console.log("[MonthlyTargetTab Debug] Triggering fetchTargets for UID:", activeUid);
         lastFetchedUid.current = activeUid;
         fetchTargets(activeUid);
         if (isAdmin) {
           fetchPendingChanges();
         }
-      } else {
-        console.log("[MonthlyTargetTab Debug] Skipped fetchTargets: UID matches last fetched.");
       }
     } else {
-      console.log("[MonthlyTargetTab Debug] activeUid is empty. AuthLoading state is:", authLoading);
       if (!authLoading) {
-        console.log("[MonthlyTargetTab Debug] Auth completed and no UID found. Setting loading to false.");
         setLoading(false);
       }
     }
   }, [activeUid, authLoading, isAdmin]);
 
-  // Set first team expanded by default when selectedMonth changes
+  // Extract unique months sorted descending
+  const uniqueMonths = useMemo(() => {
+    return Array.from(new Set(targets.map(t => t.monthName))).sort((a, b) => b.localeCompare(a));
+  }, [targets]);
+
+  // Auto-select latest month if none selected
   useEffect(() => {
-    if (selectedMonth) {
-      const activeMonthTargets = targets.filter((t: any) => t.monthName === selectedMonth);
-      if (activeMonthTargets.length > 0) {
-        setExpandedTeams({ [activeMonthTargets[0]._id]: true });
-      }
-      // Reset simulator multiplier on month change
-      setSimulatorMultiplier(100);
-      setActiveSubTab('ledger');
+    if (uniqueMonths.length > 0 && !selectedMonth) {
+      setSelectedMonth(uniqueMonths[0]);
     }
-  }, [selectedMonth, targets]);
+  }, [uniqueMonths, selectedMonth]);
 
-  // Extract unique months from targets
-  const uniqueMonths = Array.from(new Set(targets.map(t => t.monthName))).sort((a, b) => {
-    return b.localeCompare(a); // Sort descending
-  });
-
-  // Set default source month when uniqueMonths load
+  // Set default source month for carry-over
   useEffect(() => {
     if (uniqueMonths.length > 0 && !sourceMonthSelect) {
       setSourceMonthSelect(uniqueMonths[0]);
     }
   }, [uniqueMonths, sourceMonthSelect]);
 
-  // Automatically select all teams of the selected source month by default
+  // Auto-select all teams of source month
   useEffect(() => {
     if (sourceMonthSelect) {
       const sourceMonthTargets = targets.filter(t => t.monthName === sourceMonthSelect);
@@ -197,48 +171,80 @@ export default function MonthlyTargetTab() {
     }
   }, [sourceMonthSelect, targets]);
 
+  // Expand first team accordion by default when month changes
+  useEffect(() => {
+    if (selectedMonth) {
+      const activeMonthTargets = targets.filter((t: any) => t.monthName === selectedMonth);
+      if (activeMonthTargets.length > 0) {
+        setExpandedTeams({ [activeMonthTargets[0]._id]: true });
+      }
+      setSimulatorMultiplier(100);
+    }
+  }, [selectedMonth, targets]);
+
   const fetchTargets = async (uidToFetch?: string) => {
     const fetchUid = uidToFetch || activeUid;
-    console.log("[MonthlyTargetTab Debug] fetchTargets initiated with UID:", fetchUid);
-    if (!fetchUid) {
-      console.log("[MonthlyTargetTab Debug] fetchTargets aborted: fetchUid is falsy.");
-      return;
-    }
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => {
-      console.warn("[MonthlyTargetTab Debug] Fetch targets API connection timed out. Aborting request.");
-      controller.abort();
-    }, 7000);
+    if (!fetchUid) return;
 
     try {
       setLoading(true);
-      console.log("[MonthlyTargetTab Debug] Fetching targets from API...");
-      const res = await fetch(`/api/workspace/targets?uid=${fetchUid}`, {
-        signal: controller.signal
-      });
-      clearTimeout(timeoutId);
-      
-      console.log("[MonthlyTargetTab Debug] API response received. Status:", res.status);
+      const res = await fetch(`/api/workspace/targets?uid=${fetchUid}`);
       const data = await res.json();
-      console.log("[MonthlyTargetTab Debug] API data parsed successfully:", data);
       if (data.success) {
-        setTargets(data.targets);
+        setTargets(data.targets || []);
       } else {
-        console.error("[MonthlyTargetTab Debug] Target loading failed on server:", data.error);
         toast.error(`Error: ${data.error}`);
       }
     } catch (err: any) {
-      clearTimeout(timeoutId);
-      console.error("[MonthlyTargetTab Debug] Exception in fetchTargets:", err);
-      if (err.name === 'AbortError') {
-        toast.error('Database connection timed out. Showing cached state or empty workspace.');
-      } else {
-        toast.error('Failed to load targets');
-      }
+      toast.error('Failed to load targets');
     } finally {
-      console.log("[MonthlyTargetTab Debug] fetchTargets finished. Setting loading to false.");
       setLoading(false);
+    }
+  };
+
+  const triggerConfetti = (e?: React.MouseEvent) => {
+    if (typeof window === 'undefined') return;
+    let origin: any = { y: 0.6 };
+    if (e) {
+      origin = {
+        x: e.clientX / window.innerWidth,
+        y: e.clientY / window.innerHeight
+      };
+    }
+    confetti({
+      particleCount: 120,
+      spread: 70,
+      origin,
+      colors: ['#10B981', '#3B82F6', '#F59E0B', '#8B5CF6', '#EC4899']
+    });
+  };
+
+  const getDaysRemainingInMonth = (monthStr: string) => {
+    if (!monthStr) return { daysLeft: 0, totalDays: 30, isCurrentMonth: false, isPast: false, isFuture: false };
+    const parts = monthStr.split(' ');
+    if (parts.length !== 2) return { daysLeft: 15, totalDays: 30, isCurrentMonth: false, isPast: false, isFuture: false };
+    
+    const monthNames = [
+      "january", "february", "march", "april", "may", "june",
+      "july", "august", "september", "october", "november", "december"
+    ];
+    const mIndex = monthNames.indexOf(parts[0].toLowerCase());
+    const year = parseInt(parts[1]);
+    
+    if (mIndex === -1 || isNaN(year)) return { daysLeft: 15, totalDays: 30, isCurrentMonth: false, isPast: false, isFuture: false };
+    
+    const totalDays = new Date(year, mIndex + 1, 0).getDate();
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    
+    if (currentMonth === mIndex && currentYear === year) {
+      const daysLeft = Math.max(1, totalDays - now.getDate());
+      return { daysLeft, totalDays, isCurrentMonth: true, isPast: false, isFuture: false };
+    } else if (year < currentYear || (year === currentYear && mIndex < currentMonth)) {
+      return { daysLeft: 0, totalDays, isCurrentMonth: false, isPast: true, isFuture: false };
+    } else {
+      return { daysLeft: totalDays, totalDays, isCurrentMonth: false, isPast: false, isFuture: true };
     }
   };
 
@@ -264,7 +270,6 @@ export default function MonthlyTargetTab() {
         toast.error(data.error || 'Failed to process decision');
       }
     } catch (err) {
-      console.error(err);
       toast.error('Failed to communicate with server');
     } finally {
       setIsProcessingDecision(null);
@@ -280,7 +285,6 @@ export default function MonthlyTargetTab() {
       return;
     }
 
-    // Apply incremental add logic if chosen
     if (requestType === 'add') {
       newVal = (activeRequestTarget.oldAchieved || 0) + newVal;
     }
@@ -317,61 +321,9 @@ export default function MonthlyTargetTab() {
         toast.error(data.error || 'Failed to submit request');
       }
     } catch (err) {
-      console.error(err);
       toast.error('Failed to submit request');
     } finally {
       setIsSubmittingRequest(false);
-    }
-  };
-
-  // Helper: Celebrate with confetti
-  const triggerConfetti = (e?: React.MouseEvent) => {
-    if (typeof window === 'undefined') return;
-    
-    let origin: any = { y: 0.6 };
-    if (e) {
-      const { clientX, clientY } = e;
-      origin = {
-        x: clientX / window.innerWidth,
-        y: clientY / window.innerHeight
-      };
-    }
-    
-    confetti({
-      particleCount: 140,
-      spread: 75,
-      origin,
-      colors: ['#00C950', '#00F5A0', '#ffd700', '#3b82f6', '#a855f7']
-    });
-  };
-
-  // Helper: Date arithmetic for target simulations
-  const getDaysRemainingInMonth = (monthStr: string) => {
-    if (!monthStr) return { daysLeft: 0, totalDays: 30, isCurrentMonth: false, isPast: false, isFuture: false };
-    const parts = monthStr.split(' ');
-    if (parts.length !== 2) return { daysLeft: 15, totalDays: 30, isCurrentMonth: false, isPast: false, isFuture: false };
-    
-    const monthNames = [
-      "january", "february", "march", "april", "may", "june",
-      "july", "august", "september", "october", "november", "december"
-    ];
-    const mIndex = monthNames.indexOf(parts[0].toLowerCase());
-    const year = parseInt(parts[1]);
-    
-    if (mIndex === -1 || isNaN(year)) return { daysLeft: 15, totalDays: 30, isCurrentMonth: false, isPast: false, isFuture: false };
-    
-    const totalDays = new Date(year, mIndex + 1, 0).getDate();
-    const now = new Date();
-    const currentMonth = now.getMonth();
-    const currentYear = now.getFullYear();
-    
-    if (currentMonth === mIndex && currentYear === year) {
-      const daysLeft = Math.max(1, totalDays - now.getDate());
-      return { daysLeft, totalDays, isCurrentMonth: true, isPast: false, isFuture: false };
-    } else if (year < currentYear || (year === currentYear && mIndex < currentMonth)) {
-      return { daysLeft: 0, totalDays, isCurrentMonth: false, isPast: true, isFuture: false };
-    } else {
-      return { daysLeft: totalDays, totalDays, isCurrentMonth: false, isPast: false, isFuture: true };
     }
   };
 
@@ -390,7 +342,6 @@ export default function MonthlyTargetTab() {
       const teamsToClone = targets.filter(t => t.monthName === sourceMonthSelect && selectedTeamsChecklist[t._id]);
       
       if (carryOverChecked && teamsToClone.length > 0) {
-        // Carry over selected team configurations
         for (const target of teamsToClone) {
           const res = await fetch('/api/workspace/targets', {
             method: 'POST',
@@ -404,18 +355,14 @@ export default function MonthlyTargetTab() {
                 name: m.name,
                 officialTarget: m.officialTarget || 0,
                 teamTarget: m.teamTarget || 0,
-                achieved: 0 // achieved reset to 0
+                achieved: 0
               }))
             })
           });
-          const data = await res.json();
-          if (!data.success) {
-            throw new Error(data.error || `Failed to clone team ${target.teamName}`);
-          }
+          await res.json();
         }
-        toast.success(`Month folder "${formattedMonth}" created with carried over members!`);
+        toast.success(`Cloned ${teamsToClone.length} team(s) to ${formattedMonth}`);
       } else {
-        // Create month folder with a single empty CC team target
         const res = await fetch('/api/workspace/targets', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -426,20 +373,16 @@ export default function MonthlyTargetTab() {
             members: []
           })
         });
-        const data = await res.json();
-        if (!data.success) {
-          throw new Error(data.error || 'Failed to create empty folder');
-        }
-        toast.success(`Month folder "${formattedMonth}" created`);
+        await res.json();
+        toast.success(`Created month folder ${formattedMonth}`);
       }
-      
+
       setNewMonthName('');
-      setCarryOverChecked(false);
       setIsMonthModalOpen(false);
-      await fetchTargets();
-      setSelectedMonth(formattedMonth); 
-    } catch (err: any) {
-      toast.error(err.message || 'Error creating month');
+      setSelectedMonth(formattedMonth);
+      fetchTargets();
+    } catch (err) {
+      toast.error('Error creating month folder');
     } finally {
       setIsCreatingMonth(false);
     }
@@ -515,7 +458,7 @@ export default function MonthlyTargetTab() {
       });
       const data = await res.json();
       if (data.success) {
-        toast.success(`Month folder "${monthName}" and all contents deleted`);
+        toast.success(`Month folder "${monthName}" deleted`);
         if (selectedMonth === monthName) {
           setSelectedMonth(null);
         }
@@ -602,1771 +545,1161 @@ export default function MonthlyTargetTab() {
         toast.error(data.error || 'Failed to save targets');
       }
     } catch (err) {
-      toast.error('Error saving targets');
+      toast.error('Error saving target');
     } finally {
       setIsSavingTarget(false);
     }
   };
 
-  // Quick Paste Data Parser
-  const handleParseQuickPaste = () => {
+  const handleApplyQuickPaste = () => {
     if (!quickPasteText.trim() || !activeEditTarget) return;
-    
-    const lines = quickPasteText.split('\n');
-    const newMembers = [...activeEditTarget.members];
-    let successCount = 0;
-    
+
+    const lines = quickPasteText.trim().split('\n');
+    const newMembers: any[] = [];
+
     lines.forEach(line => {
-      if (!line.trim()) return;
-      
-      // Split by tab, then fall back to comma
-      let parts = line.split('\t');
-      if (parts.length < 2) {
-        parts = line.split(',');
-      }
-      
-      const cleanParts = parts.map(p => p.trim());
-      if (cleanParts.length >= 2) {
-        const empId = cleanParts[0];
-        const name = cleanParts[1];
-        // Parse targets and achievements, cleaning out dollar signs/commas
-        const officialTarget = cleanParts[2] ? Math.max(0, Number(cleanParts[2].replace(/[^0-9.]/g, ''))) : 0;
-        const teamTarget = cleanParts[3] ? Math.max(0, Number(cleanParts[3].replace(/[^0-9.]/g, ''))) : officialTarget;
-        const achieved = cleanParts[4] ? Math.max(0, Number(cleanParts[4].replace(/[^0-9.]/g, ''))) : 0;
-        
+      const parts = line.split(/[\t,;]+/).map(p => p.trim());
+      if (parts.length >= 2) {
+        const empId = parts[0] || '';
+        const name = parts[1] || '';
+        const officialT = parseFloat(parts[2]?.replace(/[^0-9.]/g, '')) || 0;
+        const teamT = parseFloat(parts[3]?.replace(/[^0-9.]/g, '')) || 0;
+        const ach = parseFloat(parts[4]?.replace(/[^0-9.]/g, '')) || 0;
+
         if (empId && name) {
-          // Check if employee already exists in local list, update it. Else append.
-          const existingIdx = newMembers.findIndex(m => m.employeeId.toUpperCase() === empId.toUpperCase());
-          if (existingIdx !== -1) {
-            newMembers[existingIdx] = {
-              ...newMembers[existingIdx],
-              name,
-              officialTarget,
-              teamTarget,
-              achieved
-            };
-          } else {
-            newMembers.push({
-              employeeId: empId,
-              name,
-              officialTarget,
-              teamTarget,
-              achieved
-            });
-          }
-          successCount++;
+          newMembers.push({
+            employeeId: empId,
+            name: name,
+            officialTarget: officialT,
+            teamTarget: teamT,
+            achieved: ach
+          });
         }
       }
     });
-    
-    setActiveEditTarget({
-      ...activeEditTarget,
-      members: newMembers
-    });
-    
-    if (successCount > 0) {
-      toast.success(`Successfully imported ${successCount} member(s)!`);
+
+    if (newMembers.length > 0) {
+      setActiveEditTarget({
+        ...activeEditTarget,
+        members: [...activeEditTarget.members, ...newMembers]
+      });
+      toast.success(`Appended ${newMembers.length} member(s) from paste data!`);
       setQuickPasteText('');
       setShowQuickPaste(false);
     } else {
-      toast.error('Unable to parse data. Ensure format is: EmployeeID, Name, [OfficialTarget], [TeamTarget], [Achieved]');
+      toast.error('Could not parse any valid member rows. Ensure columns: ID, Name, OfficialTarget, TeamTarget, Achieved');
     }
   };
 
-  const toggleAccordion = (teamId: string) => {
-    setExpandedTeams(prev => ({
-      ...prev,
-      [teamId]: !prev[teamId]
-    }));
+  const toggleAccordion = (id: string) => {
+    setExpandedTeams(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
-  // Global loading blocker removed to support local inline loaders
+  // Compute active month statistics
+  const activeMonthTargets = useMemo(() => {
+    return targets.filter(t => t.monthName === selectedMonth);
+  }, [targets, selectedMonth]);
 
-  // Filter targets for active selected month
-  const activeMonthTargets = targets.filter((t: any) => t.monthName === selectedMonth);
+  const timingInfo = useMemo(() => {
+    return getDaysRemainingInMonth(selectedMonth || '');
+  }, [selectedMonth]);
 
-  // Computations for active Month
-  const totalTargetVal = activeMonthTargets.reduce((acc: number, t: any) => acc + t.members.reduce((sum: number, mem: any) => sum + (mem.teamTarget || 0), 0), 0);
-  const totalOfficialTargetVal = activeMonthTargets.reduce((acc: number, t: any) => acc + t.members.reduce((sum: number, mem: any) => sum + (mem.officialTarget || 0), 0), 0);
-  const totalAchievedVal = activeMonthTargets.reduce((acc: number, t: any) => acc + t.members.reduce((sum: number, mem: any) => sum + (mem.achieved || 0), 0), 0);
-  const overallAchievementPercent = totalTargetVal > 0 ? Math.round((totalAchievedVal / totalTargetVal) * 100) : 0;
-  const overallGapVal = Math.max(0, totalTargetVal - totalAchievedVal);
+  const { totalOfficialTargetVal, totalTeamTargetVal, totalAchievedVal, allMembers } = useMemo(() => {
+    let offVal = 0;
+    let teamVal = 0;
+    let achVal = 0;
+    const membersList: any[] = [];
 
-  // Flattened members for stats
-  const allMembers = activeMonthTargets.flatMap((t: any) => t.members.map((m: any) => ({ ...m, teamName: t.teamName })));
-  
-  // Performance tiers calculation
-  const eliteAchievers = allMembers.filter((m: any) => m.teamTarget > 0 && m.achieved >= m.teamTarget);
-  const onTrackAchievers = allMembers.filter((m: any) => m.teamTarget > 0 && m.achieved >= m.teamTarget * 0.7 && m.achieved < m.teamTarget);
-  const supportRequired = allMembers.filter((m: any) => m.teamTarget > 0 && m.achieved < m.teamTarget * 0.7);
+    activeMonthTargets.forEach(t => {
+      t.members.forEach((m: any) => {
+        offVal += Number(m.officialTarget) || 0;
+        teamVal += Number(m.teamTarget) || 0;
+        achVal += Number(m.achieved) || 0;
+        membersList.push({ ...m, teamName: t.teamName, targetId: t._id });
+      });
+    });
 
-  // Team rankings sorted by percentage
-  const teamRankings = activeMonthTargets.map((t: any) => {
-    const tTarget = t.members.reduce((sum: number, m: any) => sum + (m.teamTarget || 0), 0);
-    const tAchieved = t.members.reduce((sum: number, m: any) => sum + (m.achieved || 0), 0);
-    const percent = tTarget > 0 ? Math.round((tAchieved / tTarget) * 100) : 0;
     return {
-      id: t._id,
-      teamName: t.teamName,
-      target: tTarget,
-      achieved: tAchieved,
-      percent
+      totalOfficialTargetVal: offVal,
+      totalTeamTargetVal: teamVal,
+      totalAchievedVal: achVal,
+      allMembers: membersList
     };
-  }).sort((a: any, b: any) => b.percent - a.percent);
+  }, [activeMonthTargets]);
 
-  // Remaining days helper calculations
-  const timingInfo = getDaysRemainingInMonth(selectedMonth || '');
+  const officialAchievementRate = totalOfficialTargetVal > 0 ? Math.round((totalAchievedVal / totalOfficialTargetVal) * 100) : 0;
+  const teamAchievementRate = totalTeamTargetVal > 0 ? Math.round((totalAchievedVal / totalTeamTargetVal) * 100) : 0;
+
+  const smashedTargetMembers = allMembers.filter(m => (m.teamTarget > 0 && m.achieved >= m.teamTarget) || (m.officialTarget > 0 && m.achieved >= m.officialTarget));
+  const onTrackMembers = allMembers.filter(m => m.teamTarget > 0 && m.achieved >= m.teamTarget * 0.75 && m.achieved < m.teamTarget);
+  const behindTargetMembers = allMembers.filter(m => m.teamTarget > 0 && m.achieved < m.teamTarget * 0.75);
+
+  const currentMonthIndex = uniqueMonths.indexOf(selectedMonth || '');
+  const handlePrevMonth = () => {
+    if (currentMonthIndex < uniqueMonths.length - 1) {
+      setSelectedMonth(uniqueMonths[currentMonthIndex + 1]);
+    }
+  };
+  const handleNextMonth = () => {
+    if (currentMonthIndex > 0) {
+      setSelectedMonth(uniqueMonths[currentMonthIndex - 1]);
+    }
+  };
 
   return (
-    <div className="w-full space-y-6 pb-12">
-      {/* Month Selection View */}
-      {!selectedMonth ? (
-        <div className="space-y-6">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-6 bg-gradient-to-br from-[#0c101d] to-[#0f172a] border border-white/5 rounded-2xl shadow-2xl relative overflow-hidden">
-            <div className="absolute -top-24 -right-24 w-52 h-52 bg-green-500/10 rounded-full blur-3xl pointer-events-none" />
-            <div className="relative z-10">
-              <h2 className="text-white font-extrabold text-2xl flex items-center gap-3">
-                <div className="p-2.5 bg-gradient-to-br from-green-500/20 to-emerald-500/20 rounded-xl border border-white/5 shadow-inner">
-                  <Calendar className="w-6 h-6 text-brand-green" />
-                </div>
-                Workspace Targets Ledger
-              </h2>
-              <p className="text-xs text-gray-400 mt-2 font-medium">Select a month container to manage performance targets, view simulators, and check leaderboard status.</p>
+    <div className="w-full space-y-6 pb-12 text-gray-100 font-sans">
+      {/* Hero Command Center Header Banner */}
+      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 bg-gradient-to-r from-gray-900 via-gray-900/95 to-emerald-950/40 border border-glass-border p-6 rounded-2xl shadow-2xl relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+        
+        <div className="space-y-2 z-10">
+          <div className="flex items-center gap-3 flex-wrap">
+            <h1 className="text-2xl lg:text-3xl font-black tracking-tight text-white uppercase flex items-center gap-3">
+              <Target className="w-8 h-8 text-emerald-400 glow-green shrink-0" />
+              Monthly Target Command Center
+            </h1>
+            {selectedMonth && (
+              <span className="px-3 py-1 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-extrabold text-xs font-mono uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
+                <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                {selectedMonth}
+              </span>
+            )}
+            <span className={`px-2.5 py-0.5 rounded-lg border text-[10px] font-black uppercase font-mono tracking-widest ${timingInfo.isPast ? 'bg-gray-800 text-gray-400 border-gray-700' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'}`}>
+              {timingInfo.isPast ? 'Concluded' : 'Running'}
+            </span>
+          </div>
+          <p className="text-gray-400 text-xs md:text-sm font-medium">
+            Real-time monthly revenue goals, team deliverables, and individual employee target ledgers.
+          </p>
+        </div>
+
+        {/* Header Action Controls */}
+        <div className="flex items-center gap-2.5 flex-wrap z-10 w-full xl:w-auto justify-start xl:justify-end">
+          {/* Month Selector Pills Dropdown */}
+          {uniqueMonths.length > 0 && (
+            <div className="flex items-center bg-black/60 border border-glass-border rounded-xl p-1 shrink-0">
+              <button 
+                onClick={handlePrevMonth}
+                disabled={currentMonthIndex >= uniqueMonths.length - 1}
+                className="p-1.5 text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                title="Previous Month"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              
+              <select
+                value={selectedMonth || ''}
+                onChange={(e) => setSelectedMonth(e.target.value)}
+                className="bg-transparent text-emerald-300 font-black text-xs px-2 py-1 focus:outline-none cursor-pointer uppercase"
+              >
+                {uniqueMonths.map(m => (
+                  <option key={m} value={m} className="bg-gray-900 text-white">{m}</option>
+                ))}
+              </select>
+
+              <button 
+                onClick={handleNextMonth}
+                disabled={currentMonthIndex <= 0}
+                className="p-1.5 text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                title="Next Month"
+              >
+                <ChevronLeft className="w-4 h-4 rotate-180" />
+              </button>
             </div>
-            
-            {isAdmin && (
+          )}
+
+          <button 
+            onClick={() => {
+              fetchTargets();
+              if (isAdmin) fetchPendingChanges();
+            }}
+            className="p-2.5 bg-gray-800/80 hover:bg-gray-700 text-gray-300 border border-glass-border rounded-xl text-xs font-bold transition-all cursor-pointer shadow-md"
+            title="Refresh Targets Data"
+          >
+            <RefreshCw className={`w-4 h-4 text-emerald-400 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+
+          {isAdmin && (
+            <button
+              onClick={() => {
+                fetchPendingChanges();
+                setIsApprovalQueueOpen(true);
+              }}
+              className="relative p-2.5 bg-gray-800/80 hover:bg-gray-700 text-gray-300 border border-glass-border rounded-xl text-xs font-bold transition-all cursor-pointer shadow-md"
+              title="Target Approval Requests"
+            >
+              <Inbox className="w-4 h-4 text-blue-400" />
+              {pendingChanges.length > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center text-[9px] font-black text-white animate-bounce shadow-md">
+                  {pendingChanges.length}
+                </span>
+              )}
+            </button>
+          )}
+
+          {isAdmin && (
+            <>
               <button 
                 onClick={() => setIsMonthModalOpen(true)}
-                className="flex items-center gap-2 px-5 py-3 rounded-xl bg-brand-green hover:bg-brand-green-hover text-black font-black text-xs uppercase tracking-wider transition-all shadow-lg glow-green cursor-pointer shrink-0"
+                className="px-4 py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-200 border border-glass-border rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer"
+              >
+                <Calendar className="w-4 h-4 text-emerald-400" />
+                <span>+ Month</span>
+              </button>
+
+              <button 
+                onClick={() => setIsTeamModalOpen(true)}
+                className="px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-emerald-600/30 flex items-center gap-1.5 cursor-pointer"
               >
                 <Plus className="w-4 h-4 stroke-[3px]" />
-                Create Month Folder
+                <span>Add Team</span>
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* 4 Full-Width KPI Summary Cards Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 w-full">
+        {/* Card 1: Official Target Coverage */}
+        <div className="bg-gray-900/90 border border-glass-border p-5 rounded-2xl shadow-xl flex items-center justify-between gap-4 relative overflow-hidden group hover:border-emerald-500/40 transition-all">
+          <div className="space-y-1.5">
+            <span className="text-[10px] text-gray-400 font-extrabold uppercase tracking-widest block">Official Target Coverage</span>
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-2xl font-black text-white font-mono">${totalAchievedVal.toLocaleString()}</span>
+              <span className="text-xs text-gray-500 font-semibold font-mono">/ ${totalOfficialTargetVal.toLocaleString()}</span>
+            </div>
+            <p className="text-[10px] text-gray-400 font-medium">Official target completion status</p>
+          </div>
+          <ProgressRing 
+            percentage={officialAchievementRate} 
+            size={76} 
+            strokeWidth={7} 
+            colorClass={officialAchievementRate >= 100 ? "text-emerald-400" : officialAchievementRate >= 75 ? "text-emerald-400" : "text-amber-400"}
+            glowColor={officialAchievementRate >= 100 ? "rgba(16,185,129,0.3)" : "rgba(245,158,11,0.3)"}
+          />
+        </div>
+
+        {/* Card 2: Team Target Coverage */}
+        <div className="bg-gray-900/90 border border-glass-border p-5 rounded-2xl shadow-xl flex items-center justify-between gap-4 relative overflow-hidden group hover:border-blue-500/40 transition-all">
+          <div className="space-y-1.5">
+            <span className="text-[10px] text-gray-400 font-extrabold uppercase tracking-widest block">Team Target Coverage</span>
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-2xl font-black text-white font-mono">${totalAchievedVal.toLocaleString()}</span>
+              <span className="text-xs text-gray-500 font-semibold font-mono">/ ${totalTeamTargetVal.toLocaleString()}</span>
+            </div>
+            <p className="text-[10px] text-gray-400 font-medium">Internal team target coverage</p>
+          </div>
+          <ProgressRing 
+            percentage={teamAchievementRate} 
+            size={76} 
+            strokeWidth={7} 
+            colorClass={teamAchievementRate >= 100 ? "text-blue-400" : teamAchievementRate >= 75 ? "text-blue-400" : "text-amber-400"}
+            glowColor="rgba(59,130,246,0.3)"
+          />
+        </div>
+
+        {/* Card 3: Target Smashed & Performers */}
+        <div className="bg-gray-900/90 border border-glass-border p-5 rounded-2xl shadow-xl flex flex-col justify-between space-y-3 relative overflow-hidden group hover:border-purple-500/40 transition-all">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] text-gray-400 font-extrabold uppercase tracking-widest block">Target Performers</span>
+            <div className="w-8 h-8 rounded-xl bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-purple-400 font-bold shrink-0">
+              <Flame className="w-4 h-4" />
+            </div>
+          </div>
+          <div>
+            <div className="text-2xl font-black text-purple-300 font-mono flex items-center gap-2">
+              <span>{smashedTargetMembers.length}</span>
+              <span className="text-xs font-bold text-gray-400 font-sans">/ {allMembers.length} Members Smashed</span>
+            </div>
+            <p className="text-[10px] text-gray-400 font-medium mt-1">
+              {onTrackMembers.length} member(s) currently on track (75%-99%)
+            </p>
+          </div>
+        </div>
+
+        {/* Card 4: Pace & Required Daily Run Rate */}
+        <div className="bg-gray-900/90 border border-glass-border p-5 rounded-2xl shadow-xl flex flex-col justify-between space-y-3 relative overflow-hidden group hover:border-amber-500/40 transition-all">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] text-gray-400 font-extrabold uppercase tracking-widest block">Calendar Pace & Run-Rate</span>
+            <div className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 font-bold shrink-0">
+              <Calendar className="w-4 h-4" />
+            </div>
+          </div>
+          <div>
+            {timingInfo.isCurrentMonth ? (
+              <>
+                <div className="text-2xl font-black text-amber-300 font-mono">
+                  ${Math.round(Math.max(0, totalTeamTargetVal - totalAchievedVal) / timingInfo.daysLeft).toLocaleString()} <span className="text-xs font-sans text-gray-400">/ day</span>
+                </div>
+                <p className="text-[10px] text-gray-400 font-medium mt-1">
+                  Required run-rate for remaining {timingInfo.daysLeft} days
+                </p>
+              </>
+            ) : timingInfo.isPast ? (
+              <>
+                <div className="text-2xl font-black text-gray-300 font-mono">Concluded</div>
+                <p className="text-[10px] text-gray-400 font-medium mt-1">Month ledger period is concluded</p>
+              </>
+            ) : (
+              <>
+                <div className="text-2xl font-black text-emerald-400 font-mono">Upcoming</div>
+                <p className="text-[10px] text-gray-400 font-medium mt-1">Month target starts soon ({timingInfo.totalDays} days)</p>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Sub-Tab Navigation Bar & Search Input */}
+      <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4 bg-gray-900/90 border border-glass-border p-2 rounded-2xl shadow-xl">
+        <div className="flex bg-black/60 border border-glass-border p-1 rounded-xl">
+          <button
+            onClick={() => setActiveSubTab('ledger')}
+            className={`flex items-center gap-2 px-5 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+              activeSubTab === 'ledger'
+                ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30'
+                : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            <ClipboardList className="w-3.5 h-3.5" />
+            <span>Teams & Members Ledger</span>
+          </button>
+          <button
+            onClick={() => setActiveSubTab('overview')}
+            className={`flex items-center gap-2 px-5 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+              activeSubTab === 'overview'
+                ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30'
+                : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            <Trophy className="w-3.5 h-3.5" />
+            <span>Leaderboard & Rankings</span>
+          </button>
+          <button
+            onClick={() => setActiveSubTab('simulator')}
+            className={`flex items-center gap-2 px-5 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+              activeSubTab === 'simulator'
+                ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30'
+                : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            <Sliders className="w-3.5 h-3.5" />
+            <span>Target Simulator</span>
+          </button>
+        </div>
+
+        {/* Member Search Bar in Ledger view */}
+        {activeSubTab === 'ledger' && (
+          <div className="relative flex-1 max-w-sm">
+            <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-2.5" />
+            <input
+              type="text"
+              placeholder="Search member by name or ID..."
+              value={memberSearch}
+              onChange={(e) => setMemberSearch(e.target.value)}
+              className="w-full pl-10 pr-8 py-2 bg-black/60 border border-glass-border rounded-xl text-xs text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500"
+            />
+            {memberSearch && (
+              <button 
+                onClick={() => setMemberSearch('')}
+                className="absolute right-2.5 top-2.5 text-gray-400 hover:text-white"
+              >
+                <X className="w-3.5 h-3.5" />
               </button>
             )}
           </div>
+        )}
+      </div>
 
-          {loading ? (
-            <div className="glass-panel p-20 rounded-2xl border border-glass-border flex flex-col items-center justify-center gap-4">
-              <Loader2 className="w-12 h-12 text-brand-green animate-spin" />
-              <span className="text-gray-400 text-xs font-black tracking-widest uppercase animate-pulse">Loading Target Frameworks...</span>
-            </div>
-          ) : uniqueMonths.length === 0 ? (
-            <div className="glass-panel p-16 rounded-2xl border border-glass-border text-center flex flex-col items-center">
-              <Calendar className="w-16 h-16 text-gray-700 mb-4 opacity-50" />
-              <h3 className="text-xl font-bold text-white mb-2">No Performance Records</h3>
-              <p className="text-gray-400 mb-6 max-w-sm text-sm">Initialize a monthly tracking workspace to start registering team targets and employee achievements.</p>
-              {isAdmin && (
-                <button 
-                  onClick={() => setIsMonthModalOpen(true)} 
-                  className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-brand-green hover:bg-brand-green-hover text-black font-extrabold text-sm transition-all shadow-lg glow-green"
-                >
-                  <Plus className="w-4 h-4 stroke-[3px]" /> Create First Month
-                </button>
-              )}
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
-              {uniqueMonths.map(m => {
-                const monthTeams = targets.filter(t => t.monthName === m);
-                const totalTargetVal = monthTeams.reduce((acc, t) => acc + t.members.reduce((sum: number, mem: any) => sum + (mem.teamTarget || 0), 0), 0);
-                const totalAchievedVal = monthTeams.reduce((acc, t) => acc + t.members.reduce((sum: number, mem: any) => sum + (mem.achieved || 0), 0), 0);
-                const achievementPercent = totalTargetVal > 0 ? Math.round((totalAchievedVal / totalTargetVal) * 100) : 0;
-
-                return (
-                  <div 
-                    key={m} 
-                    onClick={() => setSelectedMonth(m)}
-                    className="glass-panel p-6 rounded-2xl border border-glass-border hover:border-brand-green/40 cursor-pointer transition-all hover:-translate-y-1.5 group relative overflow-hidden flex flex-col justify-between min-h-[190px] bg-[#0c101d]/60 hover:bg-[#0f1527]/80"
-                  >
-                    <div className="absolute top-0 right-0 w-24 h-24 bg-green-500/5 rounded-full blur-2xl group-hover:bg-green-500/10 transition-colors" />
-                    
-                    {isAdmin && (
-                      <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-all z-20">
-                        <button 
-                          onClick={(e) => handleDeleteMonthFolder(m, e)} 
-                          className="p-2 text-red-400 hover:text-red-300 bg-red-500/15 hover:bg-red-500/25 border border-red-500/20 rounded-xl transition-all cursor-pointer"
-                          title="Delete Month Folder"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    )}
-
-                    <div>
-                      <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center mb-4 border border-green-500/20 group-hover:border-green-500/40 transition-colors">
-                        <Calendar className="w-5 h-5 text-brand-green group-hover:scale-110 transition-transform" />
-                      </div>
-                      <h3 className="text-lg font-black text-white group-hover:text-brand-green transition-colors leading-tight">{m}</h3>
-                      <p className="text-xs text-gray-500 font-bold mt-1.5 uppercase tracking-wider">{monthTeams.length} {monthTeams.length === 1 ? 'Team' : 'Teams'} Active</p>
-                    </div>
-
-                    <div className="mt-6 pt-3 border-t border-glass-border space-y-2">
-                      <div className="flex justify-between text-[10px] font-bold text-gray-400">
-                        <span>Overall Achieved</span>
-                        <span className={achievementPercent >= 100 ? 'text-green-400' : achievementPercent > 60 ? 'text-yellow-400' : 'text-gray-400'}>
-                          {achievementPercent}%
-                        </span>
-                      </div>
-                      <div className="h-1.5 w-full bg-black/40 rounded-full overflow-hidden">
-                        <div 
-                          className={`h-full rounded-full transition-all duration-500 ${achievementPercent >= 100 ? 'bg-gradient-to-r from-green-500 to-emerald-400 shadow-[0_0_8px_rgba(34,197,94,0.4)]' : achievementPercent > 60 ? 'bg-yellow-500' : 'bg-brand-green'}`}
-                          style={{ width: `${Math.min(100, achievementPercent)}%` }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+      {/* Main Tab Content Display */}
+      {loading ? (
+        <div className="p-16 text-center text-gray-400 flex items-center justify-center gap-3 bg-gray-900/60 border border-glass-border rounded-2xl">
+          <Loader2 className="w-6 h-6 animate-spin text-emerald-400" />
+          <span className="font-semibold text-sm">Syncing monthly target framework...</span>
+        </div>
+      ) : activeMonthTargets.length === 0 ? (
+        <div className="p-16 text-center bg-gray-900/80 border border-glass-border rounded-2xl space-y-4 shadow-xl">
+          <Target className="w-12 h-12 text-gray-600 mx-auto" />
+          <h3 className="text-lg font-black text-white uppercase tracking-wider">No teams registered for {selectedMonth || 'this month'}</h3>
+          <p className="text-xs text-gray-400 max-w-md mx-auto">
+            Click "+ Add Team" to start configuring targets for team members in {selectedMonth || 'this month'}.
+          </p>
+          {isAdmin && (
+            <button
+              onClick={() => setIsTeamModalOpen(true)}
+              className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-lg shadow-emerald-600/30 cursor-pointer"
+            >
+              + Add Team
+            </button>
           )}
         </div>
       ) : (
-        /* Month Details View */
-        <div className="space-y-6">
-          {/* Header Controls */}
-          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-[#0a0e17]/80 p-5 rounded-2xl border border-white/5 shadow-xl">
-            <div className="flex items-center gap-4">
-              <button 
-                onClick={() => setSelectedMonth(null)}
-                className="p-3 bg-gray-950 border border-white/10 hover:bg-gray-900 text-gray-400 hover:text-white rounded-xl transition-all flex items-center justify-center cursor-pointer shadow-md"
-                title="Back to Month List"
-              >
-                <ChevronLeft className="w-5 h-5" />
-              </button>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="text-2xl font-black text-white tracking-tight uppercase">{selectedMonth} TARGETS</h2>
-                  <span className="px-2 py-0.5 rounded-md bg-green-500/10 border border-green-500/20 text-[9px] text-brand-green font-extrabold uppercase font-mono tracking-widest">
-                    {timingInfo.isPast ? 'Concluded' : 'Running'}
-                  </span>
-                </div>
-                <p className="text-[10px] text-gray-500 font-bold mt-1 uppercase tracking-widest flex items-center gap-1.5">
-                  <Calendar className="w-3.5 h-3.5" /> Workspace Performance Engine & Analytics
-                </p>
-              </div>
-            </div>
+        <AnimatePresence mode="wait">
+          {/* Sub-Tab 1: Ledger View (Team Accordions & Member Tables) */}
+          {activeSubTab === 'ledger' && (
+            <motion.div 
+              key="ledger-view"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="space-y-4 w-full"
+            >
+              {activeMonthTargets.map(target => {
+                const totalOfficial = target.members.reduce((sum: number, m: any) => sum + (Number(m.officialTarget) || 0), 0);
+                const totalTeam = target.members.reduce((sum: number, m: any) => sum + (Number(m.teamTarget) || 0), 0);
+                const totalAchieved = target.members.reduce((sum: number, m: any) => sum + (Number(m.achieved) || 0), 0);
+                const teamAchievement = totalTeam > 0 ? Math.round((totalAchieved / totalTeam) * 100) : 0;
+                const isExpanded = !!expandedTeams[target._id];
 
-            <div className="flex items-center gap-3 w-full lg:w-auto self-stretch lg:self-auto">
-              {/* Tab Selector pills */}
-              <div className="flex p-1 bg-black/40 border border-white/5 rounded-xl flex-1 lg:flex-initial">
-                <button
-                  onClick={() => setActiveSubTab('ledger')}
-                  className={`flex-1 lg:flex-initial px-4 py-2.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                    activeSubTab === 'ledger'
-                      ? 'bg-brand-green text-black shadow-md font-extrabold shadow-green-500/15'
-                      : 'text-gray-400 hover:text-white'
-                  }`}
-                >
-                  <ClipboardList className="w-3.5 h-3.5" /> Ledger
-                </button>
-                <button
-                  onClick={() => setActiveSubTab('overview')}
-                  className={`flex-1 lg:flex-initial px-4 py-2.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                    activeSubTab === 'overview'
-                      ? 'bg-brand-green text-black shadow-md font-extrabold shadow-green-500/15'
-                      : 'text-gray-400 hover:text-white'
-                  }`}
-                >
-                  <Trophy className="w-3.5 h-3.5" /> Overview
-                </button>
-                <button
-                  onClick={() => setActiveSubTab('simulator')}
-                  className={`flex-1 lg:flex-initial px-4 py-2.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                    activeSubTab === 'simulator'
-                      ? 'bg-brand-green text-black shadow-md font-extrabold shadow-green-500/15'
-                      : 'text-gray-400 hover:text-white'
-                  }`}
-                >
-                  <Sliders className="w-3.5 h-3.5" /> Simulator
-                </button>
-              </div>
-
-              <button 
-                onClick={() => {
-                  fetchTargets();
-                  if (isAdmin) fetchPendingChanges();
-                }}
-                className="p-3 bg-gray-950 border border-white/10 hover:bg-gray-900 text-gray-400 hover:text-white rounded-xl transition-all shrink-0 cursor-pointer shadow-md"
-                title="Refresh Database"
-              >
-                <Loader2 className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-              </button>
-
-              {isAdmin && (
-                <button
-                  onClick={() => {
-                    fetchPendingChanges();
-                    setIsApprovalQueueOpen(true);
-                  }}
-                  className="relative p-3 bg-gray-950 border border-white/10 hover:bg-gray-900 text-gray-400 hover:text-white rounded-xl transition-all shrink-0 cursor-pointer shadow-md"
-                  title="Target Approval Requests"
-                >
-                  <Inbox className="w-4 h-4" />
-                  {pendingChanges.length > 0 && (
-                    <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center text-[9px] font-black text-white animate-bounce">
-                      {pendingChanges.length}
-                    </span>
-                  )}
-                </button>
-              )}
-              {isAdmin && (
-                <button 
-                  onClick={() => setIsTeamModalOpen(true)}
-                  className="flex items-center justify-center gap-1.5 px-4 py-3 rounded-xl bg-brand-green hover:bg-brand-green-hover text-black font-black text-[10px] uppercase tracking-widest transition-all shadow-md glow-green cursor-pointer shrink-0"
-                >
-                  <Plus className="w-3.5 h-3.5 stroke-[3px]" />
-                  Add Team
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Sub-tab Rendering */}
-          {loading ? (
-            <div className="glass-panel p-20 rounded-2xl border border-glass-border flex flex-col items-center justify-center gap-4">
-              <Loader2 className="w-12 h-12 text-brand-green animate-spin" />
-              <span className="text-gray-400 text-xs font-black tracking-widest uppercase animate-pulse">Syncing performance ledger...</span>
-            </div>
-          ) : (
-            <AnimatePresence mode="wait">
-              {activeSubTab === 'overview' && (
-              <motion.div 
-                key="overview-tab"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="space-y-6"
-              >
-                {/* Main Gauge and Stats Grid */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                  {/* Left Column: Progress Ring Ring */}
-                  <div className="lg:col-span-2 glass-panel p-6 rounded-2xl bg-gradient-to-br from-[#0b0f19] to-[#0d1323] border border-white/5 relative overflow-hidden flex flex-col md:flex-row items-center gap-8 shadow-xl">
-                    <div className="absolute top-0 right-0 w-44 h-44 bg-green-500/5 rounded-full blur-3xl pointer-events-none" />
-                    
-                    <ProgressRing 
-                      percentage={overallAchievementPercent} 
-                      size={130} 
-                      strokeWidth={10} 
-                      colorClass={overallAchievementPercent >= 100 ? "text-emerald-400" : overallAchievementPercent >= 70 ? "text-brand-green" : "text-yellow-400"}
-                      glowColor={overallAchievementPercent >= 100 ? "rgba(16,185,129,0.3)" : "rgba(0,201,80,0.2)"}
-                    />
-
-                    <div className="flex-1 space-y-4 text-center md:text-left">
-                      <div>
-                        <span className="text-[10px] bg-green-500/10 border border-green-500/20 text-brand-green px-2 py-0.5 rounded font-black tracking-widest uppercase font-mono">Company Performance Status</span>
-                        <h3 className="text-2xl font-black text-white tracking-tight mt-2">
-                          {overallAchievementPercent >= 100 
-                            ? 'Excellent Work! Targets Conquered.' 
-                            : overallAchievementPercent >= 80 
-                            ? 'Almost there! Push for the finish line.' 
-                            : 'Performance trajectory is active.'
-                          }
-                        </h3>
-                      </div>
-                      
-                      <div className="grid grid-cols-3 gap-4 border-t border-white/5 pt-4">
-                        <div>
-                          <p className="text-[9px] text-gray-500 font-bold uppercase tracking-wider">Company Target</p>
-                          <p className="text-lg font-black text-white mt-0.5 font-mono">${totalTargetVal.toLocaleString()}</p>
-                        </div>
-                        <div>
-                          <p className="text-[9px] text-gray-500 font-bold uppercase tracking-wider">Gross Achieved</p>
-                          <p className="text-lg font-black text-brand-green mt-0.5 font-mono">${totalAchievedVal.toLocaleString()}</p>
-                        </div>
-                        <div>
-                          <p className="text-[9px] text-gray-500 font-bold uppercase tracking-wider">Remaining Gap</p>
-                          <p className="text-lg font-black text-yellow-400 mt-0.5 font-mono">${overallGapVal.toLocaleString()}</p>
-                        </div>
-                      </div>
-
-                      {overallGapVal > 0 ? (
-                        <p className="text-xs text-gray-400 font-medium">
-                          💡 The workspace requires <span className="text-white font-bold">${overallGapVal.toLocaleString()}</span> in achievements to hit 100% company target.
-                        </p>
-                      ) : (
-                        <p className="text-xs text-brand-green font-bold flex items-center justify-center md:justify-start gap-1">
-                          <CheckCircle2 className="w-4 h-4 shrink-0" /> Target completed successfully. Reward milestones activated!
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Right Column: Performance Tiers breakdown */}
-                  <div className="glass-panel p-5 rounded-2xl border border-white/5 bg-[#0b0f19]/40 flex flex-col justify-between shadow-xl">
-                    <h4 className="text-xs font-black text-white uppercase tracking-widest border-b border-white/5 pb-2 mb-4">Performance Distribution</h4>
-                    
-                    <div className="space-y-4">
-                      {/* Elite */}
-                      <div className="flex items-center justify-between p-2 rounded-xl bg-purple-500/5 border border-purple-500/10 hover:bg-purple-500/10 transition-all">
-                        <div className="flex items-center gap-2">
-                          <div className="w-2.5 h-2.5 rounded-full bg-purple-400 shadow-[0_0_6px_#a855f7]" />
-                          <div>
-                            <p className="text-[10px] text-white font-black uppercase">Elite Achievers</p>
-                            <p className="text-[9px] text-gray-500 font-bold uppercase">100% or more achieved</p>
-                          </div>
-                        </div>
-                        <span className="text-sm font-black text-purple-400 font-mono">{eliteAchievers.length} member(s)</span>
-                      </div>
-
-                      {/* On Track */}
-                      <div className="flex items-center justify-between p-2 rounded-xl bg-green-500/5 border border-green-500/10 hover:bg-green-500/10 transition-all">
-                        <div className="flex items-center gap-2">
-                          <div className="w-2.5 h-2.5 rounded-full bg-brand-green shadow-[0_0_6px_#00c950]" />
-                          <div>
-                            <p className="text-[10px] text-white font-black uppercase">On Track</p>
-                            <p className="text-[9px] text-gray-500 font-bold uppercase">70% to 99% achieved</p>
-                          </div>
-                        </div>
-                        <span className="text-sm font-black text-brand-green font-mono">{onTrackAchievers.length} member(s)</span>
-                      </div>
-
-                      {/* Support Needed */}
-                      <div className="flex items-center justify-between p-2 rounded-xl bg-orange-500/5 border border-orange-500/10 hover:bg-orange-500/10 transition-all">
-                        <div className="flex items-center gap-2">
-                          <div className="w-2.5 h-2.5 rounded-full bg-orange-400 shadow-[0_0_6px_#f97316]" />
-                          <div>
-                            <p className="text-[10px] text-white font-black uppercase">Needs Attention</p>
-                            <p className="text-[9px] text-gray-500 font-bold uppercase">Below 70% achieved</p>
-                          </div>
-                        </div>
-                        <span className="text-sm font-black text-orange-400 font-mono">{supportRequired.length} member(s)</span>
-                      </div>
-                    </div>
-
-                    <div className="border-t border-white/5 pt-3 mt-4 text-[10px] text-gray-500 font-bold text-center uppercase tracking-widest">
-                      Total Workforce: {allMembers.length} member(s)
-                    </div>
-                  </div>
-                </div>
-
-                {/* Team Leaderboard Rankings & Star Performers Grid */}
-                <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-                  {/* Team Rankings (Left) */}
-                  <div className="xl:col-span-1 glass-panel p-5 rounded-2xl border border-white/5 shadow-xl flex flex-col">
-                    <h3 className="text-sm font-black text-white uppercase tracking-widest border-b border-white/5 pb-3 flex items-center gap-2">
-                      <Trophy className="w-4 h-4 text-yellow-400" /> Team Rankings
-                    </h3>
-                    
-                    {teamRankings.length === 0 ? (
-                      <p className="text-xs text-gray-500 text-center py-10 font-bold">No active teams to rank.</p>
-                    ) : (
-                      <div className="divide-y divide-white/5 flex-1 flex flex-col justify-center">
-                        {teamRankings.map((rank, index) => {
-                          const badgeColors = index === 0 ? "bg-amber-500/25 border-amber-500/40 text-amber-300" :
-                                              index === 1 ? "bg-slate-300/20 border-slate-300/30 text-slate-300" :
-                                              index === 2 ? "bg-amber-700/20 border-amber-700/30 text-amber-600" :
-                                              "bg-gray-800/40 border-gray-700 text-gray-400";
-                          
-                          return (
-                            <div key={rank.id} className="py-3.5 flex items-center justify-between group hover:bg-white/[0.01] transition-all px-1.5 rounded-lg">
-                              <div className="flex items-center gap-3">
-                                <span className={`w-6 h-6 rounded-md border text-[10px] font-black flex items-center justify-center font-mono ${badgeColors}`}>
-                                  #{index + 1}
-                                </span>
-                                <div>
-                                  <span className="text-sm font-black text-white group-hover:text-brand-green transition-colors uppercase">Team {rank.teamName}</span>
-                                  <p className="text-[9px] text-gray-500 font-semibold uppercase mt-0.5">Target: ${rank.target.toLocaleString()}</p>
-                                </div>
-                              </div>
-                              
-                              <div className="text-right space-y-1.5">
-                                <span className={`text-xs font-black font-mono ${rank.percent >= 100 ? 'text-green-400' : rank.percent >= 70 ? 'text-brand-green' : 'text-yellow-500'}`}>
-                                  {rank.percent}%
-                                </span>
-                                <div className="w-20 h-1 bg-gray-900 rounded-full overflow-hidden">
-                                  <div 
-                                    className={`h-full rounded-full transition-all duration-700 ${rank.percent >= 100 ? 'bg-green-500' : 'bg-brand-green'}`} 
-                                    style={{ width: `${Math.min(100, rank.percent)}%` }}
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Star Performers Showcase (Right) */}
-                  <div className="xl:col-span-2 glass-panel p-5 rounded-2xl border border-white/5 shadow-xl flex flex-col">
-                    <h3 className="text-sm font-black text-white uppercase tracking-widest border-b border-white/5 pb-3 flex items-center gap-2">
-                      <Star className="w-4 h-4 text-purple-400 animate-spin" style={{ animationDuration: '6s' }} /> Star Performers Showcase
-                    </h3>
-
-                    {eliteAchievers.length === 0 ? (
-                      <div className="flex-1 flex flex-col items-center justify-center py-16 text-center">
-                        <Award className="w-10 h-10 text-gray-700 mb-2 opacity-50" />
-                        <h4 className="text-sm font-black text-gray-400 uppercase tracking-widest">No target heroes yet</h4>
-                        <p className="text-xs text-gray-500 max-w-xs mt-1">Once team members cross 100% of their target goals, their achievements will shine here!</p>
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 flex-1 mt-4 overflow-y-auto max-h-[380px] pr-1">
-                        {eliteAchievers.map((star, idx) => {
-                          const starProgress = star.teamTarget > 0 ? Math.round((star.achieved / star.teamTarget) * 100) : 0;
-                          return (
-                            <div 
-                              key={idx}
-                              className="relative overflow-hidden p-4 rounded-xl border border-purple-500/20 bg-gradient-to-br from-purple-500/5 to-transparent hover:border-purple-500/40 transition-all flex flex-col justify-between gap-3 group hover:shadow-[0_0_15px_rgba(168,85,247,0.1)]"
-                            >
-                              {/* Glowing corner decoration */}
-                              <div className="absolute top-0 right-0 w-16 h-16 bg-purple-500/10 rounded-full blur-xl group-hover:bg-purple-500/20 transition-all" />
-                              
-                              <div className="flex items-start justify-between">
-                                <div className="flex items-center gap-3">
-                                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500/20 to-indigo-500/20 border border-purple-500/30 flex items-center justify-center text-xs font-black text-purple-400">
-                                    {star.name.charAt(0)}
-                                  </div>
-                                  <div>
-                                    <h4 className="text-sm font-extrabold text-white tracking-tight">{star.name}</h4>
-                                    <span className="text-[9px] font-bold font-mono text-gray-400 uppercase">{star.employeeId} • Team {star.teamName}</span>
-                                  </div>
-                                </div>
-                                <span className="px-2 py-0.5 rounded bg-purple-500/20 text-[9px] font-black font-mono text-purple-300 border border-purple-500/30">
-                                  {starProgress}%
-                                </span>
-                              </div>
-
-                              <div className="grid grid-cols-2 gap-2 text-xs border-t border-white/5 pt-2.5 font-mono">
-                                <div>
-                                  <p className="text-[9px] text-gray-500 font-semibold uppercase">Goal Target</p>
-                                  <p className="text-gray-300 font-bold">${star.teamTarget?.toLocaleString()}</p>
-                                </div>
-                                <div>
-                                  <p className="text-[9px] text-gray-500 font-semibold uppercase">Achieved</p>
-                                  <p className="text-purple-400 font-black">${star.achieved?.toLocaleString()}</p>
-                                </div>
-                              </div>
-
-                              <button 
-                                onClick={(e) => triggerConfetti(e)}
-                                className="w-full mt-1.5 py-2 rounded-lg bg-purple-500/15 hover:bg-purple-500 text-purple-300 hover:text-white border border-purple-500/30 text-[10px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1 cursor-pointer active:scale-95"
-                              >
-                                <Sparkles className="w-3.5 h-3.5" /> Celebrate 🎉
-                              </button>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </motion.div>
-            )}
-
-            {activeSubTab === 'simulator' && (
-              <motion.div 
-                key="simulator-tab"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="space-y-6"
-              >
-                {/* Simulator Controls & Presets */}
-                <div className="glass-panel p-6 rounded-2xl bg-gradient-to-br from-[#0c101d] to-[#0f172a] border border-white/5 shadow-xl relative overflow-hidden">
-                  <div className="absolute top-0 right-0 w-36 h-36 bg-blue-500/5 rounded-full blur-3xl pointer-events-none" />
-                  
-                  <div className="flex items-start gap-4">
-                    <div className="p-3 bg-blue-500/15 border border-blue-500/25 rounded-2xl text-blue-400">
-                      <Sliders className="w-6 h-6" />
-                    </div>
-                    <div className="space-y-1">
-                      <h3 className="text-lg font-black text-white uppercase tracking-wider">What-If Target Multiplier</h3>
-                      <p className="text-xs text-gray-400 leading-normal">
-                        Simulate organizational target shifts dynamically. Slide the multiplier to preview required run rates, achievement ratios, and capacity projections.
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Multiplier Slider Box */}
-                  <div className="mt-8 grid grid-cols-1 lg:grid-cols-4 gap-8 items-center border-t border-white/5 pt-6">
-                    <div className="lg:col-span-3 space-y-4">
-                      <div className="flex justify-between items-center text-xs font-bold text-gray-400">
-                        <span className="uppercase tracking-widest">Multiplier Scale</span>
-                        <span className="text-lg font-black text-blue-400 font-mono bg-blue-500/10 px-3 py-1 rounded-lg border border-blue-500/25">
-                          {simulatorMultiplier}% {simulatorMultiplier === 100 ? '(Baseline)' : simulatorMultiplier > 100 ? `(+${simulatorMultiplier - 100}% Stretch)` : `(-${100 - simulatorMultiplier}% Lower)`}
-                        </span>
-                      </div>
-                      
-                      <input 
-                        type="range" 
-                        min="50" 
-                        max="200" 
-                        step="5"
-                        value={simulatorMultiplier}
-                        onChange={(e) => setSimulatorMultiplier(Number(e.target.value))}
-                        className="w-full h-2.5 bg-gray-900 rounded-lg appearance-none cursor-pointer accent-brand-green border border-white/5"
-                      />
-                      
-                      <div className="flex justify-between text-[10px] text-gray-500 font-bold font-mono">
-                        <span>50% (MIN)</span>
-                        <span>100% (BASELINE)</span>
-                        <span>150% (STRETCH)</span>
-                        <span>200% (MAX SIM)</span>
-                      </div>
-                    </div>
-
-                    <div className="lg:col-span-1 space-y-2">
-                      <p className="text-[9px] text-gray-500 font-black uppercase tracking-widest block">Quick Presets</p>
-                      <div className="grid grid-cols-2 gap-2">
-                        <button 
-                          onClick={() => setSimulatorMultiplier(85)}
-                          className="px-2.5 py-2 text-[10px] font-bold border border-white/5 bg-black/40 hover:bg-black text-gray-300 rounded-lg uppercase transition-all cursor-pointer"
-                        >
-                          85% Conservative
-                        </button>
-                        <button 
-                          onClick={() => setSimulatorMultiplier(100)}
-                          className="px-2.5 py-2 text-[10px] font-bold border border-white/5 bg-black/40 hover:bg-black text-gray-300 rounded-lg uppercase transition-all cursor-pointer"
-                        >
-                          100% Reset
-                        </button>
-                        <button 
-                          onClick={() => setSimulatorMultiplier(115)}
-                          className="px-2.5 py-2 text-[10px] font-bold border border-white/5 bg-black/40 hover:bg-black text-gray-300 rounded-lg uppercase transition-all cursor-pointer"
-                        >
-                          115% Growth
-                        </button>
-                        <button 
-                          onClick={() => setSimulatorMultiplier(130)}
-                          className="px-2.5 py-2 text-[10px] font-bold border border-white/5 bg-black/40 hover:bg-black text-gray-300 rounded-lg uppercase transition-all cursor-pointer"
-                        >
-                          130% Stretch
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Simulated Outcome Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                  {/* Card 1: New Simulated Target */}
-                  <div className="glass-panel p-5 rounded-2xl border border-white/5 shadow-lg bg-[#0b0f19]/40 flex flex-col justify-between min-h-[140px]">
-                    <div>
-                      <span className="text-[9px] text-gray-500 font-bold uppercase tracking-widest block">Simulated Company Target</span>
-                      <p className="text-2xl font-black text-white mt-1.5 font-mono">
-                        ${Math.round(totalTargetVal * (simulatorMultiplier / 100)).toLocaleString()}
-                      </p>
-                    </div>
-                    <div className="border-t border-white/5 pt-2 flex items-center justify-between text-[10px] text-gray-400">
-                      <span>Original: ${totalTargetVal.toLocaleString()}</span>
-                      <span className={simulatorMultiplier >= 100 ? 'text-green-400 font-mono' : 'text-red-400 font-mono'}>
-                        {simulatorMultiplier >= 100 ? '+' : ''}{simulatorMultiplier - 100}%
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Card 2: Simulated Achievement Rate */}
-                  {(() => {
-                    const simTarget = totalTargetVal * (simulatorMultiplier / 100);
-                    const simPercent = simTarget > 0 ? Math.round((totalAchievedVal / simTarget) * 100) : 0;
-                    return (
-                      <div className="glass-panel p-5 rounded-2xl border border-white/5 shadow-lg bg-[#0b0f19]/40 flex flex-col justify-between min-h-[140px]">
-                        <div>
-                          <span className="text-[9px] text-gray-500 font-bold uppercase tracking-widest block">Simulated Achievement Rate</span>
-                          <p className={`text-2xl font-black mt-1.5 font-mono ${simPercent >= 100 ? 'text-green-400' : simPercent >= 70 ? 'text-brand-green' : 'text-yellow-500'}`}>
-                            {simPercent}%
-                          </p>
-                        </div>
-                        <div className="border-t border-white/5 pt-2 flex items-center justify-between text-[10px] text-gray-400">
-                          <span>Original Rate: {overallAchievementPercent}%</span>
-                          <span className="font-mono text-gray-500">Achieved remains constant</span>
-                        </div>
-                      </div>
-                    );
-                  })()}
-
-                  {/* Card 3: Required Run-rates */}
-                  {(() => {
-                    const simTarget = totalTargetVal * (simulatorMultiplier / 100);
-                    const simGap = Math.max(0, simTarget - totalAchievedVal);
-                    
-                    let label = "Monthly Run Rate Needed";
-                    let content = `$${simGap.toLocaleString()}`;
-                    let footerText = "Month concluded";
-
-                    if (timingInfo.isPast) {
-                      footerText = "Ledger month is concluded";
-                    } else if (timingInfo.isCurrentMonth) {
-                      label = "Daily Run Rate Needed";
-                      content = `$${Math.round(simGap / timingInfo.daysLeft).toLocaleString()} / day`;
-                      footerText = `Next ${timingInfo.daysLeft} days remaining`;
-                    } else if (timingInfo.isFuture) {
-                      label = "Daily Target Run Rate";
-                      content = `$${Math.round(simTarget / timingInfo.totalDays).toLocaleString()} / day`;
-                      footerText = `Computed over ${timingInfo.totalDays} days`;
-                    }
-
-                    return (
-                      <div className="glass-panel p-5 rounded-2xl border border-white/5 shadow-lg bg-[#0b0f19]/40 flex flex-col justify-between min-h-[140px]">
-                        <div>
-                          <span className="text-[9px] text-gray-500 font-bold uppercase tracking-widest block">{label}</span>
-                          <p className="text-xl font-black text-yellow-400 mt-2 font-mono">
-                            {content}
-                          </p>
-                        </div>
-                        <div className="border-t border-white/5 pt-2 text-[10px] text-gray-400 font-medium uppercase tracking-wider flex items-center gap-1.5">
-                          <Info className="w-3.5 h-3.5 text-blue-400" /> {footerText}
-                        </div>
-                      </div>
-                    );
-                  })()}
-
-                  {/* Card 4: Employee Target Success Ratio */}
-                  {(() => {
-                    const thresholdMultiplier = simulatorMultiplier / 100;
-                    const simSuccesses = allMembers.filter(m => {
-                      const simEmpTarget = m.teamTarget * thresholdMultiplier;
-                      return simEmpTarget > 0 && m.achieved >= simEmpTarget;
-                    });
-                    
-                    const successPercent = allMembers.length > 0 ? Math.round((simSuccesses.length / allMembers.length) * 100) : 0;
-                    
-                    return (
-                      <div className="glass-panel p-5 rounded-2xl border border-white/5 shadow-lg bg-[#0b0f19]/40 flex flex-col justify-between min-h-[140px]">
-                        <div>
-                          <span className="text-[9px] text-gray-500 font-bold uppercase tracking-widest block">Simulated Employee Success</span>
-                          <p className="text-2xl font-black text-white mt-1.5 font-mono">
-                            {simSuccesses.length} / {allMembers.length}
-                          </p>
-                        </div>
-                        <div className="border-t border-white/5 pt-2 flex items-center justify-between text-[10px] text-gray-400">
-                          <span>Success Ratio: {successPercent}%</span>
-                          <span>Original: {eliteAchievers.length}</span>
-                        </div>
-                      </div>
-                    );
-                  })()}
-                </div>
-              </motion.div>
-            )}
-
-            {activeSubTab === 'ledger' && (
-              <motion.div 
-                key="ledger-tab"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="space-y-6"
-              >
-                {/* Executive Ledger Overview Dashboard */}
-                {(() => {
-                  let grandTotalOfficialTarget = 0;
-                  let grandTotalTeamTarget = 0;
-                  let grandTotalAchieved = 0;
-                  
-                  const officialTargetFilledMembers: { name: string; team: string; achieved: number; target: number }[] = [];
-                  const teamTargetFilledMembers: { name: string; team: string; achieved: number; target: number }[] = [];
-                  const dangerZoneMembers: { name: string; team: string; achieved: number; expected: number; target: number; percent: number; neededPercent: number; totalRemainingPercent: number }[] = [];
-                  let totalMembersCount = 0;
-
-                  const isCurrent = timingInfo.isCurrentMonth;
-                  const isPast = timingInfo.isPast;
-                  
-                  let expectedProgressRatio = 0;
-                  if (isPast) {
-                    expectedProgressRatio = 1.0;
-                  } else if (isCurrent) {
-                    const daysPassed = Math.max(0, timingInfo.totalDays - timingInfo.daysLeft);
-                    expectedProgressRatio = timingInfo.totalDays > 0 ? (daysPassed / timingInfo.totalDays) : 0;
-                  }
-
-                  activeMonthTargets.forEach(target => {
-                    target.members.forEach((m: any) => {
-                      totalMembersCount++;
-                      const offT = Number(m.officialTarget) || 0;
-                      const teamT = Number(m.teamTarget) || 0;
-                      const ach = Number(m.achieved) || 0;
-                      
-                      grandTotalOfficialTarget += offT;
-                      grandTotalTeamTarget += teamT;
-                      grandTotalAchieved += ach;
-
-                      if (ach >= offT && offT > 0) {
-                        officialTargetFilledMembers.push({ name: m.name, team: target.teamName, achieved: ach, target: offT });
-                      }
-                      if (ach >= teamT && teamT > 0) {
-                        teamTargetFilledMembers.push({ name: m.name, team: target.teamName, achieved: ach, target: teamT });
-                      }
-
-                      // Prorated danger zone check based on expected date progress
-                      if (expectedProgressRatio > 0 && offT > 0) {
-                        const expectedVal = offT * expectedProgressRatio;
-                        // Flag if below 75% of prorated expected value
-                        if (ach < expectedVal * 0.75) {
-                          const currentPct = Math.round((ach / offT) * 100);
-                          const expectedPct = Math.round(expectedProgressRatio * 100);
-                          const neededPct = Math.max(0, expectedPct - currentPct);
-                          const remainingPct = Math.max(0, 100 - currentPct);
-
-                          dangerZoneMembers.push({
-                            name: m.name,
-                            team: target.teamName,
-                            achieved: ach,
-                            expected: Math.round(expectedVal),
-                            target: offT,
-                            percent: currentPct,
-                            neededPercent: neededPct,
-                            totalRemainingPercent: remainingPct
-                          });
-                        }
-                      }
-                    });
-                  });
-
-                  const officialAchievementRate = grandTotalOfficialTarget > 0 ? Math.round((grandTotalAchieved / grandTotalOfficialTarget) * 100) : 0;
-                  const teamAchievementRate = grandTotalTeamTarget > 0 ? Math.round((grandTotalAchieved / grandTotalTeamTarget) * 100) : 0;
-
+                // Filter members by search text
+                const filteredMembers = target.members.filter((m: any) => {
+                  if (!memberSearch.trim()) return true;
+                  const q = memberSearch.toLowerCase().trim();
                   return (
-                    <>
-                      {/* Premium Summary Cards */}
-                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        {/* Card 1: Official Target Progress */}
-                        <div className="glass-panel p-6 rounded-2xl border border-white/5 bg-[#0c101d]/50 shadow-xl flex items-center justify-between gap-6 relative overflow-hidden group hover:border-brand-green/30 transition-all duration-300">
-                          <div className="absolute top-0 right-0 w-24 h-24 bg-brand-green/5 rounded-full blur-2xl group-hover:bg-brand-green/10 transition-colors" />
-                          <div className="space-y-2">
-                            <span className="text-[10px] text-gray-500 font-extrabold uppercase tracking-widest block">Official Target Progress</span>
-                            <div className="flex items-baseline gap-2">
-                              <span className="text-3xl font-black text-white font-mono">${grandTotalAchieved.toLocaleString()}</span>
-                              <span className="text-xs text-gray-500 font-medium">/ ${grandTotalOfficialTarget.toLocaleString()}</span>
-                            </div>
-                            <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wider">Overall performance ledger coverage</p>
-                          </div>
-                          
-                          {/* Circle Progress */}
-                          <div className="relative w-20 h-20 shrink-0">
-                            <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
-                              <path className="text-gray-900" strokeWidth="3" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                              <path className="text-brand-green transition-all duration-1000" strokeDasharray={`${Math.min(100, officialAchievementRate)}, 100`} strokeWidth="3" strokeLinecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                            </svg>
-                            <div className="absolute inset-0 flex items-center justify-center">
-                              <span className="text-xs font-black text-white font-mono">{officialAchievementRate}%</span>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Card 2: Team Target Progress */}
-                        <div className="glass-panel p-6 rounded-2xl border border-white/5 bg-[#0c101d]/50 shadow-xl flex items-center justify-between gap-6 relative overflow-hidden group hover:border-yellow-500/20 transition-all duration-300">
-                          <div className="absolute top-0 right-0 w-24 h-24 bg-yellow-500/5 rounded-full blur-2xl group-hover:bg-yellow-500/10 transition-colors" />
-                          <div className="space-y-2">
-                            <span className="text-[10px] text-gray-500 font-extrabold uppercase tracking-widest block">Team Target Progress</span>
-                            <div className="flex items-baseline gap-2">
-                              <span className="text-3xl font-black text-white font-mono">${grandTotalAchieved.toLocaleString()}</span>
-                              <span className="text-xs text-gray-500 font-medium">/ ${grandTotalTeamTarget.toLocaleString()}</span>
-                            </div>
-                            <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wider">Overall team target coverage</p>
-                          </div>
-                          
-                          {/* Circle Progress */}
-                          <div className="relative w-20 h-20 shrink-0">
-                            <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
-                              <path className="text-gray-900" strokeWidth="3" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                              <path className="text-yellow-500 transition-all duration-1000" strokeDasharray={`${Math.min(100, teamAchievementRate)}, 100`} strokeWidth="3" strokeLinecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                            </svg>
-                            <div className="absolute inset-0 flex items-center justify-center">
-                              <span className="text-xs font-black text-white font-mono">{teamAchievementRate}%</span>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Card 3: Elite Milestone Tracker */}
-                        <div className="glass-panel p-6 rounded-2xl border border-white/5 bg-[#0c101d]/50 shadow-xl flex flex-col justify-between gap-4 relative overflow-hidden group hover:border-blue-500/20 transition-all duration-300">
-                          <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/5 rounded-full blur-2xl group-hover:bg-blue-500/10 transition-colors" />
-                          <div className="flex justify-between items-start">
-                            <div className="space-y-0.5">
-                              <span className="text-[10px] text-gray-500 font-extrabold uppercase tracking-widest block">Elite Milestone Tracker</span>
-                              <span className="text-xs font-medium text-gray-400">Target Completion Standing</span>
-                            </div>
-                            <Award className="w-5 h-5 text-blue-400 animate-pulse" />
-                          </div>
-                          
-                          <div className="grid grid-cols-2 gap-4 divide-x divide-white/5">
-                            <div>
-                              <span className="text-[9px] text-gray-500 font-bold uppercase tracking-wider block">Official Targets Met</span>
-                              <span className="text-xl font-black text-brand-green font-mono">{officialTargetFilledMembers.length} <span className="text-xs text-gray-500 font-medium">/ {totalMembersCount}</span></span>
-                            </div>
-                            <div className="pl-4">
-                              <span className="text-[9px] text-gray-500 font-bold uppercase tracking-wider block">Team Targets Met</span>
-                              <span className="text-xl font-black text-yellow-400 font-mono">{teamTargetFilledMembers.length} <span className="text-xs text-gray-500 font-medium">/ {totalMembersCount}</span></span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Target Achievers & Danger Zone Roster Wall */}
-                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 bg-[#080c14]/40 p-5 rounded-2xl border border-white/5">
-                        {/* Roster 1: Official Target Achievers */}
-                        <div className="space-y-3">
-                          <h4 className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-2">
-                            <CheckCircle2 className="w-4 h-4 text-brand-green" /> Official Target Achievers ({officialTargetFilledMembers.length})
-                          </h4>
-                          <div className="space-y-2 max-h-[140px] overflow-y-auto custom-scrollbar">
-                            {officialTargetFilledMembers.length === 0 ? (
-                              <p className="text-[11px] text-gray-500 italic py-2">No members have reached their official target yet.</p>
-                            ) : (
-                              officialTargetFilledMembers.map((m, idx) => (
-                                <div key={idx} className="flex items-center justify-between p-2.5 bg-black/40 border border-white/5 rounded-xl hover:border-brand-green/20 transition-all">
-                                  <div className="flex items-center gap-2">
-                                    <div className="w-5 h-5 rounded-full bg-brand-green/10 border border-brand-green/20 flex items-center justify-center text-[9px] font-black text-brand-green">{m.name.charAt(0)}</div>
-                                    <span className="text-xs font-bold text-white">{m.name}</span>
-                                    <span className="text-[9px] text-gray-500 uppercase font-mono">({m.team})</span>
-                                  </div>
-                                  <span className="text-[11px] font-bold text-brand-green font-mono">${m.achieved.toLocaleString()} / ${m.target.toLocaleString()}</span>
-                                </div>
-                              ))
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Roster 2: Team Target Achievers */}
-                        <div className="space-y-3 border-t lg:border-t-0 lg:border-l border-white/5 pt-4 lg:pt-0 lg:pl-6">
-                          <h4 className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-2">
-                            <Trophy className="w-4 h-4 text-yellow-500" /> Team Target Achievers ({teamTargetFilledMembers.length})
-                          </h4>
-                          <div className="space-y-2 max-h-[140px] overflow-y-auto custom-scrollbar">
-                            {teamTargetFilledMembers.length === 0 ? (
-                              <p className="text-[11px] text-gray-500 italic py-2">No members have reached their team target yet.</p>
-                            ) : (
-                              teamTargetFilledMembers.map((m, idx) => (
-                                <div key={idx} className="flex items-center justify-between p-2.5 bg-black/40 border border-white/5 rounded-xl hover:border-yellow-500/10 transition-all">
-                                  <div className="flex items-center gap-2">
-                                    <div className="w-5 h-5 rounded-full bg-yellow-500/10 border border-yellow-500/20 flex items-center justify-center text-[9px] font-black text-yellow-500">{m.name.charAt(0)}</div>
-                                    <span className="text-xs font-bold text-white">{m.name}</span>
-                                    <span className="text-[9px] text-gray-500 uppercase font-mono">({m.team})</span>
-                                  </div>
-                                  <span className="text-[11px] font-bold text-yellow-500 font-mono">${m.achieved.toLocaleString()} / ${m.target.toLocaleString()}</span>
-                                </div>
-                              ))
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Roster 3: Danger Zone Watchlist */}
-                        <div className="space-y-3 border-t lg:border-t-0 lg:border-l border-white/5 pt-4 lg:pt-0 lg:pl-6">
-                          <h4 className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-2">
-                            <AlertCircle className="w-4 h-4 text-red-500 animate-pulse" /> Danger Zone ({dangerZoneMembers.length})
-                          </h4>
-                          <div className="space-y-2 max-h-[220px] overflow-y-auto custom-scrollbar pr-1 flex flex-col gap-2.5">
-                            {dangerZoneMembers.length === 0 ? (
-                              <p className="text-[11px] text-gray-500 italic py-2">
-                                {expectedProgressRatio === 0 
-                                  ? 'Target month has not started yet.' 
-                                  : 'All members are on track! No risk data.'}
-                              </p>
-                            ) : (
-                              dangerZoneMembers.map((m, idx) => (
-                                <div key={idx} className="flex flex-col p-3 bg-black/40 border border-white/5 rounded-xl hover:border-red-500/30 hover:bg-red-500/[0.01] transition-all gap-2 relative overflow-hidden group">
-                                  <div className="absolute top-0 right-0 w-12 h-12 bg-red-500/[0.01] rounded-full blur-xl group-hover:bg-red-500/[0.03] transition-colors" />
-                                  <div className="flex items-center justify-between gap-2 min-w-0">
-                                    <div className="flex items-center gap-2 min-w-0">
-                                      <div className="w-5.5 h-5.5 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center text-[9px] font-black text-red-400 shrink-0">{m.name.charAt(0)}</div>
-                                      <div className="truncate min-w-0">
-                                        <span className="text-xs font-bold text-white truncate block">{m.name}</span>
-                                        <span className="text-[8px] text-gray-500 font-extrabold uppercase tracking-wider block font-mono">Team {m.team}</span>
-                                      </div>
-                                    </div>
-                                    <div className="text-right shrink-0">
-                                      <span className="text-[10px] font-extrabold text-red-450 font-mono block">${m.achieved.toLocaleString()} <span className="text-[9px] text-gray-500 font-medium">/ ${m.target.toLocaleString()}</span></span>
-                                    </div>
-                                  </div>
-
-                                  {/* Custom timeline track */}
-                                  <div className="space-y-1">
-                                    <div className="w-full bg-gray-950 rounded-full h-1.5 overflow-hidden flex border border-white/5">
-                                      {/* Achieved segment */}
-                                      <div 
-                                        style={{ width: `${m.percent}%` }} 
-                                        className="h-full bg-gradient-to-r from-red-600 to-amber-500 rounded-l-full" 
-                                      />
-                                      {/* Needed prorated segment */}
-                                      <div 
-                                        style={{ width: `${m.neededPercent}%` }} 
-                                        className="h-full bg-red-500 animate-pulse border-l border-white/20" 
-                                      />
-                                    </div>
-                                    <div className="flex justify-between items-center text-[8px] font-mono tracking-widest uppercase font-bold text-gray-500">
-                                      <span className="text-amber-500">Done: {m.percent}%</span>
-                                      <span className="text-red-400">Prorated Gap: +{m.neededPercent}%</span>
-                                      <span>Rem: {m.totalRemainingPercent}%</span>
-                                    </div>
-                                  </div>
-                                </div>
-                              ))
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </>
+                    m.name?.toLowerCase().includes(q) ||
+                    m.employeeId?.toLowerCase().includes(q)
                   );
-                })()}
+                });
 
-                {/* Active Teams Target Cards Accordion Layout */}
-                <div className="space-y-4">
-                  {activeMonthTargets.map(target => {
-                    const totalOfficialTarget = target.members.reduce((sum: number, m: any) => sum + (Number(m.officialTarget) || 0), 0);
-                    const totalTeamTarget = target.members.reduce((sum: number, m: any) => sum + (Number(m.teamTarget) || 0), 0);
-                    const totalAchieved = target.members.reduce((sum: number, m: any) => sum + (Number(m.achieved) || 0), 0);
-                    const teamAchievement = totalTeamTarget > 0 ? Math.round((totalAchieved / totalTeamTarget) * 100) : 0;
-                    const isExpanded = !!expandedTeams[target._id];
-
-                    return (
-                      <div 
-                        key={target._id} 
-                        className="bg-[#0b0f19]/60 border border-white/5 hover:border-brand-green/30 rounded-2xl overflow-hidden shadow-2xl backdrop-blur-md transition-all duration-300 hover:shadow-[0_0_25px_rgba(0,201,80,0.03)]"
-                      >
-                        {/* Accordion Trigger Header */}
-                        <div 
-                          onClick={() => toggleAccordion(target._id)}
-                          className="p-4 bg-[#0a0f19] hover:bg-[#0f1629] cursor-pointer flex flex-col md:flex-row justify-between items-start md:items-center gap-4 transition-colors select-none"
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="relative p-2.5 bg-gradient-to-br from-green-500/20 to-emerald-500/20 border border-green-500/30 rounded-xl text-brand-green shadow-inner">
-                              <Target className="w-4.5 h-4.5" />
-                              <div className="absolute inset-0 rounded-xl bg-brand-green/10 animate-pulse pointer-events-none" />
-                            </div>
-                            <div>
-                              <div className="flex items-center gap-2.5">
-                                <h3 className="text-base font-black text-white tracking-tight uppercase">Team {target.teamName}</h3>
-                                <span className={`px-2.5 py-0.5 rounded-full border text-[9px] font-black uppercase font-mono tracking-widest ${
-                                  teamAchievement >= 100 ? 'bg-green-500/10 border-green-500/30 text-green-400' :
-                                  teamAchievement > 60 ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400' :
-                                  'bg-gray-500/10 border-gray-500/30 text-gray-400'
-                                }`}>
-                                  {teamAchievement}% Achieved
-                                </span>
-                              </div>
-                              <p className="text-[10px] text-gray-500 font-semibold uppercase mt-0.5">
-                                Configured for {target.members.length} {target.members.length === 1 ? 'member' : 'members'}
-                              </p>
-                            </div>
+                return (
+                  <div 
+                    key={target._id} 
+                    className="bg-gray-900/90 border border-glass-border hover:border-emerald-500/40 rounded-2xl overflow-hidden shadow-2xl transition-all"
+                  >
+                    {/* Team Header Trigger */}
+                    <div 
+                      onClick={() => toggleAccordion(target._id)}
+                      className="p-4 bg-black/50 hover:bg-black/70 cursor-pointer flex flex-col md:flex-row justify-between items-start md:items-center gap-4 transition-colors select-none"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 font-bold shrink-0 shadow-inner">
+                          <Target className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2.5">
+                            <h3 className="text-base font-black text-white uppercase tracking-tight">Team {target.teamName}</h3>
+                            <span className={`px-2.5 py-0.5 rounded-full border text-[9px] font-black uppercase font-mono tracking-widest ${
+                              teamAchievement >= 100 ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' :
+                              teamAchievement >= 75 ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' :
+                              'bg-amber-500/20 text-amber-400 border-amber-500/30'
+                            }`}>
+                              {teamAchievement}% Achieved
+                            </span>
                           </div>
+                          <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wider mt-0.5">
+                            {target.members.length} {target.members.length === 1 ? 'Member' : 'Members'} Configured
+                          </p>
+                        </div>
+                      </div>
 
-                          <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end">
-                            {/* Summary bar for easy reference when collapsed */}
-                            <div className="flex items-center gap-4 text-xs font-mono">
-                              <div>
-                                <span className="text-[9px] text-gray-500 font-bold block uppercase tracking-wider">Goal</span>
-                                <span className="text-gray-300 font-bold">${totalTeamTarget.toLocaleString()}</span>
-                              </div>
-                              <div>
-                                <span className="text-[9px] text-gray-500 font-bold block uppercase tracking-wider font-sans">Achieved</span>
-                                <span className="text-brand-green font-extrabold">${totalAchieved.toLocaleString()}</span>
-                              </div>
-                            </div>
-
-                            <div className="flex items-center gap-2.5" onClick={e => e.stopPropagation()}>
-                              {isAdmin && (
-                                <>
-                                  <button
-                                    onClick={() => handleOpenEditModal(target)}
-                                    className="px-3.5 py-2 border border-blue-500/35 hover:border-blue-500/70 bg-blue-500/10 hover:bg-blue-500/25 text-blue-400 text-[10px] font-black uppercase tracking-wider rounded-xl flex items-center gap-1.5 transition-all cursor-pointer"
-                                  >
-                                    <Edit2 className="w-3 h-3" /> Manage
-                                  </button>
-                                  <button
-                                    onClick={() => handleDeleteTeamTarget(target._id, target.teamName)}
-                                    className="p-2 border border-red-500/30 hover:border-red-500/60 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl transition-all cursor-pointer"
-                                    title="Delete Team targets"
-                                  >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                  </button>
-                                </>
-                              )}
-                              
-                              {/* Accordion chevron toggle */}
-                              <div className="p-2 bg-gray-900 border border-white/5 rounded-xl hover:bg-gray-800 transition-colors text-gray-400">
-                                {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                              </div>
-                            </div>
+                      <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end">
+                        <div className="flex items-center gap-4 text-xs font-mono">
+                          <div>
+                            <span className="text-[9px] text-gray-400 font-bold block uppercase tracking-wider">Goal</span>
+                            <span className="text-gray-200 font-bold">${totalTeam.toLocaleString()}</span>
+                          </div>
+                          <div>
+                            <span className="text-[9px] text-gray-400 font-bold block uppercase tracking-wider">Achieved</span>
+                            <span className="text-emerald-400 font-black">${totalAchieved.toLocaleString()}</span>
                           </div>
                         </div>
 
-                        {/* Collapsible content with animation */}
-                        <AnimatePresence initial={false}>
-                          {isExpanded && (
-                            <motion.div
-                              initial={{ height: 0 }}
-                              animate={{ height: "auto" }}
-                              exit={{ height: 0 }}
-                              className="overflow-hidden"
-                            >
-                              <div className="border-t border-white/5 overflow-x-auto">
-                                <table className="w-full text-left border-collapse whitespace-nowrap">
-                                  <thead className="bg-[#080b12] text-[10px] text-gray-400 font-bold uppercase tracking-wider border-b border-white/5">
-                                    <tr>
-                                      <th className="px-6 py-4">Employee ID</th>
-                                      <th className="px-6 py-4">Member Name</th>
-                                      <th className="px-6 py-4 text-right">Official Target</th>
-                                      <th className="px-6 py-4 text-right">Team Target</th>
-                                      <th className="px-6 py-4 text-right">Achieved</th>
-                                      <th className="px-6 py-4 text-right w-56">Achievement Progress</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody className="divide-y divide-white/5 bg-black/10">
-                                    {target.members.map((m: any, idx: number) => {
-                                      const itemProgress = m.teamTarget > 0 ? Math.round((m.achieved / m.teamTarget) * 100) : 0;
-                                      return (
-                                        <tr key={idx} className="hover:bg-white/[0.02] transition-colors">
-                                          <td className="px-6 py-4 text-xs font-mono font-bold text-gray-400">{m.employeeId}</td>
-                                          <td className="px-6 py-4">
-                                            <div className="flex items-center gap-2.5">
-                                              <div className="w-7 h-7 rounded-full bg-gradient-to-br from-green-500/20 to-emerald-500/20 border border-green-500/30 flex items-center justify-center text-xs font-extrabold text-brand-green">
-                                                {m.name.charAt(0)}
-                                              </div>
-                                              <span className="text-white text-sm font-medium">{m.name}</span>
-                                            </div>
-                                          </td>
-                                          <td className="px-6 py-4 text-right font-mono text-gray-400 text-sm font-medium">${m.officialTarget?.toLocaleString()}</td>
-                                          <td className="px-6 py-4 text-right font-mono text-gray-300 text-sm font-semibold">${m.teamTarget?.toLocaleString()}</td>
-                                          <td className="px-6 py-4 text-right font-mono text-brand-green text-sm font-black">${m.achieved?.toLocaleString()}</td>
-                                          <td className="px-6 py-4 text-right">
-                                            <div className="flex items-center justify-end gap-3.5">
-                                              {!isAdmin && (
-                                                <button
-                                                  onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setActiveRequestTarget({
-                                                      targetId: target._id,
-                                                      teamName: target.teamName,
-                                                      monthName: target.monthName,
-                                                      memberName: m.name,
-                                                      employeeId: m.employeeId,
-                                                      oldAchieved: m.achieved
-                                                    });
-                                                    setRequestedAchieved(String(m.achieved));
-                                                    setIsRequestModalOpen(true);
-                                                  }}
-                                                  className="px-2.5 py-1.5 rounded-lg border border-brand-green/25 hover:border-brand-green/50 bg-brand-green/5 hover:bg-brand-green/15 text-brand-green text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1 shadow-sm shadow-green-500/5 hover:shadow-green-500/15"
-                                                  title="Request to update achievement score"
-                                                >
-                                                  <ArrowUpRight className="w-3 h-3" /> Request
-                                                </button>
-                                              )}
-                                              <span className={`text-xs font-black w-8 text-right ${itemProgress >= 100 ? 'text-green-400 font-mono' : itemProgress >= 70 ? 'text-brand-green font-mono' : 'text-gray-400 font-mono'}`}>{itemProgress}%</span>
-                                              <div className="w-24 h-1.5 bg-gray-900 rounded-full overflow-hidden border border-white/5">
-                                                <div 
-                                                  className={`h-full rounded-full transition-all duration-700 ${itemProgress >= 100 ? 'bg-green-500' : 'bg-brand-green'}`} 
-                                                  style={{ width: `${Math.min(100, itemProgress)}%` }}
-                                                />
-                                              </div>
-                                            </div>
-                                          </td>
-                                        </tr>
+                        <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
+                          {isAdmin && (
+                            <>
+                              <button
+                                onClick={() => handleOpenEditModal(target)}
+                                className="px-3 py-1.5 border border-blue-500/40 bg-blue-500/10 hover:bg-blue-500/25 text-blue-300 text-xs font-extrabold uppercase rounded-xl flex items-center gap-1 transition-all cursor-pointer"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                                <span>Manage</span>
+                              </button>
+                              <button
+                                onClick={() => handleDeleteTeamTarget(target._id, target.teamName)}
+                                className="p-1.5 border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl transition-all cursor-pointer"
+                                title="Delete Team"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </>
+                          )}
+                          <div className="p-1.5 bg-black/40 border border-glass-border rounded-xl text-gray-400">
+                            {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Member Table Content */}
+                    <AnimatePresence initial={false}>
+                      {isExpanded && (
+                        <motion.div
+                          initial={{ height: 0 }}
+                          animate={{ height: "auto" }}
+                          exit={{ height: 0 }}
+                          className="overflow-hidden"
+                        >
+                          <div className="border-t border-white/5 overflow-x-auto">
+                            <table className="w-full text-left border-collapse text-xs text-gray-300">
+                              <thead>
+                                <tr className="bg-black/60 border-b border-glass-border text-gray-400 font-black uppercase text-[10px] tracking-wider">
+                                  <th className="py-3 px-4">Employee ID</th>
+                                  <th className="py-3 px-4">Member Name</th>
+                                  <th className="py-3 px-4 text-right">Official Target</th>
+                                  <th className="py-3 px-4 text-right">Team Target</th>
+                                  <th className="py-3 px-4 text-right">Achieved</th>
+                                  <th className="py-3 px-4">Progress Bar</th>
+                                  <th className="py-3 px-4 text-center">Status</th>
+                                  <th className="py-3 px-4 text-right">Actions</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-white/5">
+                                {filteredMembers.length === 0 ? (
+                                  <tr>
+                                    <td colSpan={8} className="py-8 text-center text-gray-500 italic">
+                                      {memberSearch ? 'No team members match your search query.' : 'No members configured for this team yet.'}
+                                    </td>
+                                  </tr>
+                                ) : (
+                                  filteredMembers.map((m: any, idx: number) => {
+                                    const memTeamT = Number(m.teamTarget) || 0;
+                                    const memAch = Number(m.achieved) || 0;
+                                    const pct = memTeamT > 0 ? Math.round((memAch / memTeamT) * 100) : 0;
+
+                                    let statusBadge = (
+                                      <span className="px-2.5 py-0.5 bg-amber-500/15 text-amber-300 border border-amber-500/30 rounded-lg text-[10px] font-bold uppercase">
+                                        Behind
+                                      </span>
+                                    );
+                                    if (pct >= 100) {
+                                      statusBadge = (
+                                        <span className="px-2.5 py-0.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-lg text-[10px] font-black uppercase flex items-center justify-center gap-1">
+                                          <Flame className="w-3 h-3 text-emerald-400" /> Smashed
+                                        </span>
                                       );
-                                    })}
-                                    {target.members.length === 0 && (
-                                      <tr>
-                                        <td colSpan={6} className="px-6 py-10 text-center text-gray-500 text-sm">
-                                          No targets configured for this team. {isAdmin ? 'Click "Manage" to insert members.' : ''}
+                                    } else if (pct >= 75) {
+                                      statusBadge = (
+                                        <span className="px-2.5 py-0.5 bg-blue-500/20 text-blue-300 border border-blue-500/30 rounded-lg text-[10px] font-bold uppercase">
+                                          On Track
+                                        </span>
+                                      );
+                                    }
+
+                                    return (
+                                      <tr key={idx} className="hover:bg-black/30 transition-colors">
+                                        <td className="py-3 px-4 font-mono font-bold text-emerald-400 whitespace-nowrap">
+                                          {m.employeeId || '—'}
+                                        </td>
+                                        <td className="py-3 px-4 font-bold text-white whitespace-nowrap">
+                                          <div className="flex items-center gap-2">
+                                            <div className="w-6 h-6 rounded-full bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-[10px] font-black text-emerald-400">
+                                              {m.name ? m.name.charAt(0).toUpperCase() : 'M'}
+                                            </div>
+                                            <span>{m.name}</span>
+                                          </div>
+                                        </td>
+                                        <td className="py-3 px-4 text-right font-mono font-semibold text-gray-300 whitespace-nowrap">
+                                          ${(Number(m.officialTarget) || 0).toLocaleString()}
+                                        </td>
+                                        <td className="py-3 px-4 text-right font-mono font-bold text-white whitespace-nowrap">
+                                          ${(Number(m.teamTarget) || 0).toLocaleString()}
+                                        </td>
+                                        <td className="py-3 px-4 text-right font-mono font-black text-emerald-400 whitespace-nowrap">
+                                          ${(Number(m.achieved) || 0).toLocaleString()}
+                                        </td>
+                                        <td className="py-3 px-4 min-w-[140px]">
+                                          <div className="space-y-1">
+                                            <div className="w-full bg-black/50 border border-glass-border h-2 rounded-full overflow-hidden">
+                                              <div 
+                                                className={`h-full rounded-full transition-all duration-500 ${pct >= 100 ? 'bg-gradient-to-r from-emerald-500 to-teal-400 shadow-sm shadow-emerald-500/50' : 'bg-emerald-500'}`}
+                                                style={{ width: `${Math.min(100, pct)}%` }}
+                                              />
+                                            </div>
+                                            <div className="text-[9px] font-mono text-gray-400 font-bold text-right">{pct}%</div>
+                                          </div>
+                                        </td>
+                                        <td className="py-3 px-4 text-center whitespace-nowrap">
+                                          {statusBadge}
+                                        </td>
+                                        <td className="py-3 px-4 text-right whitespace-nowrap">
+                                          {!isAdmin ? (
+                                            <button
+                                              onClick={() => {
+                                                setActiveRequestTarget({
+                                                  targetId: target._id,
+                                                  teamName: target.teamName,
+                                                  monthName: target.monthName,
+                                                  memberName: m.name,
+                                                  employeeId: m.employeeId,
+                                                  oldAchieved: m.achieved || 0
+                                                });
+                                                setRequestedAchieved('');
+                                                setRequestType('add');
+                                                setIsRequestModalOpen(true);
+                                              }}
+                                              className="px-2.5 py-1 bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/40 rounded-lg text-[10px] font-bold cursor-pointer"
+                                            >
+                                              Request Update
+                                            </button>
+                                          ) : (
+                                            <button
+                                              onClick={() => handleOpenEditModal(target)}
+                                              className="p-1 text-gray-400 hover:text-white"
+                                              title="Edit Target"
+                                            >
+                                              <Edit2 className="w-3.5 h-3.5" />
+                                            </button>
+                                          )}
                                         </td>
                                       </tr>
-                                    )}
-                                  </tbody>
-                                </table>
-                              </div>
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
+                                    );
+                                  })
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                );
+              })}
+            </motion.div>
+          )}
+
+          {/* Sub-Tab 2: Leaderboard & Rankings */}
+          {activeSubTab === 'overview' && (
+            <motion.div 
+              key="overview-view"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full"
+            >
+              {/* Smashed Targets Wall of Fame */}
+              <div className="bg-gray-900/90 border border-glass-border p-6 rounded-2xl shadow-xl space-y-4">
+                <h3 className="text-base font-black text-white uppercase tracking-wider flex items-center gap-2 border-b border-white/10 pb-3">
+                  <Flame className="w-5 h-5 text-emerald-400" /> Target Smashed Wall of Fame ({smashedTargetMembers.length})
+                </h3>
+                {smashedTargetMembers.length === 0 ? (
+                  <div className="py-12 text-center text-gray-500 italic space-y-2">
+                    <Trophy className="w-10 h-10 text-gray-700 mx-auto" />
+                    <p>No members have smashed their 100% target goal yet in {selectedMonth}.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1">
+                    {smashedTargetMembers.map((m, idx) => (
+                      <div key={idx} className="p-3.5 bg-black/50 border border-emerald-500/30 rounded-xl flex items-center justify-between shadow-md">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-xs font-black text-emerald-400">
+                            {m.name.charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <div className="text-sm font-extrabold text-white">{m.name}</div>
+                            <div className="text-[10px] text-gray-400 uppercase font-mono font-bold">Team {m.teamName} • ID: {m.employeeId}</div>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-sm font-black text-emerald-400 font-mono">${(Number(m.achieved) || 0).toLocaleString()}</div>
+                          <div className="text-[9px] font-bold text-emerald-300 font-mono">100%+ Goal Met</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Team Standings Leaderboard */}
+              <div className="bg-gray-900/90 border border-glass-border p-6 rounded-2xl shadow-xl space-y-4">
+                <h3 className="text-base font-black text-white uppercase tracking-wider flex items-center gap-2 border-b border-white/10 pb-3">
+                  <Trophy className="w-5 h-5 text-amber-400" /> Team Standings Leaderboard
+                </h3>
+                <div className="space-y-3">
+                  {activeMonthTargets.map((t, idx) => {
+                    const goal = t.members.reduce((sum: number, m: any) => sum + (Number(m.teamTarget) || 0), 0);
+                    const ach = t.members.reduce((sum: number, m: any) => sum + (Number(m.achieved) || 0), 0);
+                    const pct = goal > 0 ? Math.round((ach / goal) * 100) : 0;
+
+                    return (
+                      <div key={t._id} className="p-3.5 bg-black/50 border border-glass-border rounded-xl flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs font-black font-mono border ${
+                            idx === 0 ? 'bg-amber-500/20 border-amber-500/40 text-amber-300' : 'bg-gray-800 text-gray-300 border-gray-700'
+                          }`}>
+                            #{idx + 1}
+                          </div>
+                          <div>
+                            <div className="text-sm font-extrabold text-white uppercase">Team {t.teamName}</div>
+                            <div className="text-[10px] text-gray-400 font-mono">{t.members.length} Members</div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-4">
+                          <div className="text-right font-mono">
+                            <div className="text-xs font-black text-emerald-400">${ach.toLocaleString()}</div>
+                            <div className="text-[10px] text-gray-500">/ ${goal.toLocaleString()}</div>
+                          </div>
+                          <span className="px-3 py-1 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-xl text-xs font-black font-mono">
+                            {pct}%
+                          </span>
+                        </div>
                       </div>
                     );
                   })}
                 </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+              </div>
+            </motion.div>
           )}
+
+          {/* Sub-Tab 3: Target Simulator */}
+          {activeSubTab === 'simulator' && (
+            <motion.div 
+              key="simulator-view"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="bg-gray-900/90 border border-glass-border p-6 rounded-2xl shadow-xl space-y-6 w-full"
+            >
+              <div className="space-y-1">
+                <h3 className="text-lg font-black text-white uppercase tracking-wider flex items-center gap-2">
+                  <Sliders className="w-5 h-5 text-emerald-400" /> Interactive Target Simulator
+                </h3>
+                <p className="text-xs text-gray-400">
+                  Simulate target multiplier adjustments from 50% to 200% to project team milestones and required daily run-rates.
+                </p>
+              </div>
+
+              {/* Slider Control */}
+              <div className="p-5 bg-black/50 border border-glass-border rounded-xl space-y-4">
+                <div className="flex justify-between items-center text-xs font-bold text-gray-300">
+                  <span>Target Multiplier: <strong className="text-emerald-400 font-mono text-sm">{simulatorMultiplier}%</strong></span>
+                  <div className="flex gap-2">
+                    <button onClick={() => setSimulatorMultiplier(85)} className="px-2 py-1 bg-gray-800 text-xs rounded hover:bg-gray-700">85%</button>
+                    <button onClick={() => setSimulatorMultiplier(100)} className="px-2 py-1 bg-emerald-600 text-xs text-white rounded">100% Reset</button>
+                    <button onClick={() => setSimulatorMultiplier(120)} className="px-2 py-1 bg-gray-800 text-xs rounded hover:bg-gray-700">120%</button>
+                    <button onClick={() => setSimulatorMultiplier(150)} className="px-2 py-1 bg-gray-800 text-xs rounded hover:bg-gray-700">150%</button>
+                  </div>
+                </div>
+
+                <input 
+                  type="range" 
+                  min={50} 
+                  max={200} 
+                  step={5} 
+                  value={simulatorMultiplier} 
+                  onChange={(e) => setSimulatorMultiplier(Number(e.target.value))}
+                  className="w-full accent-emerald-500 cursor-pointer"
+                />
+              </div>
+
+              {/* Projected Results Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="p-4 bg-black/40 border border-glass-border rounded-xl">
+                  <span className="text-[10px] text-gray-400 uppercase font-bold block">Simulated Team Goal</span>
+                  <span className="text-xl font-black text-white font-mono mt-1 block">
+                    ${Math.round(totalTeamTargetVal * (simulatorMultiplier / 100)).toLocaleString()}
+                  </span>
+                </div>
+                <div className="p-4 bg-black/40 border border-glass-border rounded-xl">
+                  <span className="text-[10px] text-gray-400 uppercase font-bold block">Simulated Coverage</span>
+                  <span className="text-xl font-black text-emerald-400 font-mono mt-1 block">
+                    {Math.round(totalTeamTargetVal * (simulatorMultiplier / 100)) > 0 ? Math.round((totalAchievedVal / (totalTeamTargetVal * (simulatorMultiplier / 100))) * 100) : 0}%
+                  </span>
+                </div>
+                <div className="p-4 bg-black/40 border border-glass-border rounded-xl">
+                  <span className="text-[10px] text-gray-400 uppercase font-bold block">Required Daily Run Rate</span>
+                  <span className="text-xl font-black text-amber-300 font-mono mt-1 block">
+                    ${timingInfo.daysLeft > 0 ? Math.round(Math.max(0, (totalTeamTargetVal * (simulatorMultiplier / 100)) - totalAchievedVal) / timingInfo.daysLeft).toLocaleString() : 0} / day
+                  </span>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      )}
+
+      {/* Add Month Modal */}
+      {isMonthModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-gray-900 border border-emerald-500/40 rounded-2xl w-full max-w-md shadow-2xl p-6 space-y-4 text-left relative">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <h3 className="text-base font-black text-white uppercase tracking-wider flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-emerald-400" /> Create Month Folder
+              </h3>
+              <button onClick={() => setIsMonthModalOpen(false)} className="text-gray-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateMonth} className="space-y-4 text-xs">
+              <div className="space-y-1">
+                <label className="font-bold text-gray-300 block">Month Folder Name:</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. September 2026"
+                  value={newMonthName}
+                  onChange={(e) => setNewMonthName(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-black/60 border border-glass-border rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              {uniqueMonths.length > 0 && (
+                <div className="p-3 bg-black/40 border border-glass-border rounded-xl space-y-2">
+                  <label className="flex items-center gap-2 cursor-pointer font-bold text-gray-300">
+                    <input
+                      type="checkbox"
+                      checked={carryOverChecked}
+                      onChange={(e) => setCarryOverChecked(e.target.checked)}
+                      className="accent-emerald-500"
+                    />
+                    <span>Carry Over Existing Team Configurations</span>
+                  </label>
+                  
+                  {carryOverChecked && (
+                    <div className="space-y-1 pt-1">
+                      <span className="text-[10px] text-gray-400 font-bold block">Source Month to Clone:</span>
+                      <select
+                        value={sourceMonthSelect}
+                        onChange={(e) => setSourceMonthSelect(e.target.value)}
+                        className="w-full px-3 py-2 bg-black/60 border border-glass-border rounded-xl text-white focus:outline-none"
+                      >
+                        {uniqueMonths.map(m => (
+                          <option key={m} value={m}>{m}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="flex justify-end gap-3 pt-3 border-t border-white/10">
+                <button type="button" onClick={() => setIsMonthModalOpen(false)} className="px-4 py-2 bg-gray-800 text-gray-300 font-bold rounded-xl">
+                  Cancel
+                </button>
+                <button type="submit" disabled={isCreatingMonth} className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-xl shadow-lg shadow-emerald-600/30">
+                  {isCreatingMonth ? 'Creating...' : 'Create Month'}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 
-      {/* CREATE MONTH MODAL */}
-      <AnimatePresence>
-        {isMonthModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-black/75 backdrop-blur-sm" onClick={() => setIsMonthModalOpen(false)} />
-            <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative w-full max-w-sm bg-gray-950 border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-10">
-              <div className="p-5 border-b border-white/10 flex justify-between items-center bg-black/40">
-                <h3 className="text-base font-black text-white flex items-center gap-2">
-                  <Calendar className="w-5 h-5 text-brand-green" /> Create Month Folder
-                </h3>
-                <button onClick={() => setIsMonthModalOpen(false)} className="p-1 hover:bg-gray-800 text-gray-400 hover:text-white rounded-lg transition-colors cursor-pointer">
-                  <X className="w-5 h-5" />
+      {/* Add Team Modal */}
+      {isTeamModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-gray-900 border border-emerald-500/40 rounded-2xl w-full max-w-md shadow-2xl p-6 space-y-4 text-left relative">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <h3 className="text-base font-black text-white uppercase tracking-wider flex items-center gap-2">
+                <Target className="w-5 h-5 text-emerald-400" /> Add Team to {selectedMonth}
+              </h3>
+              <button onClick={() => setIsTeamModalOpen(false)} className="text-gray-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateTeamTarget} className="space-y-4 text-xs">
+              <div className="space-y-1">
+                <label className="font-bold text-gray-300 block">Team Name:</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. CC, DEV, MARKETING"
+                  value={newTeamName}
+                  onChange={(e) => setNewTeamName(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-black/60 border border-glass-border rounded-xl text-white uppercase placeholder-gray-500 focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-3 border-t border-white/10">
+                <button type="button" onClick={() => setIsTeamModalOpen(false)} className="px-4 py-2 bg-gray-800 text-gray-300 font-bold rounded-xl">
+                  Cancel
+                </button>
+                <button type="submit" disabled={isCreatingTeam} className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-xl shadow-lg shadow-emerald-600/30">
+                  {isCreatingTeam ? 'Adding...' : 'Add Team'}
                 </button>
               </div>
-              <form onSubmit={handleCreateMonth} className="p-5 space-y-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block">Month Name</label>
-                  <input 
-                    required 
-                    autoFocus 
-                    type="text" 
-                    placeholder="e.g. July 2026" 
-                    value={newMonthName} 
-                    onChange={e => setNewMonthName(e.target.value)} 
-                    className="w-full glass-input px-3.5 py-2.5 text-sm bg-black/50 border border-gray-800 rounded-xl focus:border-green-500 focus:outline-none text-white transition-colors" 
-                  />
-                  <p className="text-[10px] text-gray-500 font-medium">Provide Month and Year to distinguish target collections.</p>
-                </div>
+            </form>
+          </div>
+        </div>
+      )}
 
-                {/* Carry Over Section */}
-                {uniqueMonths.length > 0 && (
-                  <div className="space-y-3 pt-3 border-t border-white/5">
-                    <label className="flex items-center gap-2.5 cursor-pointer select-none">
-                      <input 
-                        type="checkbox" 
-                        checked={carryOverChecked}
-                        onChange={e => setCarryOverChecked(e.target.checked)}
-                        className="w-4 h-4 rounded border-gray-800 text-brand-green focus:ring-brand-green bg-black"
+      {/* Edit Member Targets Modal */}
+      {isEditModalOpen && activeEditTarget && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-gray-900 border border-emerald-500/40 rounded-2xl w-full max-w-4xl shadow-2xl p-6 space-y-4 text-left relative max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <h3 className="text-base font-black text-white uppercase tracking-wider flex items-center gap-2">
+                <Edit2 className="w-5 h-5 text-emerald-400" /> Manage Team {activeEditTarget.teamName} ({activeEditTarget.monthName})
+              </h3>
+              <button onClick={() => setIsEditModalOpen(false)} className="text-gray-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditedTarget} className="space-y-4 text-xs">
+              <div className="flex justify-between items-center">
+                <span className="font-bold text-gray-300">Team Member Target Rows:</span>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowQuickPaste(!showQuickPaste)}
+                    className="px-3 py-1.5 bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/40 rounded-xl font-bold cursor-pointer"
+                  >
+                    📋 Bulk Quick Paste
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleAddMemberRow}
+                    className="px-3 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 rounded-xl font-bold cursor-pointer"
+                  >
+                    + Add Member Row
+                  </button>
+                </div>
+              </div>
+
+              {showQuickPaste && (
+                <div className="p-4 bg-black/60 border border-blue-500/40 rounded-xl space-y-3">
+                  <span className="font-bold text-blue-300 block">Paste TSV/CSV Columns: EmployeeID, Name, OfficialTarget, TeamTarget, Achieved</span>
+                  <textarea
+                    rows={4}
+                    placeholder={`15789\tMd. Ibrahim Sardar\t1100\t1500\t40\n15790\tMd. Sajjad\t1100\t1500\t0`}
+                    value={quickPasteText}
+                    onChange={(e) => setQuickPasteText(e.target.value)}
+                    className="w-full px-3 py-2 bg-black/80 border border-glass-border rounded-xl text-white font-mono text-xs focus:outline-none"
+                  />
+                  <div className="flex justify-end gap-2">
+                    <button type="button" onClick={() => setShowQuickPaste(false)} className="px-3 py-1 bg-gray-800 text-gray-300 rounded">Cancel</button>
+                    <button type="button" onClick={handleApplyQuickPaste} className="px-4 py-1 bg-blue-600 text-white font-bold rounded">Apply Parsed Members</button>
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
+                {activeEditTarget.members.map((m: any, idx: number) => (
+                  <div key={idx} className="grid grid-cols-12 gap-2 items-center p-3 bg-black/40 border border-glass-border rounded-xl">
+                    <div className="col-span-2">
+                      <span className="text-[9px] text-gray-500 font-bold block mb-0.5">Emp ID:</span>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. 15789"
+                        value={m.employeeId}
+                        onChange={(e) => handleMemberFieldChange(idx, 'employeeId', e.target.value)}
+                        className="w-full px-2.5 py-1.5 bg-black/60 border border-glass-border rounded-lg text-white font-mono focus:outline-none"
                       />
-                      <span className="text-xs font-black text-white uppercase tracking-wider">Carry over member info</span>
-                    </label>
-
-                    {carryOverChecked && (
-                      <motion.div 
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: "auto" }}
-                        className="space-y-3 pl-6 overflow-hidden"
-                      >
-                        <div className="space-y-1.5">
-                          <label className="text-[10px] font-extrabold text-gray-500 uppercase tracking-widest block">Source Month</label>
-                          <select
-                            value={sourceMonthSelect}
-                            onChange={e => setSourceMonthSelect(e.target.value)}
-                            className="w-full bg-[#111625] border border-gray-800 rounded-xl px-3 py-2 text-xs text-white focus:border-green-500 focus:outline-none cursor-pointer"
-                          >
-                            {uniqueMonths.map(m => (
-                              <option key={m} value={m}>{m}</option>
-                            ))}
-                          </select>
-                        </div>
-
-                        {/* Checklist of Teams to copy */}
-                        <div className="space-y-2">
-                          <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-widest block">Select Teams to copy</span>
-                          <div className="bg-[#0b0f19] border border-white/5 rounded-xl p-2.5 max-h-36 overflow-y-auto space-y-2.5 custom-scrollbar">
-                            {targets.filter(t => t.monthName === sourceMonthSelect).map(t => (
-                              <label key={t._id} className="flex items-center justify-between text-xs cursor-pointer select-none">
-                                <div className="flex items-center gap-2">
-                                  <input 
-                                    type="checkbox" 
-                                    checked={!!selectedTeamsChecklist[t._id]}
-                                    onChange={e => {
-                                      setSelectedTeamsChecklist(prev => ({
-                                        ...prev,
-                                        [t._id]: e.target.checked
-                                      }));
-                                    }}
-                                    className="w-3.5 h-3.5 rounded border-gray-800 text-brand-green focus:ring-brand-green bg-black"
-                                  />
-                                  <span className="text-xs font-bold text-white">Team {t.teamName}</span>
-                                </div>
-                                <span className="text-[10px] text-gray-500 font-mono font-bold uppercase">{t.members.length} members</span>
-                              </label>
-                            ))}
-                            {targets.filter(t => t.monthName === sourceMonthSelect).length === 0 && (
-                              <span className="text-[10px] text-gray-500 italic block">No active teams found in selected month.</span>
-                            )}
-                          </div>
-                        </div>
-                      </motion.div>
-                    )}
-                  </div>
-                )}
-
-                <div className="pt-2 flex justify-end gap-3">
-                  <button type="button" onClick={() => setIsMonthModalOpen(false)} className="px-4 py-2.5 text-xs font-bold text-gray-400 hover:text-white transition-colors cursor-pointer">Cancel</button>
-                  <button type="submit" disabled={isCreatingMonth} className="px-5 py-2.5 text-xs font-black bg-brand-green hover:bg-brand-green-hover text-black rounded-xl uppercase tracking-wider transition-colors flex items-center gap-2 shadow-lg glow-green cursor-pointer">
-                    {isCreatingMonth ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Create Folder'}
-                  </button>
-                </div>
-              </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* CREATE TEAM TARGET MODAL */}
-      <AnimatePresence>
-        {isTeamModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-black/75 backdrop-blur-sm" onClick={() => setIsTeamModalOpen(false)} />
-            <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative w-full max-w-sm bg-gray-950 border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-10">
-              <div className="p-5 border-b border-white/10 flex justify-between items-center bg-black/40">
-                <h3 className="text-base font-black text-white flex items-center gap-2">
-                  <Target className="w-5 h-5 text-brand-green" /> Add Team Target
-                </h3>
-                <button onClick={() => setIsTeamModalOpen(false)} className="p-1 hover:bg-gray-800 text-gray-400 hover:text-white rounded-lg transition-colors cursor-pointer">
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-              <form onSubmit={handleCreateTeamTarget} className="p-5 space-y-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block">Team Initials / Code</label>
-                  <input 
-                    required 
-                    autoFocus 
-                    type="text" 
-                    placeholder="e.g. CC, CM, QA, DM" 
-                    value={newTeamName} 
-                    onChange={e => setNewTeamName(e.target.value)} 
-                    className="w-full glass-input px-3.5 py-2.5 text-sm bg-black/50 border border-gray-800 rounded-xl focus:border-green-500 focus:outline-none text-white transition-colors" 
-                  />
-                  <p className="text-[10px] text-gray-500 font-medium">Provide team code (normally 2 letters like CC, CM) for {selectedMonth}.</p>
-                </div>
-                <div className="pt-2 flex justify-end gap-3">
-                  <button type="button" onClick={() => setIsTeamModalOpen(false)} className="px-4 py-2.5 text-xs font-bold text-gray-400 hover:text-white transition-colors cursor-pointer">Cancel</button>
-                  <button type="submit" disabled={isCreatingTeam} className="px-5 py-2.5 text-xs font-black bg-brand-green hover:bg-brand-green-hover text-black rounded-xl uppercase tracking-wider transition-colors flex items-center gap-2 shadow-lg glow-green cursor-pointer">
-                    {isCreatingTeam ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Add Team'}
-                  </button>
-                </div>
-              </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* EDIT TARGETS (MANAGE TEAM MEMBERS) MODAL */}
-      <AnimatePresence>
-        {isEditModalOpen && activeEditTarget && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => setIsEditModalOpen(false)} />
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.96, y: 15 }} 
-              animate={{ opacity: 1, scale: 1, y: 0 }} 
-              exit={{ opacity: 0, scale: 0.96, y: 15 }} 
-              className="relative w-full max-w-6xl bg-gradient-to-b from-[#0d111c] to-[#080a10] border border-brand-green/20 rounded-2xl shadow-[0_0_55px_rgba(0,201,80,0.1)] overflow-hidden z-10 flex flex-col max-h-[85vh] transition-all duration-300"
-            >
-              <div className="p-5 border-b border-white/5 flex justify-between items-center bg-black/60 backdrop-blur-md">
-                <div>
-                  <h3 className="text-base font-black text-white flex items-center gap-2 uppercase tracking-wide">
-                    <div className="p-1.5 bg-brand-green/10 border border-brand-green/25 rounded-lg text-brand-green">
-                      <Edit2 className="w-4 h-4" />
                     </div>
-                    Manage Team {activeEditTarget.teamName} Targets
-                  </h3>
-                  <p className="text-[10px] text-brand-green uppercase tracking-widest mt-1 font-bold font-mono">Performance Month: {activeEditTarget.monthName}</p>
-                </div>
-                <button onClick={() => setIsEditModalOpen(false)} className="p-2 hover:bg-white/5 text-gray-400 hover:text-white rounded-xl transition-all cursor-pointer border border-transparent hover:border-white/5">
-                  <X className="w-4.5 h-4.5" />
-                </button>
-              </div>
 
-              <form onSubmit={handleSaveEditedTarget} className="flex-1 overflow-y-auto p-6 flex flex-col gap-6">
-                <div className="space-y-5">
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                    <span className="text-xs font-black text-gray-400 uppercase tracking-wider">Configure Member Entry List</span>
-                    <div className="flex items-center gap-3 w-full sm:w-auto">
+                    <div className="col-span-3">
+                      <span className="text-[9px] text-gray-500 font-bold block mb-0.5">Member Name:</span>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Full Name"
+                        value={m.name}
+                        onChange={(e) => handleMemberFieldChange(idx, 'name', e.target.value)}
+                        className="w-full px-2.5 py-1.5 bg-black/60 border border-glass-border rounded-lg text-white focus:outline-none"
+                      />
+                    </div>
+
+                    <div className="col-span-2">
+                      <span className="text-[9px] text-gray-500 font-bold block mb-0.5">Official Target:</span>
+                      <input
+                        type="number"
+                        min="0"
+                        value={m.officialTarget}
+                        onChange={(e) => handleMemberFieldChange(idx, 'officialTarget', Number(e.target.value))}
+                        className="w-full px-2.5 py-1.5 bg-black/60 border border-glass-border rounded-lg text-white font-mono focus:outline-none"
+                      />
+                    </div>
+
+                    <div className="col-span-2">
+                      <span className="text-[9px] text-gray-500 font-bold block mb-0.5">Team Target:</span>
+                      <input
+                        type="number"
+                        min="0"
+                        value={m.teamTarget}
+                        onChange={(e) => handleMemberFieldChange(idx, 'teamTarget', Number(e.target.value))}
+                        className="w-full px-2.5 py-1.5 bg-black/60 border border-glass-border rounded-lg text-white font-mono focus:outline-none"
+                      />
+                    </div>
+
+                    <div className="col-span-2">
+                      <span className="text-[9px] text-gray-500 font-bold block mb-0.5">Achieved:</span>
+                      <input
+                        type="number"
+                        min="0"
+                        value={m.achieved}
+                        onChange={(e) => handleMemberFieldChange(idx, 'achieved', Number(e.target.value))}
+                        className="w-full px-2.5 py-1.5 bg-black/60 border border-glass-border rounded-lg text-emerald-400 font-mono font-bold focus:outline-none"
+                      />
+                    </div>
+
+                    <div className="col-span-1 text-right">
                       <button
                         type="button"
-                        onClick={() => setShowQuickPaste(!showQuickPaste)}
-                        className="px-3.5 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-black uppercase tracking-wider rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer"
+                        onClick={() => handleRemoveMemberRow(idx)}
+                        className="p-1.5 text-gray-500 hover:text-red-400"
+                        title="Remove member"
                       >
-                        <FileSpreadsheet className="w-3.5 h-3.5" />
-                        {showQuickPaste ? "Hide Excel Paste" : "Quick Excel Paste"}
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={handleAddMemberRow}
-                        className="px-3 py-2 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/30 text-[10px] font-black uppercase tracking-wider rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer ml-auto sm:ml-0"
-                      >
-                        <UserPlus className="w-3.5 h-3.5" /> Add Member Row
+                        <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
                   </div>
-
-                  {/* Excel Quick Paste Section */}
-                  <AnimatePresence>
-                    {showQuickPaste && (
-                      <motion.div 
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: "auto" }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="overflow-hidden"
-                      >
-                        <div className="p-4 bg-black/40 border border-emerald-500/15 rounded-xl space-y-3">
-                          <div className="flex justify-between items-center border-b border-white/5 pb-2">
-                            <h4 className="text-xs font-black text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
-                              <ClipboardList className="w-4 h-4" /> Bulk Spreadsheet Data Import
-                            </h4>
-                            <span className="text-[8px] bg-emerald-500/10 px-2 py-0.5 rounded text-emerald-300 font-extrabold uppercase">Copy-Paste Tool</span>
-                          </div>
-                          <p className="text-[10px] text-gray-400 leading-normal">
-                            Copy rows directly from Excel/Google Sheets and paste in the input box below. Fields must be ordered:
-                            <code className="bg-emerald-500/10 text-emerald-400 mx-1 px-1 rounded font-mono font-bold">Employee ID | Name | Official Target | Team Target | Achieved</code>
-                            (separated by Tabs or Commas). Existing IDs will be overwritten; new IDs will append.
-                          </p>
-                          <textarea
-                            rows={4}
-                            value={quickPasteText}
-                            onChange={e => setQuickPasteText(e.target.value)}
-                            placeholder="EMP-101&#9;John Doe&#9;5000&#9;5000&#9;4800&#10;EMP-102&#9;Jane Smith&#9;6000&#9;6000&#9;6000"
-                            className="w-full bg-black border border-white/10 p-2.5 rounded-lg text-xs font-mono text-white focus:border-emerald-500 focus:outline-none"
-                          />
-                          <div className="flex justify-end gap-2.5 pt-1">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setQuickPasteText('');
-                                setShowQuickPaste(false);
-                              }}
-                              className="px-3 py-1.5 text-[10px] font-bold text-gray-400 hover:text-white uppercase transition-colors cursor-pointer"
-                            >
-                              Cancel
-                            </button>
-                            <button
-                              type="button"
-                              onClick={handleParseQuickPaste}
-                              className="px-4 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-black font-black text-[10px] uppercase rounded-lg transition-all cursor-pointer shadow-md"
-                            >
-                              Parse & Import Rows
-                            </button>
-                          </div>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-
-                  <div className="overflow-x-hidden border border-white/5 rounded-xl">
-                    <table className="w-full text-left text-xs whitespace-nowrap">
-                      <thead className="bg-[#0b0f19] text-gray-400 font-bold uppercase tracking-wider border-b border-white/5">
-                        <tr>
-                          <th className="px-4 py-3">Employee ID</th>
-                          <th className="px-4 py-3">Name</th>
-                          <th className="px-4 py-3 text-right">Official Target ($)</th>
-                          <th className="px-4 py-3 text-right">Team Target ($)</th>
-                          <th className="px-4 py-3 text-right">Achieved ($)</th>
-                          <th className="px-4 py-3 text-center w-16">Remove</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-white/5 bg-black/20">
-                        {activeEditTarget.members.map((m: any, idx: number) => (
-                          <tr key={idx} className="hover:bg-white/[0.01] transition-colors">
-                            <td className="px-3 py-2">
-                              <input 
-                                required
-                                type="text" 
-                                value={m.employeeId} 
-                                onChange={e => {
-                                  const val = e.target.value;
-                                  handleMemberFieldChange(idx, 'employeeId', val);
-                                  const matchedName = knownMembersMap[val.trim().toUpperCase()];
-                                  if (matchedName) {
-                                    handleMemberFieldChange(idx, 'name', matchedName);
-                                  }
-                                }} 
-                                placeholder="e.g. 16573" 
-                                className="w-36 bg-black/40 border border-white/10 px-2.5 py-1.5 rounded-lg text-white font-mono focus:border-brand-green/40 focus:ring-1 focus:ring-brand-green/20 focus:outline-none transition-all" 
-                              />
-                            </td>
-                            <td className="px-3 py-2">
-                              <input 
-                                required
-                                type="text" 
-                                value={m.name} 
-                                onChange={e => handleMemberFieldChange(idx, 'name', e.target.value)} 
-                                placeholder="Employee Name (e.g. Rifat)" 
-                                className="w-64 bg-black/40 border border-white/10 px-2.5 py-1.5 rounded-lg text-white font-semibold focus:border-brand-green/40 focus:ring-1 focus:ring-brand-green/20 focus:outline-none transition-all" 
-                              />
-                            </td>
-                            <td className="px-3 py-2 text-right">
-                              <input 
-                                type="number" 
-                                value={m.officialTarget} 
-                                onChange={e => handleMemberFieldChange(idx, 'officialTarget', Math.max(0, Number(e.target.value)))} 
-                                className="w-32 bg-black/40 border border-white/10 px-2.5 py-1.5 rounded-lg text-white text-right font-mono focus:border-brand-green/40 focus:ring-1 focus:ring-brand-green/20 focus:outline-none transition-all" 
-                                min="0"
-                              />
-                            </td>
-                            <td className="px-3 py-2 text-right">
-                              <input 
-                                type="number" 
-                                value={m.teamTarget} 
-                                onChange={e => handleMemberFieldChange(idx, 'teamTarget', Math.max(0, Number(e.target.value)))} 
-                                className="w-32 bg-black/40 border border-white/10 px-2.5 py-1.5 rounded-lg text-white text-right font-semibold font-mono focus:border-brand-green/40 focus:ring-1 focus:ring-brand-green/20 focus:outline-none transition-all" 
-                                min="0"
-                              />
-                            </td>
-                            <td className="px-3 py-2 text-right">
-                              <div className="flex items-center gap-1.5 justify-end">
-                                <input 
-                                  type="number" 
-                                  value={m.achieved} 
-                                  onChange={e => handleMemberFieldChange(idx, 'achieved', Math.max(0, Number(e.target.value)))} 
-                                  className="w-28 bg-black/40 border border-green-500/20 px-2 py-1.5 rounded-lg text-brand-green text-right font-bold font-mono focus:border-brand-green/20 focus:outline-none text-xs" 
-                                  min="0"
-                                  title="Directly edit total achieved"
-                                />
-                                <div className="flex items-center border border-blue-500/25 bg-blue-950/20 rounded-lg overflow-hidden shrink-0">
-                                  <input 
-                                    type="number" 
-                                    placeholder="+ Add"
-                                    id={`add-val-${idx}`}
-                                    className="w-16 bg-transparent px-1.5 py-1 text-blue-400 text-right font-semibold font-mono focus:outline-none text-[10px] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
-                                    min="0"
-                                    onKeyDown={(e) => {
-                                      if (e.key === 'Enter') {
-                                        e.preventDefault();
-                                        const val = Number((e.target as HTMLInputElement).value) || 0;
-                                        if (val > 0) {
-                                          handleMemberFieldChange(idx, 'achieved', m.achieved + val);
-                                          (e.target as HTMLInputElement).value = '';
-                                          toast.success(`Added $${val} to total achieved!`);
-                                        }
-                                      }
-                                    }}
-                                  />
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      const inputEl = document.getElementById(`add-val-${idx}`) as HTMLInputElement;
-                                      if (inputEl) {
-                                        const val = Number(inputEl.value) || 0;
-                                        if (val > 0) {
-                                          handleMemberFieldChange(idx, 'achieved', m.achieved + val);
-                                          inputEl.value = '';
-                                          toast.success(`Added $${val} to total achieved!`);
-                                        }
-                                      }
-                                    }}
-                                    className="px-1.5 py-1 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 border-l border-blue-500/20 transition-colors text-[10px] font-black cursor-pointer"
-                                    title="Add to total"
-                                  >
-                                    +
-                                  </button>
-                                </div>
-                              </div>
-                            </td>
-                            <td className="px-3 py-2 text-center">
-                              <button 
-                                type="button" 
-                                onClick={() => handleRemoveMemberRow(idx)}
-                                className="p-1.5 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                        {activeEditTarget.members.length === 0 && (
-                          <tr>
-                            <td colSpan={6} className="px-4 py-8 text-center text-gray-500 font-bold uppercase tracking-wider">No team members added. Add row or paste from Excel.</td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
-                <div className="pt-6 mt-6 border-t border-white/5 flex justify-end gap-3">
-                  <button 
-                    type="button" 
-                    onClick={() => setIsEditModalOpen(false)} 
-                    className="px-4 py-2.5 text-xs font-bold text-gray-400 hover:text-white transition-colors cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                  <button 
-                    type="submit" 
-                    disabled={isSavingTarget} 
-                    className="px-5 py-2.5 text-xs font-black bg-brand-green hover:bg-brand-green-hover text-black rounded-xl transition-colors flex items-center gap-2 shadow-lg glow-green cursor-pointer uppercase tracking-wider"
-                  >
-                    {isSavingTarget ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                    Save Team targets
-                  </button>
-                </div>
-              </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* TARGET UPDATES APPROVAL QUEUE MODAL */}
-      <AnimatePresence>
-        {isApprovalQueueOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-black/75 backdrop-blur-sm" onClick={() => setIsApprovalQueueOpen(false)} />
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 20 }} 
-              animate={{ opacity: 1, scale: 1, y: 0 }} 
-              exit={{ opacity: 0, scale: 0.95, y: 20 }} 
-              className="relative w-full max-w-2xl bg-gray-950 border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-10 flex flex-col max-h-[80vh]"
-            >
-              <div className="p-5 border-b border-white/10 flex justify-between items-center bg-black/40">
-                <div>
-                  <h3 className="text-base font-black text-white flex items-center gap-2 uppercase tracking-wide">
-                    <Inbox className="w-5 h-5 text-brand-green" /> Target Approval Requests
-                  </h3>
-                  <p className="text-[10px] text-gray-400 uppercase tracking-widest mt-0.5 font-bold">Review and merge team member achievement updates</p>
-                </div>
-                <button onClick={() => setIsApprovalQueueOpen(false)} className="p-1 hover:bg-gray-800 text-gray-400 hover:text-white rounded-lg transition-colors cursor-pointer">
-                  <X className="w-5 h-5" />
-                </button>
+                ))}
               </div>
 
-              <div className="p-5 overflow-y-auto space-y-4 flex-1">
-                {pendingChanges.length === 0 ? (
-                  <div className="text-center py-12 text-gray-500 font-bold uppercase tracking-wider text-xs">No pending requests found.</div>
-                ) : (
-                  pendingChanges.map((change) => {
-                    const { targetId, teamName, monthName, memberName, memberEmployeeId, oldAchieved, requestedAchieved } = change.data;
-                    const isProcessing = isProcessingDecision === change._id;
-                    return (
-                      <div key={change._id} className="p-4 bg-[#0a0f19] border border-white/5 rounded-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 transition-colors hover:border-white/10">
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <span className="px-2 py-0.5 bg-brand-green/10 text-brand-green text-[9px] font-black rounded uppercase tracking-wider">Team {teamName}</span>
-                            <span className="text-[10px] text-gray-500 font-bold">{monthName}</span>
-                          </div>
-                          <h4 className="text-sm font-bold text-white">{memberName} <span className="text-xs font-mono text-gray-500">({memberEmployeeId})</span></h4>
-                          <p className="text-[10px] text-gray-400 font-medium">Submitted by: {change.authorEmail}</p>
-                          <div className="flex items-center gap-2 pt-1">
-                            <span className="text-xs text-gray-500 line-through">${oldAchieved}</span>
-                            <span className="text-xs text-gray-500">➔</span>
-                            <span className="text-xs font-black text-brand-green font-mono">${requestedAchieved}</span>
-                          </div>
-                        </div>
+              <div className="flex justify-end gap-3 pt-3 border-t border-white/10">
+                <button type="button" onClick={() => setIsEditModalOpen(false)} className="px-4 py-2 bg-gray-800 text-gray-300 font-bold rounded-xl">
+                  Cancel
+                </button>
+                <button type="submit" disabled={isSavingTarget} className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-xl shadow-lg shadow-emerald-600/30">
+                  {isSavingTarget ? 'Saving...' : 'Save All Targets'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
-                        <div className="flex items-center gap-2 self-stretch sm:self-auto justify-end">
-                          <button
-                            disabled={isProcessing}
-                            onClick={() => handleDecision(change._id, 'reject')}
-                            className="px-3.5 py-2 border border-red-500/20 hover:border-red-500/50 bg-red-500/5 hover:bg-red-500/15 text-red-400 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all cursor-pointer"
-                          >
-                            Reject
-                          </button>
-                          <button
-                            disabled={isProcessing}
-                            onClick={() => handleDecision(change._id, 'approve')}
-                            className="px-4 py-2 bg-brand-green hover:bg-brand-green-hover text-black text-[10px] font-black uppercase tracking-wider rounded-xl transition-all shadow-md glow-green cursor-pointer flex items-center gap-1"
-                          >
-                            {isProcessing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Approve'}
-                          </button>
-                        </div>
+      {/* Target Adjustment Request Modal */}
+      {isRequestModalOpen && activeRequestTarget && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-gray-900 border border-purple-500/40 rounded-2xl w-full max-w-md shadow-2xl p-6 space-y-4 text-left relative">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <h3 className="text-base font-black text-white uppercase tracking-wider flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-purple-400" /> Submit Target Update Request
+              </h3>
+              <button onClick={() => setIsRequestModalOpen(false)} className="text-gray-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitRequest} className="space-y-4 text-xs">
+              <div className="p-3 bg-black/40 border border-glass-border rounded-xl space-y-1">
+                <div className="font-bold text-white text-sm">{activeRequestTarget.memberName} ({activeRequestTarget.employeeId})</div>
+                <div className="text-[10px] text-gray-400 font-mono">Team {activeRequestTarget.teamName} • {activeRequestTarget.monthName}</div>
+                <div className="text-xs text-emerald-400 font-bold font-mono">Current Achieved: ${activeRequestTarget.oldAchieved}</div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="font-bold text-gray-300 block">Adjustment Mode:</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setRequestType('add')}
+                    className={`py-2 px-3 rounded-xl font-bold border transition-all cursor-pointer ${
+                      requestType === 'add' ? 'bg-purple-600 text-white border-purple-400' : 'bg-black/40 text-gray-400 border-glass-border'
+                    }`}
+                  >
+                    + Add Incremental Score
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRequestType('override')}
+                    className={`py-2 px-3 rounded-xl font-bold border transition-all cursor-pointer ${
+                      requestType === 'override' ? 'bg-purple-600 text-white border-purple-400' : 'bg-black/40 text-gray-400 border-glass-border'
+                    }`}
+                  >
+                    Set Total Score
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="font-bold text-gray-300 block">
+                  {requestType === 'add' ? 'Amount to Add ($ / Points):' : 'New Total Achieved ($ / Points):'}
+                </label>
+                <input
+                  type="number"
+                  required
+                  min="0"
+                  placeholder="e.g. 50"
+                  value={requestedAchieved}
+                  onChange={(e) => setRequestedAchieved(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-black/60 border border-glass-border rounded-xl text-white font-mono focus:outline-none focus:border-purple-500"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-3 border-t border-white/10">
+                <button type="button" onClick={() => setIsRequestModalOpen(false)} className="px-4 py-2 bg-gray-800 text-gray-300 font-bold rounded-xl">
+                  Cancel
+                </button>
+                <button type="submit" disabled={isSubmittingRequest} className="px-6 py-2 bg-purple-600 hover:bg-purple-500 text-white font-black rounded-xl shadow-lg shadow-purple-600/30">
+                  {isSubmittingRequest ? 'Submitting...' : 'Submit Request'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Admin Approval Queue Modal */}
+      {isApprovalQueueOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-gray-900 border border-blue-500/40 rounded-2xl w-full max-w-2xl shadow-2xl p-6 space-y-4 text-left relative max-h-[85vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <h3 className="text-base font-black text-white uppercase tracking-wider flex items-center gap-2">
+                <Inbox className="w-5 h-5 text-blue-400" /> Target Adjustment Approval Requests ({pendingChanges.length})
+              </h3>
+              <button onClick={() => setIsApprovalQueueOpen(false)} className="text-gray-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {pendingChanges.length === 0 ? (
+              <div className="py-12 text-center text-gray-500 italic">No pending target adjustment requests.</div>
+            ) : (
+              <div className="space-y-3">
+                {pendingChanges.map((change) => (
+                  <div key={change._id} className="p-4 bg-black/50 border border-glass-border rounded-xl space-y-2">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <div className="font-bold text-white text-sm">{change.data?.memberName} ({change.data?.memberEmployeeId})</div>
+                        <div className="text-[10px] text-gray-400 font-mono">Submitted by: {change.submittedBy}</div>
                       </div>
-                    );
-                  })
-                )}
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* MEMBER SUBMIT ACHIEVEMENT REQUEST MODAL */}
-      <AnimatePresence>
-        {isRequestModalOpen && activeRequestTarget && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-black/75 backdrop-blur-sm" onClick={() => setIsRequestModalOpen(false)} />
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 20 }} 
-              animate={{ opacity: 1, scale: 1, y: 0 }} 
-              exit={{ opacity: 0, scale: 0.95, y: 20 }} 
-              className="relative w-full max-w-sm bg-gray-950 border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-10"
-            >
-              <div className="p-5 border-b border-white/10 flex justify-between items-center bg-black/40">
-                <h3 className="text-base font-black text-white flex items-center gap-2">
-                  <ArrowUpRight className="w-5 h-5 text-brand-green" /> Request Achievement update
-                </h3>
-                <button onClick={() => setIsRequestModalOpen(false)} className="p-1 hover:bg-gray-800 text-gray-400 hover:text-white rounded-lg transition-colors cursor-pointer">
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-              
-              <form onSubmit={handleSubmitRequest} className="p-5 space-y-4">
-                <div className="p-3 bg-white/[0.02] border border-white/5 rounded-xl space-y-1.5">
-                  <div className="flex justify-between text-[10px] font-bold text-gray-500 uppercase">
-                    <span>Member</span>
-                    <span>Employee ID</span>
-                  </div>
-                  <div className="flex justify-between text-xs font-black text-white">
-                    <span>{activeRequestTarget.memberName}</span>
-                    <span className="font-mono text-gray-300">{activeRequestTarget.employeeId}</span>
-                  </div>
-                  <div className="flex justify-between text-[10px] font-bold text-gray-500 uppercase pt-2">
-                    <span>Team / Month</span>
-                    <span>Current Score</span>
-                  </div>
-                  <div className="flex justify-between text-xs font-black text-white">
-                    <span>Team {activeRequestTarget.teamName} ({activeRequestTarget.monthName})</span>
-                    <span className="font-mono text-brand-green">${activeRequestTarget.oldAchieved}</span>
-                  </div>
-                </div>
-
-                {/* Selector for request type */}
-                <div className="flex bg-black/40 border border-white/5 p-1 rounded-xl">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setRequestType('add');
-                      setRequestedAchieved('');
-                    }}
-                    className={`flex-1 py-1.5 text-[9px] font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer ${
-                      requestType === 'add'
-                        ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                        : 'text-gray-400 hover:text-white'
-                    }`}
-                  >
-                    + Add to Current
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setRequestType('override');
-                      setRequestedAchieved('');
-                    }}
-                    className={`flex-1 py-1.5 text-[9px] font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer ${
-                      requestType === 'override'
-                        ? 'bg-green-500/20 text-brand-green border border-green-500/30'
-                        : 'text-gray-400 hover:text-white'
-                    }`}
-                  >
-                    Override Total
-                  </button>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block">
-                    {requestType === 'add' ? 'Value to Add ($)' : 'New Total Achieved ($)'}
-                  </label>
-                  <input 
-                    required 
-                    autoFocus 
-                    type="number" 
-                    placeholder={requestType === 'add' ? "e.g. 500" : "Enter new total score"} 
-                    value={requestedAchieved} 
-                    onChange={e => setRequestedAchieved(e.target.value)} 
-                    className="w-full glass-input px-3.5 py-2.5 text-sm bg-black/50 border border-gray-850 focus:border-green-500 rounded-xl focus:outline-none text-white transition-colors" 
-                    min="0"
-                  />
-                  {requestedAchieved && !isNaN(Number(requestedAchieved)) && (
-                    <div className="p-2.5 rounded-lg bg-[#0a101b] border border-white/5 text-[9px] text-gray-400 font-bold uppercase tracking-wider flex justify-between items-center">
-                      <span>Resulting Score:</span>
-                      <span className="font-mono text-white text-xs">
-                        {requestType === 'add'
-                          ? `$${activeRequestTarget.oldAchieved} + $${Number(requestedAchieved)} = $${activeRequestTarget.oldAchieved + Number(requestedAchieved)}`
-                          : `$${Number(requestedAchieved)}`
-                        }
+                      <span className="px-2 py-0.5 bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded text-[9px] font-bold">
+                        {change.data?.monthName} • Team {change.data?.teamName}
                       </span>
                     </div>
-                  )}
-                  <p className="text-[10px] text-gray-500 font-medium">
-                    {requestType === 'add'
-                      ? 'The entered value will be added directly onto your current score upon approval.'
-                      : 'This value will overwrite your current score completely upon approval.'
-                    }
-                  </p>
-                </div>
 
-                <div className="pt-2 flex justify-end gap-3">
-                  <button type="button" onClick={() => setIsRequestModalOpen(false)} className="px-4 py-2.5 text-xs font-bold text-gray-400 hover:text-white transition-colors cursor-pointer">Cancel</button>
-                  <button type="submit" disabled={isSubmittingRequest} className="px-5 py-2.5 text-xs font-black bg-brand-green hover:bg-brand-green-hover text-black rounded-xl uppercase tracking-wider transition-colors flex items-center gap-2 shadow-lg glow-green cursor-pointer">
-                    {isSubmittingRequest ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Submit Request'}
-                  </button>
-                </div>
-              </form>
-            </motion.div>
+                    <div className="flex items-center gap-4 text-xs font-mono">
+                      <div>
+                        <span className="text-gray-500 text-[10px]">Previous:</span>
+                        <span className="text-gray-300 font-bold block">${change.data?.oldAchieved}</span>
+                      </div>
+                      <div className="text-gray-500 font-bold">➔</div>
+                      <div>
+                        <span className="text-emerald-400 text-[10px]">Requested:</span>
+                        <span className="text-emerald-400 font-black block">${change.data?.requestedAchieved}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end gap-2 pt-2 border-t border-white/5">
+                      <button
+                        onClick={() => handleDecision(change._id, 'reject')}
+                        disabled={isProcessingDecision === change._id}
+                        className="px-3 py-1.5 bg-red-600/20 text-red-300 border border-red-500/30 rounded-lg text-xs font-bold hover:bg-red-600/30"
+                      >
+                        Reject
+                      </button>
+                      <button
+                        onClick={() => handleDecision(change._id, 'approve')}
+                        disabled={isProcessingDecision === change._id}
+                        className="px-4 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-black shadow-md hover:bg-emerald-500"
+                      >
+                        Approve & Apply
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-        )}
-      </AnimatePresence>
+        </div>
+      )}
     </div>
   );
 }
