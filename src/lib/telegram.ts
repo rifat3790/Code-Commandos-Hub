@@ -190,6 +190,32 @@ export async function syncTelegramUpdates() {
           newGroupsCount++;
         }
       }
+
+      // Handle interactive bot commands (/issue, /issues, /cc, /help)
+      const text = (msg.text || '').trim();
+      const targetChatId = String(chat?.id || user?.id);
+
+      if (text.startsWith('/issue') || text.startsWith('/issues') || text.startsWith('/cc')) {
+        const parts = text.split(/\s+/);
+        const filterMember = parts.length > 1 ? parts[1].trim() : undefined;
+        try {
+          await sendCCSummaryReport(undefined, targetChatId, filterMember);
+        } catch (e: any) {
+          console.error("Error sending /issue command response:", e.message);
+        }
+      } else if (text.startsWith('/help')) {
+        const helpMsg = [
+          `🤖 <b>CODE COMMANDOS BOT COMMANDS</b> 🤖\n`,
+          `• <code>/issue</code> - View all pending CC team issues report`,
+          `• <code>/issue [name]</code> - View pending issues for a specific member (e.g. <code>/issue nitto</code>)`,
+          `• <code>/start</code> - Register for 1-on-1 private direct alerts`,
+          `• <code>/help</code> - Show this command list\n`,
+          `<i>Code Commandos Hub Automated Alert System</i>`
+        ].join('\n');
+        try {
+          await sendTelegramMessage(targetChatId, helpMsg, 'HTML');
+        } catch (e) {}
+      }
     }
 
     if (newGroupsCount > 0) {
@@ -532,11 +558,13 @@ export async function checkAndNotifyCCIssues() {
   }
 }
 
-export async function sendCCSummaryReport(slotType?: '8am' | '3pm' | '5pm' | 'congrats') {
+export async function sendCCSummaryReport(slotType?: '8am' | '3pm' | '5pm' | 'congrats', targetChatId?: string, filterMember?: string) {
   await connectToDatabase();
   const config = await getOrCreateTelegramConfig();
-  if (!config || !config.groupChatIds || config.groupChatIds.length === 0) {
-    return { success: false, message: 'No Group Chat IDs configured' };
+  
+  const targetIds = targetChatId ? [targetChatId] : (config.groupChatIds || []);
+  if (targetIds.length === 0) {
+    return { success: false, message: 'No Group Chat IDs or target specified' };
   }
 
   const sheetUrl = 'https://docs.google.com/spreadsheets/d/1ic9UMVX0FFsAyz0TZ-_lGKj_D9NornoGhq38KTRtM54/export?format=csv&gid=1412843338';
@@ -546,7 +574,7 @@ export async function sendCCSummaryReport(slotType?: '8am' | '3pm' | '5pm' | 'co
   const csvText = await response.text();
   const rows = parseCSVRows(csvText);
 
-  const ccRows = rows.filter(r => {
+  let ccRows = rows.filter(r => {
     const assign = getAssignNameFromRow(r);
     return assign && /\/cc/i.test(assign);
   });
@@ -572,28 +600,14 @@ export async function sendCCSummaryReport(slotType?: '8am' | '3pm' | '5pm' | 'co
       `👏 <b>Kudos to Code Commandos Team!</b> 🚀`
     ].join('\n');
 
-    for (const cid of config.groupChatIds) {
+    for (const cid of targetIds) {
       await sendTelegramMessage(cid, congratsMsg, 'HTML');
     }
     return { success: true, count: 0, type: 'congrats' };
   }
 
-  // Determine headers based on slot
-  let customTitle = '📋 <b>CURRENT PENDING /CC ISSUES REPORT</b> 📋';
-  let customBanner = '📢 <i>Please review and resolve all assigned issues.</i>';
-
-  if (slotType === '8am') {
-    customTitle = '🌅 <b>MORNING ISSUES ALERT (08:00 AM BD TIME)</b> 🌅';
-    customBanner = '📢 <i>Good morning team! Please review and clear all your assigned issues for today.</i>';
-  } else if (slotType === '3pm') {
-    customTitle = '☀️ <b>AFTERNOON ISSUES UPDATE (03:00 PM BD TIME)</b> ☀️';
-    customBanner = '⚠️ <i>Attention team! The following issues are still pending. Please resolve them as soon as possible.</i>';
-  } else if (slotType === '5pm') {
-    customTitle = '🌆 <b>END-OF-DAY FINAL ISSUES ALERT (05:00 PM BD TIME)</b> 🌆';
-    customBanner = '🚨 <i>Final Reminder! The following issues are still pending. Everyone must clear all assigned issues before leaving the office today!</i>';
-  }
-
-  const grouped: Record<string, any[]> = {};
+  // Group issues by employee
+  let grouped: Record<string, any[]> = {};
   const mentionsToTag = new Set<string>();
 
   for (const r of ccRows) {
@@ -601,11 +615,44 @@ export async function sendCCSummaryReport(slotType?: '8am' | '3pm' | '5pm' | 'co
     const cleanAssign = assignRaw.replace(/\/(cc|cm|cw)/gi, '').trim();
     const names = cleanAssign.split('/').map(n => n.trim()).filter(n => n.length > 0);
     for (const name of names) {
+      if (filterMember && !name.toLowerCase().includes(filterMember.toLowerCase())) {
+        continue;
+      }
       if (!grouped[name]) grouped[name] = [];
       grouped[name].push(r);
       const tag = userMentionsMap[name.toLowerCase()] || `@${name}`;
       mentionsToTag.add(tag);
     }
+  }
+
+  if (filterMember && Object.keys(grouped).length === 0) {
+    const noFilterMsg = [
+      `✅ <b>NO ISSUES FOUND FOR "${filterMember.toUpperCase()}"!</b> ✅\n`,
+      `👏 Great news! There are currently no pending /CC issues assigned to <b>${filterMember}</b>.\n`,
+      `<i>Code Commandos Hub Automated Bot</i>`
+    ].join('\n');
+
+    for (const cid of targetIds) {
+      await sendTelegramMessage(cid, noFilterMsg, 'HTML');
+    }
+    return { success: true, count: 0, type: 'filter_empty' };
+  }
+
+  // Determine headers based on slot
+  let customTitle = '📋 <b>CURRENT PENDING /CC ISSUES REPORT</b> 📋';
+  let customBanner = '📢 <i>Please review and resolve all assigned issues below.</i>';
+
+  if (filterMember) {
+    customTitle = `🔍 <b>ISSUES REPORT FOR: ${filterMember.toUpperCase()}</b> 🔍`;
+  } else if (slotType === '8am') {
+    customTitle = '🌅 <b>MORNING ISSUES ALERT (08:00 AM BD TIME)</b> 🌅';
+    customBanner = '📢 <i>Good morning team! Please review and clear all your assigned issues for today.</i>';
+  } else if (slotType === '3pm') {
+    customTitle = '☀️ <b>AFTERNOON ISSUES UPDATE (03:00 PM BD TIME)</b> ☀️';
+    customBanner = '⚠️ <i>Attention team! The following issues are still pending. Please resolve them as soon as possible.</i>';
+  } else if (slotType === '5pm') {
+    customTitle = '🌆 <b>END-OF-DAY FINAL ISSUES ALERT (05:00 PM BD TIME)</b> 🌆';
+    customBanner = '🚨 <i>Final Reminder! The following issues are still pending. Everyone must clear all assigned issues before leaving office!</i>';
   }
 
   let text = `${customTitle}\n\n${customBanner}\n\n`;
@@ -635,9 +682,9 @@ export async function sendCCSummaryReport(slotType?: '8am' | '3pm' | '5pm' | 'co
     idx++;
   }
 
-  for (const cid of config.groupChatIds) {
+  for (const cid of targetIds) {
     await sendTelegramMessage(cid, text, 'HTML');
   }
 
-  return { success: true, count: ccRows.length, type: slotType || 'summary' };
+  return { success: true, count: Object.keys(grouped).length, type: slotType || 'summary' };
 }
