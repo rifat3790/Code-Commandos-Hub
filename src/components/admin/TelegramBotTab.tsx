@@ -65,6 +65,7 @@ export default function TelegramBotTab() {
   const [userMentions, setUserMentions] = useState<Record<string, string>>({});
   const [autoAlertsEnabled, setAutoAlertsEnabled] = useState(true);
   const [lastCheckedAt, setLastCheckedAt] = useState<string | null>(null);
+  const [notificationLogs, setNotificationLogs] = useState<any[]>([]);
   const [subscribers, setSubscribers] = useState<any[]>([]);
   const [syncingSubscribers, setSyncingSubscribers] = useState(false);
   const [newSubId, setNewSubId] = useState('');
