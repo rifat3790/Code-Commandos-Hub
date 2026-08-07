@@ -243,6 +243,10 @@ export default function MockupPage() {
   const [role2, setRole2] = useState('Developer');
   const [memberPhoto2, setMemberPhoto2] = useState<string>('');
   
+  // Header Badge customization for Official Agency Duo
+  const [teamBadgeName, setTeamBadgeName] = useState('CODE COMMANDOS');
+  const [teamBadgeSubtag, setTeamBadgeSubtag] = useState('SHOPIFY TEAM');
+
   // Custom Screenshots (Base64)
   const [reviewScreenshot, setReviewScreenshot] = useState<string>(DEFAULT_FIVERR_SCREENSHOT);
   const [useNativeLayout, setUseNativeLayout] = useState(false);
@@ -1639,6 +1643,29 @@ export default function MockupPage() {
               <Type className="w-3.5 h-3.5 text-green-400" />
               <span>Member Details</span>
             </span>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-[9px] font-bold text-cyan-400 uppercase">Header Badge Team Name</label>
+                <input
+                  type="text"
+                  value={teamBadgeName}
+                  onChange={(e) => setTeamBadgeName(e.target.value)}
+                  className="w-full px-3 py-1.5 rounded-lg glass-input text-xs font-bold border-cyan-500/30"
+                  placeholder="e.g. CODE COMMANDOS"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[9px] font-bold text-cyan-400 uppercase">Header Badge Tagline</label>
+                <input
+                  type="text"
+                  value={teamBadgeSubtag}
+                  onChange={(e) => setTeamBadgeSubtag(e.target.value)}
+                  className="w-full px-3 py-1.5 rounded-lg glass-input text-xs font-bold border-cyan-500/30"
+                  placeholder="e.g. SHOPIFY TEAM"
+                />
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">
                 <label className="text-[9px] font-bold text-gray-400 uppercase">Team Name</label>
@@ -3569,8 +3596,8 @@ export default function MockupPage() {
                         ⌘
                       </div>
                       <div className="flex flex-col text-left leading-none">
-                        <span className="text-[10px] font-black text-white uppercase tracking-wider font-mono">CODE MATRIX</span>
-                        <span className="text-[7.5px] font-bold text-cyan-400 uppercase tracking-widest">SHOPIFY TEAM</span>
+                        <span className="text-[10px] font-black text-white uppercase tracking-wider font-mono">{teamBadgeName}</span>
+                        <span className="text-[7.5px] font-bold text-cyan-400 uppercase tracking-widest">{teamBadgeSubtag}</span>
                       </div>
                     </div>
 
