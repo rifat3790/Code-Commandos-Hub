@@ -52,7 +52,10 @@ type LayoutStructure =
   | 'dual_cyberpunk'
   | 'dual_gold_ribbon'
   | 'dual_split_hex'
-  | 'dual_minimal_zen';
+  | 'dual_minimal_zen'
+  | 'commandos_duo_split'
+  | 'commandos_duo_card'
+  | 'commandos_duo_glass';
 
 type PatternOverlay = 'none' | 'dots' | 'grid' | 'waves';
 type TipsStyle = 'premium_gold' | 'neon_cyberpunk' | 'minimal_glass' | 'playful_bubble' | 'center_floating_arrow' | 'center_elegant_tag' | 'center_neon_glow' | 'center_pill_premium' | 'center_diamond_glass' | 'center_massive_medal';
@@ -68,7 +71,10 @@ const isDualStructure = (str: LayoutStructure) => {
     'dual_cyberpunk',
     'dual_gold_ribbon',
     'dual_split_hex',
-    'dual_minimal_zen'
+    'dual_minimal_zen',
+    'commandos_duo_split',
+    'commandos_duo_card',
+    'commandos_duo_glass'
   ].includes(str);
 };
 
@@ -86,6 +92,9 @@ const LAYOUTS: { value: MockupStyle; label: string; desc: string }[] = [
 ];
 
 const STRUCTURES: { value: LayoutStructure; label: string; desc: string }[] = [
+  { value: 'commandos_duo_split', label: '⭐ Code Commandos Official Duo (Reference)', desc: 'Official Overlapping Duo Avatars + Full Fiverr Review Card' },
+  { value: 'commandos_duo_card', label: 'Code Commandos Duo Badge', desc: 'Agency Duo Badge with Neon Overlapping Rings' },
+  { value: 'commandos_duo_glass', label: 'Code Commandos Glassmorphism Duo', desc: 'Overlapping Glass Avatar Rings + Shopify Partner Header' },
   { value: 'banner', label: 'Classic Banner', desc: 'Avatar on top left, details on bottom' },
   { value: 'fiverr_split', label: 'Fiverr Congrats Card', desc: 'Reference image design (split green & white panels)' },
   { value: 'split', label: 'Split Dashboard', desc: 'Left profile panel, right details card' },
@@ -720,6 +729,105 @@ export default function MockupPage() {
           </div>
         </div>
 
+      </div>
+    );
+  };
+
+  // Helper to render full authentic Fiverr Review panel matching user reference image
+  const renderFiverrFullDetailedNative = () => {
+    return (
+      <div className="w-full bg-white text-black rounded-xl border border-gray-200 p-3.5 text-left font-sans shadow-md text-[11px] space-y-2.5 select-none shrink-0 overflow-hidden">
+        {/* Top review status row */}
+        <div className="flex items-center justify-between border-b border-gray-100 pb-1.5 text-[9.5px] text-gray-400">
+          <div className="flex items-center gap-1">
+            <Star className="w-3 h-3 text-gray-300 fill-gray-100" />
+            <span className="font-semibold text-gray-600">{clientName} gave you a 5-star review</span>
+            <span className="text-gray-400 font-mono text-[8.5px] ml-1">{formatDate(completionDate)}</span>
+          </div>
+          <span className="text-gray-300 text-[10px]">^</span>
+        </div>
+
+        {/* Buyer review content */}
+        <div className="space-y-1.5">
+          <span className="text-[8.5px] font-black uppercase tracking-wider text-gray-400 block font-mono">
+            {clientName.toUpperCase()}&apos;S REVIEW
+          </span>
+
+          <div className="flex gap-2 items-start">
+            <div className="w-6 h-6 rounded-full bg-[#1dbf73] text-white font-black flex items-center justify-center text-[10px] shrink-0 uppercase shadow-sm">
+              {clientName[0] || 'S'}
+            </div>
+            <div className="flex-1 space-y-0.5">
+              <div className="flex items-center gap-1 flex-wrap">
+                <span className="font-bold text-gray-800 text-[11px]">{clientName}&apos;s message</span>
+                <div className="flex gap-0.5">{renderStars(ratingStars)}</div>
+                <span className="font-extrabold text-gray-800 text-[11px]">{ratingStars}</span>
+              </div>
+              <p className="text-gray-700 text-[10.5px] leading-snug font-medium">
+                {reviewText}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Ratings breakdown */}
+        <div className="space-y-1 pt-0.5 text-[9.5px] text-gray-600 font-medium">
+          <div className="flex items-center justify-between">
+            <span>Seller communication level</span>
+            <div className="flex items-center gap-1">
+              <div className="flex gap-0.5">{renderStars(commRating)}</div>
+              <span className="font-bold text-gray-800 text-[10px]">{commRating}</span>
+            </div>
+          </div>
+          <div className="flex items-center justify-between">
+            <span>Quality of delivery</span>
+            <div className="flex items-center gap-1">
+              <div className="flex gap-0.5">{renderStars(qualityRating)}</div>
+              <span className="font-bold text-gray-800 text-[10px]">{qualityRating}</span>
+            </div>
+          </div>
+          <div className="flex items-center justify-between">
+            <span>Value of delivery</span>
+            <div className="flex items-center gap-1">
+              <div className="flex gap-0.5">{renderStars(valueRating)}</div>
+              <span className="font-bold text-gray-800 text-[10px]">{valueRating}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Things that went well */}
+        <div className="pt-1.5 border-t border-gray-100 text-[9px] space-y-0.5">
+          <span className="font-extrabold uppercase tracking-wider text-gray-400 block text-[8px]">THINGS THAT WENT WELL</span>
+          <p className="text-gray-700 font-medium">
+            Proactive communication • Level of cooperation • Politeness <span className="text-gray-400 font-bold underline cursor-pointer">+2 more</span>
+          </p>
+        </div>
+
+        {/* Our Policy Box */}
+        <div className="p-2 rounded-lg bg-gray-50 border border-gray-100 text-[8.5px] text-gray-500 space-y-0.5">
+          <div className="flex items-center gap-1 text-gray-700 font-bold uppercase text-[7.5px] tracking-wider">
+            <ShieldCheck className="w-2.5 h-2.5 text-gray-600" />
+            <span>OUR POLICY</span>
+          </div>
+          <p className="leading-tight text-[8px]">
+            Ratings and reviews are subjective and reflect the buyer&apos;s individual experience.
+          </p>
+        </div>
+
+        {/* Seller Reply Box */}
+        <div className="pt-1.5 border-t border-gray-100 flex items-center gap-1.5 text-[9.5px]">
+          <div className="w-4 h-4 rounded-full overflow-hidden bg-gray-800 shrink-0">
+            {memberPhoto ? (
+              <img src={memberPhoto} className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full bg-gray-700 text-white text-[7.5px] font-bold flex items-center justify-center">Me</div>
+            )}
+          </div>
+          <div className="text-gray-700 font-medium truncate text-[9.5px]">
+            <span className="font-bold text-gray-900 mr-1">Me</span>
+            <span>Thank you so much for your kind words. It was a pleasure to work with you.</span>
+          </div>
+        </div>
       </div>
     );
   };
@@ -3437,10 +3545,230 @@ export default function MockupPage() {
                     )}
                   </div>
 
-                  {/* Footer specs */}
-                  <div className="w-full flex justify-between items-center text-[8px] font-mono text-gray-600 border-t border-gray-900 pt-1.5">
-                    <span>DELIVERED: {formatDate(completionDate)}</span>
-                    <span>DOMAIN: {website}</span>
+                </div>
+              )}
+
+              {/* STRUCTURE RENDERER 19: Official Code Commandos Agency Duo ('commandos_duo_split') */}
+              {structure === 'commandos_duo_split' && (
+                <div className="flex-1 flex flex-col justify-between h-full p-4 relative z-10 text-left bg-gradient-to-br from-[#0a1628] via-[#0d213a] to-[#040a14] rounded-xl overflow-hidden select-none border-2 border-cyan-500/30 shadow-2xl">
+                  {/* Geometric background accents */}
+                  <div className="absolute inset-0 pointer-events-none opacity-20" style={{ backgroundImage: 'linear-gradient(135deg, rgba(6,182,212,0.2) 25%, transparent 25%), linear-gradient(225deg, rgba(6,182,212,0.2) 25%, transparent 25%)', backgroundSize: '40px 40px' }} />
+
+                  {/* Top Header Branding Bar */}
+                  <div className="flex items-center justify-between border-b border-cyan-500/20 pb-3 z-10 shrink-0">
+                    {/* Left Agency Logo */}
+                    <div className="flex items-center gap-1">
+                      <span className="text-xl font-black tracking-tight text-white font-sans">
+                        soft<span className="text-emerald-400 font-black">v</span>ence<span className="text-[10px] text-gray-400 font-mono align-top">™</span>
+                      </span>
+                    </div>
+
+                    {/* Middle Team Badge */}
+                    <div className="flex items-center gap-2 bg-gradient-to-r from-blue-900/60 to-cyan-950/60 px-3 py-1 rounded-lg border border-cyan-500/30 backdrop-blur-sm shadow-md">
+                      <div className="w-5 h-5 rounded bg-cyan-500 flex items-center justify-center text-black font-black text-[10px]">
+                        ⌘
+                      </div>
+                      <div className="flex flex-col text-left leading-none">
+                        <span className="text-[10px] font-black text-white uppercase tracking-wider font-mono">CODE MATRIX</span>
+                        <span className="text-[7.5px] font-bold text-cyan-400 uppercase tracking-widest">SHOPIFY TEAM</span>
+                      </div>
+                    </div>
+
+                    {/* Right Shopify Partner Logo */}
+                    <div className="flex items-center gap-1.5 bg-emerald-950/40 border border-emerald-500/30 px-3 py-1 rounded-lg">
+                      <div className="w-4 h-4 rounded bg-emerald-500 text-black flex items-center justify-center font-black text-[9px] shadow-sm">
+                        s
+                      </div>
+                      <span className="text-xs font-black text-white font-sans tracking-tight">shopify</span>
+                    </div>
+                  </div>
+
+                  {/* Main Grid: Left Overlapping Avatars + Right Fiverr Review */}
+                  <div className="grid grid-cols-12 gap-5 flex-1 items-center z-10 my-2">
+                    {/* Left 5-cols: Overlapping Duo Profile & Banner */}
+                    <div className="col-span-5 flex flex-col items-center text-center space-y-3 justify-center">
+                      {/* Overlapping Dual Circular Avatars */}
+                      <div className="relative w-44 h-32 my-1 flex items-center justify-center">
+                        {/* Member 1 (Top Left) */}
+                        <div 
+                          className="absolute top-0 left-0 w-24 h-24 rounded-full overflow-hidden bg-gray-800 border-4 border-emerald-400 shadow-[0_0_20px_rgba(52,211,153,0.3)] z-10"
+                        >
+                          {memberPhoto ? (
+                            <img src={memberPhoto} className="w-full h-full object-cover" />
+                          ) : (
+                            <Trophy className="w-9 h-9 text-gray-600 m-auto mt-7" />
+                          )}
+                        </div>
+
+                        {/* Member 2 (Bottom Right Overlapping) */}
+                        <div 
+                          className="absolute bottom-0 right-0 w-24 h-24 rounded-full overflow-hidden bg-gray-800 border-4 border-emerald-400 shadow-[0_0_20px_rgba(52,211,153,0.4)] z-20"
+                        >
+                          {memberPhoto2 ? (
+                            <img src={memberPhoto2} className="w-full h-full object-cover" />
+                          ) : (
+                            <Trophy className="w-9 h-9 text-gray-600 m-auto mt-7" />
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Glowing CONGRATULATIONS Banner */}
+                      <div className="w-full bg-gradient-to-r from-blue-600 via-cyan-500 to-blue-600 py-1.5 px-3 rounded-lg shadow-lg border border-cyan-300/40 transform -rotate-1">
+                        <span className="text-sm font-black text-white uppercase tracking-widest block drop-shadow-md font-sans">
+                          CONGRATULATIONS
+                        </span>
+                      </div>
+
+                      {/* 5-Star Rating */}
+                      <div className="flex gap-1 justify-center py-0.5">
+                        {renderStars(5)}
+                      </div>
+
+                      {/* Formatted Team Member Names */}
+                      <div className="space-y-0.5">
+                        <h2 className="text-base font-black text-white tracking-wide font-sans leading-tight drop-shadow-sm">
+                          {memberName} &amp; {memberName2}
+                        </h2>
+                        <p className="text-[9.5px] text-cyan-300 font-bold font-mono tracking-wider uppercase">
+                          {role} &amp; {role2}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Right 7-cols: Full Authentic Fiverr Review Card */}
+                    <div className="col-span-7 h-full flex flex-col justify-center overflow-hidden">
+                      {useNativeLayout ? (
+                        renderFiverrFullDetailedNative()
+                      ) : (
+                        <div className="w-full flex justify-center drop-shadow-2xl">
+                          {renderScreenshotBrowserFrame("max-h-[220px]")}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Footer Specs Bar */}
+                  <div className="flex justify-between items-center text-[8.5px] font-mono text-cyan-300/70 border-t border-cyan-500/20 pt-1.5 z-10 shrink-0">
+                    <span>ORDER ID: {orderId}</span>
+                    <span className="font-bold text-white tracking-wider">CODE COMMANDOS OMEGA PLATINUM</span>
+                    <span>VALUED AT ${orderPrice} USD</span>
+                  </div>
+                </div>
+              )}
+
+              {/* STRUCTURE RENDERER 20: Code Commandos Duo Badge ('commandos_duo_card') */}
+              {structure === 'commandos_duo_card' && (
+                <div className="flex-1 flex flex-col justify-between h-full p-4 relative z-10 text-left bg-gray-950 border-2 border-emerald-500/40 rounded-xl overflow-hidden shadow-2xl">
+                  {/* Header */}
+                  <div className="flex items-center justify-between border-b border-gray-800 pb-2 z-10 shrink-0 font-mono text-[9.5px]">
+                    <span className="font-extrabold text-emerald-400 flex items-center gap-1.5">
+                      <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                      <span>CODE COMMANDOS AGENCY // DUO MILESTONE</span>
+                    </span>
+                    <span className="text-gray-400 font-bold">${orderPrice} USD VERIFIED</span>
+                  </div>
+
+                  {/* Main Grid */}
+                  <div className="grid grid-cols-12 gap-4 flex-1 items-center z-10 my-2">
+                    {/* Avatar Spotlight Column */}
+                    <div className="col-span-5 flex flex-col items-center text-center space-y-3 bg-black/60 p-4 rounded-2xl border border-emerald-500/30">
+                      <div className="flex items-center gap-3">
+                        <div className="w-16 h-16 rounded-full overflow-hidden bg-gray-800 border-2 border-emerald-400 shadow-[0_0_15px_rgba(52,211,153,0.3)]">
+                          {memberPhoto ? (
+                            <img src={memberPhoto} className="w-full h-full object-cover" />
+                          ) : (
+                            <Trophy className="w-6 h-6 text-gray-600 m-auto mt-3.5" />
+                          )}
+                        </div>
+                        <div className="w-16 h-16 rounded-full overflow-hidden bg-gray-800 border-2 border-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.3)]">
+                          {memberPhoto2 ? (
+                            <img src={memberPhoto2} className="w-full h-full object-cover" />
+                          ) : (
+                            <Trophy className="w-6 h-6 text-gray-600 m-auto mt-3.5" />
+                          )}
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[8px] font-black uppercase font-mono border border-emerald-500/30">
+                          ★ ★ ★ ★ ★ 5.0 RATED
+                        </span>
+                        <h3 className="text-xs font-black text-white uppercase tracking-wider">{memberName} &amp; {memberName2}</h3>
+                        <p className="text-[8.5px] font-mono text-gray-400">{role} &amp; {role2}</p>
+                      </div>
+                    </div>
+
+                    {/* Review Column */}
+                    <div className="col-span-7 h-full flex flex-col justify-center">
+                      {useNativeLayout ? renderFiverrFullDetailedNative() : (
+                        <div className="w-full flex justify-center">
+                          {renderScreenshotBrowserFrame("max-h-[220px]")}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Footer */}
+                  <div className="flex justify-between items-center text-[8px] font-mono text-gray-500 border-t border-gray-800 pt-1.5 z-10 shrink-0">
+                    <span>REF: {orderId}</span>
+                    <span>SHOPIFY PARTNERS VERIFIED</span>
+                    <span>DATE: {formatDate(completionDate)}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* STRUCTURE RENDERER 21: Code Commandos Glassmorphism Duo ('commandos_duo_glass') */}
+              {structure === 'commandos_duo_glass' && (
+                <div className="flex-1 flex flex-col justify-between h-full p-4 relative z-10 text-left bg-gradient-to-br from-[#0d172a] via-[#1e293b] to-[#0f172a] rounded-xl border border-white/10 shadow-2xl">
+                  {/* Header */}
+                  <div className="flex items-center justify-between border-b border-white/10 pb-2 z-10 font-mono text-[9px] text-gray-300">
+                    <span className="font-black text-white flex items-center gap-1.5">
+                      <Sparkle className="w-4 h-4 text-yellow-400" />
+                      <span>CODE COMMANDOS OMEGA GLASS</span>
+                    </span>
+                    <span className="text-emerald-400 font-bold">${orderPrice} USD</span>
+                  </div>
+
+                  {/* Body */}
+                  <div className="grid grid-cols-12 gap-4 flex-1 items-center z-10 my-2">
+                    {/* Left Duo Glass Card */}
+                    <div className="col-span-5 p-4 rounded-2xl bg-white/5 border border-white/15 backdrop-blur-md text-center space-y-3 shadow-xl">
+                      <div className="relative w-36 h-24 m-auto flex items-center justify-center">
+                        <div className="absolute left-1 top-0 w-20 h-20 rounded-full overflow-hidden bg-gray-800 border-2 border-yellow-400 shadow-md">
+                          {memberPhoto ? (
+                            <img src={memberPhoto} className="w-full h-full object-cover" />
+                          ) : (
+                            <Trophy className="w-7 h-7 text-gray-600 m-auto mt-4" />
+                          )}
+                        </div>
+                        <div className="absolute right-1 bottom-0 w-20 h-20 rounded-full overflow-hidden bg-gray-800 border-2 border-yellow-400 shadow-md">
+                          {memberPhoto2 ? (
+                            <img src={memberPhoto2} className="w-full h-full object-cover" />
+                          ) : (
+                            <Trophy className="w-7 h-7 text-gray-600 m-auto mt-4" />
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="space-y-0.5">
+                        <h3 className="text-xs font-black text-white uppercase tracking-wider">{memberName} &amp; {memberName2}</h3>
+                        <p className="text-[8.5px] font-mono text-yellow-400 font-bold">{role} &amp; {role2}</p>
+                      </div>
+                    </div>
+
+                    {/* Right Review Card */}
+                    <div className="col-span-7 h-full flex flex-col justify-center">
+                      {useNativeLayout ? renderFiverrFullDetailedNative() : (
+                        <div className="w-full flex justify-center">
+                          {renderScreenshotBrowserFrame("max-h-[220px]")}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Footer */}
+                  <div className="flex justify-between items-center text-[8px] font-mono text-gray-400 border-t border-white/10 pt-1.5">
+                    <span>ORDER: {orderId}</span>
+                    <span>SHOPIFY EXPERTS TEAM</span>
                   </div>
                 </div>
               )}
