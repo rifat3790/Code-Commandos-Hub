@@ -3673,13 +3673,6 @@ export default function MockupPage() {
                       )}
                     </div>
                   </div>
-
-                  {/* Footer Specs Bar */}
-                  <div className="flex justify-between items-center text-[8.5px] font-mono text-cyan-300/70 border-t border-cyan-500/20 pt-1.5 z-10 shrink-0">
-                    <span>ORDER ID: {orderId}</span>
-                    <span className="font-bold text-white tracking-wider">CODE COMMANDOS OMEGA PLATINUM</span>
-                    <span>VALUED AT ${orderPrice} USD</span>
-                  </div>
                 </div>
               )}
 
