@@ -111,7 +111,7 @@ const STRUCTURES: { value: LayoutStructure; label: string; desc: string }[] = [
   { value: 'dual_bento', label: 'Duo Bento Grid', desc: 'Split Bento layout featuring two team members' },
   { value: 'dual_infinity', label: 'Executive Infinity Tandem', desc: 'Ultra-luxurious dual gold crest certificate' },
   { value: 'dual_cyberpunk', label: 'Cyberpunk Neon Syndicate', desc: 'Sci-Fi HUD grid with neon badges & cyber glow' },
-  { value: 'dual_gold_ribbon', label: '24K Golden Luxury Royale', desc: '24K Gold foil & carbon certificate with wax seal' },
+  { value: 'dual_gold_ribbon', label: 'Code Commandos Royal Crest', desc: 'Golden Royale carbon certificate with wax seal stamp' },
   { value: 'dual_split_hex', label: 'Apex Hexagonal Duo', desc: 'Hexagonal duo cards with central stats pill' },
   { value: 'dual_minimal_zen', label: 'Minimalist Dark Monolith', desc: 'Sleek Apple/Vercel style dark duo card' }
 ];
@@ -3301,7 +3301,7 @@ export default function MockupPage() {
                   {/* Top Gold Ribbon Banner */}
                   <div className="w-full bg-gradient-to-r from-yellow-600 via-amber-400 to-yellow-600 py-1.5 px-4 flex items-center justify-center gap-2 text-black font-black text-[10px] uppercase tracking-[0.25em] shadow-md z-10">
                     <Crown className="w-4 h-4 fill-black text-black" />
-                    <span>24K ROYAL DUO PERFORMANCE CREW</span>
+                    <span>CODE COMMANDOS ROYAL DUO CREW</span>
                     <Crown className="w-4 h-4 fill-black text-black" />
                   </div>
 
