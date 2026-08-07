@@ -30,10 +30,30 @@ import { removeBackground as imglyRemoveBackground } from '@imgly/background-rem
 import { useWorkspaceStore } from '@/store/workspaceStore';
 import { MockupStyle } from '@/types';
 
-type LayoutStructure = 'banner' | 'fiverr_split' | 'split' | 'spotlight' | 'certificate' | 'sidebyside' | 'showcase' | 'bento' | 'dual_screen' | 'premium_award' | 'dual_profile';
+type LayoutStructure = 
+  | 'banner' 
+  | 'fiverr_split' 
+  | 'split' 
+  | 'spotlight' 
+  | 'certificate' 
+  | 'sidebyside' 
+  | 'showcase' 
+  | 'bento' 
+  | 'dual_screen' 
+  | 'premium_award' 
+  | 'dual_profile'
+  | 'dual_versus'
+  | 'dual_glass_card'
+  | 'dual_bento'
+  | 'dual_infinity';
+
 type PatternOverlay = 'none' | 'dots' | 'grid' | 'waves';
 type TipsStyle = 'premium_gold' | 'neon_cyberpunk' | 'minimal_glass' | 'playful_bubble' | 'center_floating_arrow' | 'center_elegant_tag' | 'center_neon_glow' | 'center_pill_premium' | 'center_diamond_glass' | 'center_massive_medal';
 type TipsColorTheme = 'yellow' | 'emerald' | 'amethyst' | 'ruby' | 'sapphire' | 'monochrome';
+
+const isDualStructure = (str: LayoutStructure) => {
+  return ['dual_profile', 'dual_versus', 'dual_glass_card', 'dual_bento', 'dual_infinity'].includes(str);
+};
 
 const LAYOUTS: { value: MockupStyle; label: string; desc: string }[] = [
   { value: 'green-award', label: 'Green Award', desc: 'Image 1 green banner design' },
@@ -59,7 +79,11 @@ const STRUCTURES: { value: LayoutStructure; label: string; desc: string }[] = [
   { value: 'bento', label: 'Premium Bento Grid', desc: 'Grid block containing photo, screenshot & stats' },
   { value: 'dual_screen', label: 'Dual Glassmorphic Screen', desc: 'Two equal columns: Profile Card + Browser Mockup' },
   { value: 'premium_award', label: 'Luxury Platinum Award', desc: 'Prestige border, gold details, seal stamp' },
-  { value: 'dual_profile', label: 'Dual Profile Spotlight', desc: 'Side-by-side team members layout' }
+  { value: 'dual_profile', label: 'Dual Profile Spotlight', desc: 'Side-by-side team members layout' },
+  { value: 'dual_versus', label: 'Duo Power Synergy', desc: 'Futuristic tandem cards with central power badge' },
+  { value: 'dual_glass_card', label: 'Twin Floating Glass Cards', desc: 'Dual 3D glass profile cards over project view' },
+  { value: 'dual_bento', label: 'Duo Bento Grid', desc: 'Split Bento layout featuring two team members' },
+  { value: 'dual_infinity', label: 'Executive Infinity Tandem', desc: 'Ultra-luxurious dual gold crest certificate' }
 ];
 
 const DEFAULT_FIVERR_SCREENSHOT = `data:image/svg+xml;utf8,${encodeURIComponent(`
@@ -1593,8 +1617,8 @@ export default function MockupPage() {
               </div>
             </div>
 
-            {/* Second Member for Dual Profile */}
-            {structure === 'dual_profile' && (
+            {/* Second Member for Duo / Double Layouts */}
+            {isDualStructure(structure) && (
               <div className="pt-4 border-t border-glass-border space-y-3">
                 <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider flex items-center gap-1.5">
                   <Type className="w-3.5 h-3.5 text-blue-400" />
@@ -2676,6 +2700,376 @@ export default function MockupPage() {
                         {renderScreenshotBrowserFrame("max-h-[190px]")}
                       </div>
                     )}
+                  </div>
+                </div>
+              )}
+
+              {/* STRUCTURE RENDERER 11: Duo Power Synergy ('dual_versus') */}
+              {structure === 'dual_versus' && (
+                <div className="flex-1 flex flex-col justify-between h-full p-3 relative z-10 text-left">
+                  {/* Top Header Tag */}
+                  <div className="flex items-center justify-between border-b border-white/10 pb-2 mb-2 shrink-0">
+                    <div className="flex items-center gap-2">
+                      <span 
+                        className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest font-mono text-black shadow-md"
+                        style={{ backgroundColor: themeColor }}
+                      >
+                        ⚡ DUO POWER SYNERGY
+                      </span>
+                      <span className="text-[9px] text-gray-400 font-mono">COLLABORATIVE MILESTONE</span>
+                    </div>
+                    <span className="text-[9px] text-gray-400 font-mono"># {orderId}</span>
+                  </div>
+
+                  {/* Center Duo Cards with versus / synergy badge */}
+                  <div className="grid grid-cols-12 gap-3 items-center my-auto">
+                    {/* Member 1 Card (col-span-5) */}
+                    <div 
+                      className="col-span-5 rounded-2xl p-3.5 border text-center flex flex-col items-center space-y-2 relative overflow-hidden backdrop-blur-md"
+                      style={{ background: 'rgba(3, 7, 18, 0.55)', borderColor: `${themeColor}40` }}
+                    >
+                      <div className="relative">
+                        <div 
+                          className="w-20 h-20 rounded-2xl overflow-hidden bg-gray-800 flex items-center justify-center border-2 shadow-lg"
+                          style={{ borderColor: themeColor, boxShadow: `0 0 20px ${themeColor}30` }}
+                        >
+                          {memberPhoto ? (
+                            <img src={memberPhoto} className="w-full h-full object-cover" alt="Member 1" />
+                          ) : (
+                            <Trophy className="w-8 h-8 text-gray-600" />
+                          )}
+                        </div>
+                        <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full bg-black/80 border border-white/20 text-[7.5px] font-black text-white uppercase tracking-wider font-mono">
+                          CO-LEAD
+                        </span>
+                      </div>
+                      <div className="space-y-0.5">
+                        <h3 className="text-xs font-black text-white uppercase tracking-wider truncate max-w-[120px]">{memberName}</h3>
+                        <p className="text-[9px] font-bold truncate max-w-[120px]" style={{ color: themeColor }}>{role}</p>
+                      </div>
+                    </div>
+
+                    {/* Central Synergy Emblem (col-span-2) */}
+                    <div className="col-span-2 flex flex-col items-center justify-center relative z-20">
+                      <div 
+                        className="w-10 h-10 rounded-full flex items-center justify-center border-2 text-white font-black text-xs font-mono shadow-2xl transform rotate-45"
+                        style={{ 
+                          background: `linear-gradient(135deg, ${themeColor}, #000000)`,
+                          borderColor: '#ffffff',
+                          boxShadow: `0 0 20px ${themeColor}60`
+                        }}
+                      >
+                        <span className="transform -rotate-45 font-black text-sm">⚡</span>
+                      </div>
+                      <span className="text-[7.5px] font-black text-gray-300 uppercase tracking-widest mt-1 font-mono">SYNERGY</span>
+                    </div>
+
+                    {/* Member 2 Card (col-span-5) */}
+                    <div 
+                      className="col-span-5 rounded-2xl p-3.5 border text-center flex flex-col items-center space-y-2 relative overflow-hidden backdrop-blur-md"
+                      style={{ background: 'rgba(3, 7, 18, 0.55)', borderColor: `${themeColor}40` }}
+                    >
+                      <div className="relative">
+                        <div 
+                          className="w-20 h-20 rounded-2xl overflow-hidden bg-gray-800 flex items-center justify-center border-2 shadow-lg"
+                          style={{ borderColor: themeColor, boxShadow: `0 0 20px ${themeColor}30` }}
+                        >
+                          {memberPhoto2 ? (
+                            <img src={memberPhoto2} className="w-full h-full object-cover" alt="Member 2" />
+                          ) : (
+                            <Trophy className="w-8 h-8 text-gray-600" />
+                          )}
+                        </div>
+                        <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full bg-black/80 border border-white/20 text-[7.5px] font-black text-white uppercase tracking-wider font-mono">
+                          CO-LEAD
+                        </span>
+                      </div>
+                      <div className="space-y-0.5">
+                        <h3 className="text-xs font-black text-white uppercase tracking-wider truncate max-w-[120px]">{memberName2}</h3>
+                        <p className="text-[9px] font-bold truncate max-w-[120px]" style={{ color: themeColor }}>{role2}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Bottom Deliverable Showcase */}
+                  <div className="mt-2 shrink-0">
+                    {useNativeLayout ? (
+                      <div className="p-3 rounded-xl bg-white border border-gray-200 text-black space-y-2 shadow-xl text-left">
+                        <div className="flex items-center justify-between border-b border-gray-100 pb-1 text-[8.5px] text-gray-400 font-bold uppercase">
+                          <span>Client Feedback</span>
+                          <span>@{clientName}</span>
+                        </div>
+                        <p className="text-[10px] text-gray-700 italic font-medium leading-tight bg-gray-50 p-2 rounded border border-gray-100 line-clamp-2">
+                          &quot;{reviewText}&quot;
+                        </p>
+                        <div className="flex items-center justify-between pt-1 border-t border-gray-100 text-[9px]">
+                          <div className="flex gap-0.5">{renderStars(ratingStars)}</div>
+                          <span className="font-extrabold text-emerald-600">${orderPrice} USD Verified Order</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="w-full flex justify-center">
+                        {renderScreenshotBrowserFrame("max-h-[170px]")}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* STRUCTURE RENDERER 12: Twin Floating Glass Cards ('dual_glass_card') */}
+              {structure === 'dual_glass_card' && (
+                <div className="flex-1 flex flex-col justify-between h-full p-4 relative z-10 text-left">
+                  {/* Top Bar */}
+                  <div className="flex justify-between items-center border-b border-white/10 pb-2">
+                    <span className="text-[9px] font-black text-white uppercase tracking-widest font-mono flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-yellow-400" />
+                      <span>TWIN GLASS FLOATING CARDS</span>
+                    </span>
+                    <span className="text-[9px] font-mono text-emerald-400 font-bold bg-emerald-950/60 border border-emerald-500/30 px-2 py-0.5 rounded-md">
+                      ${orderPrice} USD DELIVERED
+                    </span>
+                  </div>
+
+                  {/* Floating Glass Cards Row */}
+                  <div className="grid grid-cols-2 gap-4 my-2">
+                    {/* Member 1 Card */}
+                    <div 
+                      className="rounded-2xl p-3.5 border bg-white/10 backdrop-blur-md text-white shadow-2xl flex items-center gap-3 transform -rotate-1 border-white/20 hover:rotate-0 transition-transform"
+                      style={{ boxShadow: `0 10px 30px ${themeColor}20` }}
+                    >
+                      <div 
+                        className="w-14 h-14 rounded-full overflow-hidden bg-gray-800 shrink-0 border-2 shadow-md"
+                        style={{ borderColor: themeColor }}
+                      >
+                        {memberPhoto ? (
+                          <img src={memberPhoto} className="w-full h-full object-cover" />
+                        ) : (
+                          <Trophy className="w-6 h-6 text-gray-600 m-auto mt-3.5" />
+                        )}
+                      </div>
+                      <div className="space-y-0.5 overflow-hidden">
+                        <span className="text-[8px] font-extrabold uppercase tracking-wider text-gray-300 block">CREW MEMBER #1</span>
+                        <h3 className="text-xs font-black text-white uppercase tracking-wide truncate">{memberName}</h3>
+                        <p className="text-[9px] font-semibold text-gray-300 truncate">{role}</p>
+                      </div>
+                    </div>
+
+                    {/* Member 2 Card */}
+                    <div 
+                      className="rounded-2xl p-3.5 border bg-white/10 backdrop-blur-md text-white shadow-2xl flex items-center gap-3 transform rotate-1 border-white/20 hover:rotate-0 transition-transform"
+                      style={{ boxShadow: `0 10px 30px ${themeColor}20` }}
+                    >
+                      <div 
+                        className="w-14 h-14 rounded-full overflow-hidden bg-gray-800 shrink-0 border-2 shadow-md"
+                        style={{ borderColor: themeColor }}
+                      >
+                        {memberPhoto2 ? (
+                          <img src={memberPhoto2} className="w-full h-full object-cover" />
+                        ) : (
+                          <Trophy className="w-6 h-6 text-gray-600 m-auto mt-3.5" />
+                        )}
+                      </div>
+                      <div className="space-y-0.5 overflow-hidden">
+                        <span className="text-[8px] font-extrabold uppercase tracking-wider text-gray-300 block">CREW MEMBER #2</span>
+                        <h3 className="text-xs font-black text-white uppercase tracking-wide truncate">{memberName2}</h3>
+                        <p className="text-[9px] font-semibold text-gray-300 truncate">{role2}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Deliverable Mockup Card */}
+                  <div className="flex-1 flex flex-col justify-end mt-2">
+                    {useNativeLayout ? renderFiverrNative() : (
+                      <div className="w-full flex justify-center">
+                        {renderScreenshotBrowserFrame("max-h-[200px]")}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* STRUCTURE RENDERER 13: Duo Bento Grid ('dual_bento') */}
+              {structure === 'dual_bento' && (
+                <div className="grid grid-cols-12 gap-3 flex-1 items-stretch text-left pr-24 h-full p-2">
+                  {/* Member 1 Bento Card (col-span-6) */}
+                  <div 
+                    className="col-span-6 rounded-xl p-3 flex items-center gap-3 border backdrop-blur-md"
+                    style={{ background: 'rgba(3, 7, 18, 0.45)', borderColor: `${themeColor}30` }}
+                  >
+                    <div 
+                      className="w-14 h-14 rounded-xl overflow-hidden bg-gray-800 shrink-0 border-2 shadow-md"
+                      style={{ borderColor: themeColor }}
+                    >
+                      {memberPhoto ? (
+                        <img src={memberPhoto} className="w-full h-full object-cover" />
+                      ) : (
+                        <Trophy className="w-6 h-6 text-gray-600 m-auto mt-3.5" />
+                      )}
+                    </div>
+                    <div className="space-y-0.5 overflow-hidden">
+                      <span className="px-1.5 py-0.5 rounded bg-green-500/10 border border-green-500/20 text-green-400 text-[7.5px] font-black uppercase font-mono">
+                        PRIMARY CREW
+                      </span>
+                      <h3 className="text-xs font-black text-white uppercase truncate">{memberName}</h3>
+                      <p className="text-[8.5px] text-gray-300 font-medium truncate">{role}</p>
+                    </div>
+                  </div>
+
+                  {/* Member 2 Bento Card (col-span-6) */}
+                  <div 
+                    className="col-span-6 rounded-xl p-3 flex items-center gap-3 border backdrop-blur-md"
+                    style={{ background: 'rgba(3, 7, 18, 0.45)', borderColor: `${themeColor}30` }}
+                  >
+                    <div 
+                      className="w-14 h-14 rounded-xl overflow-hidden bg-gray-800 shrink-0 border-2 shadow-md"
+                      style={{ borderColor: themeColor }}
+                    >
+                      {memberPhoto2 ? (
+                        <img src={memberPhoto2} className="w-full h-full object-cover" />
+                      ) : (
+                        <Trophy className="w-6 h-6 text-gray-600 m-auto mt-3.5" />
+                      )}
+                    </div>
+                    <div className="space-y-0.5 overflow-hidden">
+                      <span className="px-1.5 py-0.5 rounded bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[7.5px] font-black uppercase font-mono">
+                        CO-DEVELOPER
+                      </span>
+                      <h3 className="text-xs font-black text-white uppercase truncate">{memberName2}</h3>
+                      <p className="text-[8.5px] text-gray-300 font-medium truncate">{role2}</p>
+                    </div>
+                  </div>
+
+                  {/* Middle Duo Milestone Stats Ribbon (col-span-12) */}
+                  <div className="col-span-12 rounded-lg bg-black/40 border border-white/10 p-2.5 flex items-center justify-between text-[9px] px-4 font-mono">
+                    <span className="text-white font-bold flex items-center gap-1.5">
+                      <Award className="w-3.5 h-3.5 text-yellow-400" />
+                      <span>CODE COMMANDOS DUO CREW</span>
+                    </span>
+                    <div className="flex items-center gap-4 text-gray-300 font-bold">
+                      <span>VALUE: <span className="text-emerald-400">${orderPrice} USD</span></span>
+                      <span>RATING: <span className="text-yellow-400">5.0 ★</span></span>
+                      <span>ID: <span className="text-white">{orderId}</span></span>
+                    </div>
+                  </div>
+
+                  {/* Bottom Deliverable Card (col-span-12) */}
+                  <div className="col-span-12 flex flex-col justify-center overflow-hidden">
+                    {useNativeLayout ? (
+                      <div className="p-3 rounded-xl bg-white text-black space-y-2 shadow-xl">
+                        <p className="text-[10.5px] italic text-gray-800 leading-tight">
+                          &quot;{reviewText}&quot;
+                        </p>
+                        <div className="flex items-center justify-between text-[8.5px] text-gray-500 font-bold border-t border-gray-100 pt-1">
+                          <span>Reviewed by @{clientName}</span>
+                          <span>Delivery Approved</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="w-full flex justify-center">
+                        {renderScreenshotBrowserFrame("max-h-[170px]")}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* STRUCTURE RENDERER 14: Executive Infinity Tandem ('dual_infinity') */}
+              {structure === 'dual_infinity' && (
+                <div className="flex-1 flex flex-col justify-between items-center text-center space-y-3 relative py-2 pr-14 h-full">
+                  {/* Metallic Double Border outline */}
+                  <div 
+                    className="absolute inset-2 border-2 rounded-2xl pointer-events-none" 
+                    style={{ borderColor: `${themeColor}35`, boxShadow: `inset 0 0 25px ${themeColor}15` }}
+                  />
+                  
+                  {/* Certificate Header */}
+                  <div className="space-y-0.5 z-10">
+                    <div className="flex items-center justify-center gap-1.5 text-yellow-400">
+                      <Award className="w-4 h-4 fill-yellow-400 text-black" />
+                      <span className="text-[9.5px] font-black tracking-widest uppercase font-mono">
+                        EXECUTIVE DUO PERFORMANCE AWARD
+                      </span>
+                      <Award className="w-4 h-4 fill-yellow-400 text-black" />
+                    </div>
+                    <p className="text-[8px] text-gray-400 font-mono uppercase tracking-wider">
+                      HONORING COLLABORATIVE DEVELOPMENT EXCELLENCE
+                    </p>
+                  </div>
+
+                  {/* Linked Double Profile Avatar Frame */}
+                  <div className="flex items-center justify-center gap-6 z-10 my-auto">
+                    {/* Member 1 Avatar */}
+                    <div className="flex items-center gap-3 bg-black/40 border border-white/15 p-2 rounded-2xl pr-4">
+                      <div 
+                        className="w-14 h-14 rounded-full overflow-hidden bg-gray-800 border-2 shadow-lg shrink-0"
+                        style={{ borderColor: themeColor, boxShadow: `0 0 15px ${themeColor}40` }}
+                      >
+                        {memberPhoto ? (
+                          <img src={memberPhoto} className="w-full h-full object-cover" />
+                        ) : (
+                          <Trophy className="w-6 h-6 text-gray-600 m-auto mt-3.5" />
+                        )}
+                      </div>
+                      <div className="text-left space-y-0.5">
+                        <h3 className="text-xs font-black text-white uppercase tracking-wider">{memberName}</h3>
+                        <p className="text-[8.5px] font-bold tracking-wide" style={{ color: themeColor }}>{role}</p>
+                      </div>
+                    </div>
+
+                    {/* Infinity Badge Link */}
+                    <div 
+                      className="w-8 h-8 rounded-full bg-gradient-to-r from-yellow-500 to-amber-600 flex items-center justify-center text-black font-black text-sm shadow-xl font-mono shrink-0"
+                    >
+                      ∞
+                    </div>
+
+                    {/* Member 2 Avatar */}
+                    <div className="flex items-center gap-3 bg-black/40 border border-white/15 p-2 rounded-2xl pl-4">
+                      <div className="text-right space-y-0.5">
+                        <h3 className="text-xs font-black text-white uppercase tracking-wider">{memberName2}</h3>
+                        <p className="text-[8.5px] font-bold tracking-wide" style={{ color: themeColor }}>{role2}</p>
+                      </div>
+                      <div 
+                        className="w-14 h-14 rounded-full overflow-hidden bg-gray-800 border-2 shadow-lg shrink-0"
+                        style={{ borderColor: themeColor, boxShadow: `0 0 15px ${themeColor}40` }}
+                      >
+                        {memberPhoto2 ? (
+                          <img src={memberPhoto2} className="w-full h-full object-cover" />
+                        ) : (
+                          <Trophy className="w-6 h-6 text-gray-600 m-auto mt-3.5" />
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Deliverable Review / Screenshot section */}
+                  <div className="w-full px-4 z-10">
+                    {useNativeLayout ? (
+                      <div className="p-3 rounded-xl bg-white border border-gray-200 text-black space-y-1.5 shadow-xl text-left">
+                        <div className="flex items-center justify-between text-[8px] text-gray-400 font-bold uppercase border-b border-gray-100 pb-1">
+                          <span>Verified Client Feedback</span>
+                          <span>Ref: {orderId}</span>
+                        </div>
+                        <p className="text-[10px] text-gray-800 italic font-medium leading-relaxed">
+                          &quot;{reviewText}&quot;
+                        </p>
+                        <div className="flex items-center justify-between text-[9px] pt-1 border-t border-gray-100 font-bold">
+                          <div className="flex gap-0.5">{renderStars(ratingStars)}</div>
+                          <span className="text-emerald-600">${orderPrice} USD Verified Order</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="w-full flex justify-center">
+                        {renderScreenshotBrowserFrame("max-h-[170px]")}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Footer specs */}
+                  <div className="w-full flex justify-between items-center text-[8.5px] font-mono text-gray-400 px-6 border-t border-white/10 pt-1.5 z-10">
+                    <span>DATE: {formatDate(completionDate)}</span>
+                    <span className="text-yellow-400 font-bold">CODE COMMANDOS OMEGA PLATINUM</span>
+                    <span>DOMAIN: {website}</span>
                   </div>
                 </div>
               )}
