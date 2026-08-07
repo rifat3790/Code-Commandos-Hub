@@ -22,7 +22,10 @@ import {
   CheckCircle2,
   Award,
   Grid,
-  Sparkle
+  Sparkle,
+  Crown,
+  ShieldCheck,
+  Zap
 } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import confetti from 'canvas-confetti';
@@ -45,14 +48,28 @@ type LayoutStructure =
   | 'dual_versus'
   | 'dual_glass_card'
   | 'dual_bento'
-  | 'dual_infinity';
+  | 'dual_infinity'
+  | 'dual_cyberpunk'
+  | 'dual_gold_ribbon'
+  | 'dual_split_hex'
+  | 'dual_minimal_zen';
 
 type PatternOverlay = 'none' | 'dots' | 'grid' | 'waves';
 type TipsStyle = 'premium_gold' | 'neon_cyberpunk' | 'minimal_glass' | 'playful_bubble' | 'center_floating_arrow' | 'center_elegant_tag' | 'center_neon_glow' | 'center_pill_premium' | 'center_diamond_glass' | 'center_massive_medal';
 type TipsColorTheme = 'yellow' | 'emerald' | 'amethyst' | 'ruby' | 'sapphire' | 'monochrome';
 
 const isDualStructure = (str: LayoutStructure) => {
-  return ['dual_profile', 'dual_versus', 'dual_glass_card', 'dual_bento', 'dual_infinity'].includes(str);
+  return [
+    'dual_profile', 
+    'dual_versus', 
+    'dual_glass_card', 
+    'dual_bento', 
+    'dual_infinity',
+    'dual_cyberpunk',
+    'dual_gold_ribbon',
+    'dual_split_hex',
+    'dual_minimal_zen'
+  ].includes(str);
 };
 
 const LAYOUTS: { value: MockupStyle; label: string; desc: string }[] = [
@@ -83,7 +100,11 @@ const STRUCTURES: { value: LayoutStructure; label: string; desc: string }[] = [
   { value: 'dual_versus', label: 'Duo Power Synergy', desc: 'Futuristic tandem cards with central power badge' },
   { value: 'dual_glass_card', label: 'Twin Floating Glass Cards', desc: 'Dual 3D glass profile cards over project view' },
   { value: 'dual_bento', label: 'Duo Bento Grid', desc: 'Split Bento layout featuring two team members' },
-  { value: 'dual_infinity', label: 'Executive Infinity Tandem', desc: 'Ultra-luxurious dual gold crest certificate' }
+  { value: 'dual_infinity', label: 'Executive Infinity Tandem', desc: 'Ultra-luxurious dual gold crest certificate' },
+  { value: 'dual_cyberpunk', label: 'Cyberpunk Neon Syndicate', desc: 'Sci-Fi HUD grid with neon badges & cyber glow' },
+  { value: 'dual_gold_ribbon', label: '24K Golden Luxury Royale', desc: '24K Gold foil & carbon certificate with wax seal' },
+  { value: 'dual_split_hex', label: 'Apex Hexagonal Duo', desc: 'Hexagonal duo cards with central stats pill' },
+  { value: 'dual_minimal_zen', label: 'Minimalist Dark Monolith', desc: 'Sleek Apple/Vercel style dark duo card' }
 ];
 
 const DEFAULT_FIVERR_SCREENSHOT = `data:image/svg+xml;utf8,${encodeURIComponent(`
@@ -3069,6 +3090,356 @@ export default function MockupPage() {
                   <div className="w-full flex justify-between items-center text-[8.5px] font-mono text-gray-400 px-6 border-t border-white/10 pt-1.5 z-10">
                     <span>DATE: {formatDate(completionDate)}</span>
                     <span className="text-yellow-400 font-bold">CODE COMMANDOS OMEGA PLATINUM</span>
+                    <span>DOMAIN: {website}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* STRUCTURE RENDERER 15: Cyberpunk Neon Syndicate ('dual_cyberpunk') */}
+              {structure === 'dual_cyberpunk' && (
+                <div className="flex-1 flex flex-col justify-between h-full p-4 relative z-10 text-left bg-gray-950/80 border border-cyan-500/30 rounded-xl overflow-hidden">
+                  {/* Top HUD Status Bar */}
+                  <div className="flex items-center justify-between border-b border-cyan-500/20 pb-2 text-[9px] font-mono">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
+                      <span className="text-cyan-400 font-extrabold tracking-widest">[ SYSTEM: DUO_NEON_SYNDICATE ]</span>
+                    </div>
+                    <span className="text-pink-400 font-mono font-bold">STATUS: OVERFLOW_99.8%</span>
+                  </div>
+
+                  {/* Center Hexagonal HUD Duo Profile */}
+                  <div className="grid grid-cols-12 gap-4 items-center my-auto px-2">
+                    {/* Member 1 Cyber Card */}
+                    <div className="col-span-5 p-3 rounded-2xl bg-black/70 border border-cyan-500/40 text-center flex flex-col items-center space-y-2 shadow-[0_0_20px_rgba(6,182,212,0.15)] relative">
+                      <div className="relative">
+                        <div 
+                          className="w-20 h-20 rounded-2xl overflow-hidden bg-gray-900 border-2 border-cyan-400 flex items-center justify-center shadow-[0_0_15px_rgba(6,182,212,0.4)]"
+                        >
+                          {memberPhoto ? (
+                            <img src={memberPhoto} className="w-full h-full object-cover" />
+                          ) : (
+                            <Zap className="w-8 h-8 text-cyan-400" />
+                          )}
+                        </div>
+                        <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded bg-cyan-500 text-black text-[7.5px] font-black font-mono tracking-widest">
+                          #DEV_01
+                        </span>
+                      </div>
+                      <div className="space-y-0.5 pt-1">
+                        <h3 className="text-xs font-black text-white font-mono uppercase tracking-wider truncate max-w-[120px]">{memberName}</h3>
+                        <p className="text-[8.5px] font-mono text-cyan-400 font-bold truncate max-w-[120px]">{role}</p>
+                      </div>
+                    </div>
+
+                    {/* Center Cyber HUD Core Emblem */}
+                    <div className="col-span-2 flex flex-col items-center justify-center">
+                      <div className="w-10 h-10 rounded-xl bg-gray-900 border border-pink-500/60 flex items-center justify-center text-pink-400 font-mono text-xs font-black shadow-[0_0_15px_rgba(236,72,153,0.4)] transform rotate-12">
+                        <Zap className="w-5 h-5 fill-pink-500 text-pink-400" />
+                      </div>
+                      <span className="text-[7px] font-mono font-black text-pink-400 uppercase tracking-widest mt-1">MATRIX</span>
+                    </div>
+
+                    {/* Member 2 Cyber Card */}
+                    <div className="col-span-5 p-3 rounded-2xl bg-black/70 border border-pink-500/40 text-center flex flex-col items-center space-y-2 shadow-[0_0_20px_rgba(236,72,153,0.15)] relative">
+                      <div className="relative">
+                        <div 
+                          className="w-20 h-20 rounded-2xl overflow-hidden bg-gray-900 border-2 border-pink-400 flex items-center justify-center shadow-[0_0_15px_rgba(236,72,153,0.4)]"
+                        >
+                          {memberPhoto2 ? (
+                            <img src={memberPhoto2} className="w-full h-full object-cover" />
+                          ) : (
+                            <Zap className="w-8 h-8 text-pink-400" />
+                          )}
+                        </div>
+                        <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded bg-pink-500 text-black text-[7.5px] font-black font-mono tracking-widest">
+                          #DEV_02
+                        </span>
+                      </div>
+                      <div className="space-y-0.5 pt-1">
+                        <h3 className="text-xs font-black text-white font-mono uppercase tracking-wider truncate max-w-[120px]">{memberName2}</h3>
+                        <p className="text-[8.5px] font-mono text-pink-400 font-bold truncate max-w-[120px]">{role2}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Bottom Cyber Review / Deliverable Box */}
+                  <div className="mt-2 shrink-0">
+                    {useNativeLayout ? (
+                      <div className="p-3 rounded-xl bg-gray-950 border border-cyan-500/30 text-white space-y-1.5 text-left font-mono">
+                        <div className="flex items-center justify-between text-[8px] text-cyan-400 border-b border-cyan-500/20 pb-1">
+                          <span>[ CLIENT_FEEDBACK // Verified ]</span>
+                          <span>@{clientName}</span>
+                        </div>
+                        <p className="text-[9.5px] text-gray-300 italic font-mono leading-relaxed">
+                          &quot;{reviewText}&quot;
+                        </p>
+                        <div className="flex items-center justify-between text-[8.5px] pt-1 border-t border-cyan-500/20 text-emerald-400 font-bold">
+                          <div className="flex gap-0.5">{renderStars(ratingStars)}</div>
+                          <span>VALUATION: ${orderPrice} USD</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="w-full flex justify-center">
+                        {renderScreenshotBrowserFrame("max-h-[170px]")}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* STRUCTURE RENDERER 16: 24K Golden Luxury Royale ('dual_gold_ribbon') */}
+              {structure === 'dual_gold_ribbon' && (
+                <div className="flex-1 flex flex-col justify-between items-center text-center space-y-3 relative py-3 pr-14 h-full bg-gradient-to-b from-[#12100e] via-[#0a0908] to-[#12100e] border-2 border-yellow-500/60 rounded-2xl shadow-[0_0_40px_rgba(234,179,8,0.2)] overflow-hidden">
+                  {/* Top Gold Ribbon Banner */}
+                  <div className="w-full bg-gradient-to-r from-yellow-600 via-amber-400 to-yellow-600 py-1.5 px-4 flex items-center justify-center gap-2 text-black font-black text-[10px] uppercase tracking-[0.25em] shadow-md z-10">
+                    <Crown className="w-4 h-4 fill-black text-black" />
+                    <span>24K ROYAL DUO PERFORMANCE CREW</span>
+                    <Crown className="w-4 h-4 fill-black text-black" />
+                  </div>
+
+                  {/* Center Duo Gold Crest Avatars */}
+                  <div className="flex items-center justify-center gap-8 z-10 my-auto">
+                    {/* Member 1 Avatar */}
+                    <div className="flex flex-col items-center space-y-1.5">
+                      <div className="relative">
+                        <div 
+                          className="w-20 h-20 rounded-full overflow-hidden bg-gray-900 border-4 border-yellow-400 flex items-center justify-center shadow-[0_0_25px_rgba(250,204,21,0.4)]"
+                        >
+                          {memberPhoto ? (
+                            <img src={memberPhoto} className="w-full h-full object-cover" />
+                          ) : (
+                            <Trophy className="w-8 h-8 text-yellow-400" />
+                          )}
+                        </div>
+                        <div className="absolute -bottom-1 -right-1 bg-yellow-400 text-black p-1 rounded-full shadow-lg border border-black">
+                          <Crown className="w-3.5 h-3.5 fill-black" />
+                        </div>
+                      </div>
+                      <div className="text-center">
+                        <h3 className="text-xs font-black text-yellow-100 uppercase tracking-wider font-serif">{memberName}</h3>
+                        <p className="text-[8.5px] font-bold text-yellow-400 uppercase tracking-wide">{role}</p>
+                      </div>
+                    </div>
+
+                    {/* Central Royal Medal */}
+                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-yellow-300 via-amber-500 to-yellow-600 flex items-center justify-center text-black shadow-2xl border-2 border-yellow-200 z-20 shrink-0">
+                      <Award className="w-6 h-6 fill-black text-black" />
+                    </div>
+
+                    {/* Member 2 Avatar */}
+                    <div className="flex flex-col items-center space-y-1.5">
+                      <div className="relative">
+                        <div 
+                          className="w-20 h-20 rounded-full overflow-hidden bg-gray-900 border-4 border-yellow-400 flex items-center justify-center shadow-[0_0_25px_rgba(250,204,21,0.4)]"
+                        >
+                          {memberPhoto2 ? (
+                            <img src={memberPhoto2} className="w-full h-full object-cover" />
+                          ) : (
+                            <Trophy className="w-8 h-8 text-yellow-400" />
+                          )}
+                        </div>
+                        <div className="absolute -bottom-1 -right-1 bg-yellow-400 text-black p-1 rounded-full shadow-lg border border-black">
+                          <Crown className="w-3.5 h-3.5 fill-black" />
+                        </div>
+                      </div>
+                      <div className="text-center">
+                        <h3 className="text-xs font-black text-yellow-100 uppercase tracking-wider font-serif">{memberName2}</h3>
+                        <p className="text-[8.5px] font-bold text-yellow-400 uppercase tracking-wide">{role2}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Deliverable Review / Screenshot section */}
+                  <div className="w-full px-4 z-10">
+                    {useNativeLayout ? (
+                      <div className="p-3.5 rounded-xl bg-white/95 border-2 border-yellow-400/50 text-black space-y-1.5 shadow-2xl text-left">
+                        <div className="flex items-center justify-between text-[8.5px] text-gray-500 font-bold uppercase border-b border-gray-100 pb-1">
+                          <span className="text-yellow-600 font-black">Royal Seal Verified Review</span>
+                          <span>Ref: {orderId}</span>
+                        </div>
+                        <p className="text-[10.5px] text-gray-800 italic font-serif leading-relaxed">
+                          &quot;{reviewText}&quot;
+                        </p>
+                        <div className="flex items-center justify-between text-[9px] pt-1 border-t border-gray-100 font-extrabold">
+                          <div className="flex gap-0.5">{renderStars(ratingStars)}</div>
+                          <span className="text-yellow-600 font-black">${orderPrice} USD Royal Milestone</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="w-full flex justify-center">
+                        {renderScreenshotBrowserFrame("max-h-[170px]")}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Footer specs */}
+                  <div className="w-full flex justify-between items-center text-[8.5px] font-mono text-yellow-500/80 px-6 border-t border-yellow-500/20 pt-1 z-10">
+                    <span>VALUED: ${orderPrice} USD</span>
+                    <span className="font-bold tracking-widest">CODE COMMANDOS ROYALE</span>
+                    <span>DATE: {formatDate(completionDate)}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* STRUCTURE RENDERER 17: Apex Hexagonal Duo ('dual_split_hex') */}
+              {structure === 'dual_split_hex' && (
+                <div className="flex-1 flex flex-col justify-between h-full p-4 relative z-10 text-left">
+                  {/* Top Bar Header */}
+                  <div className="flex justify-between items-center border-b border-white/10 pb-2">
+                    <span className="text-[9.5px] font-black text-white uppercase tracking-widest font-mono flex items-center gap-1.5">
+                      <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                      <span>APEX HEXAGONAL DUO SHOWCASE</span>
+                    </span>
+                    <span className="text-[8.5px] font-mono text-gray-400">REF: {orderId}</span>
+                  </div>
+
+                  {/* Center Hex Duo Cards */}
+                  <div className="grid grid-cols-2 gap-4 my-auto">
+                    {/* Member 1 Hex Card */}
+                    <div 
+                      className="rounded-2xl p-3.5 border bg-gray-950/60 backdrop-blur-md text-white shadow-xl flex items-center gap-3.5 border-white/15"
+                      style={{ borderColor: `${themeColor}40` }}
+                    >
+                      <div 
+                        className="w-16 h-16 rounded-2xl overflow-hidden bg-gray-800 shrink-0 border-2 shadow-md flex items-center justify-center transform rotate-3"
+                        style={{ borderColor: themeColor }}
+                      >
+                        {memberPhoto ? (
+                          <img src={memberPhoto} className="w-full h-full object-cover transform -rotate-3" />
+                        ) : (
+                          <Trophy className="w-7 h-7 text-gray-600" />
+                        )}
+                      </div>
+                      <div className="space-y-0.5 overflow-hidden">
+                        <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[7.5px] font-black uppercase font-mono">
+                          APEX LEAD #1
+                        </span>
+                        <h3 className="text-xs font-black text-white uppercase tracking-wide truncate">{memberName}</h3>
+                        <p className="text-[9px] font-semibold text-gray-300 truncate">{role}</p>
+                      </div>
+                    </div>
+
+                    {/* Member 2 Hex Card */}
+                    <div 
+                      className="rounded-2xl p-3.5 border bg-gray-950/60 backdrop-blur-md text-white shadow-xl flex items-center gap-3.5 border-white/15"
+                      style={{ borderColor: `${themeColor}40` }}
+                    >
+                      <div 
+                        className="w-16 h-16 rounded-2xl overflow-hidden bg-gray-800 shrink-0 border-2 shadow-md flex items-center justify-center transform -rotate-3"
+                        style={{ borderColor: themeColor }}
+                      >
+                        {memberPhoto2 ? (
+                          <img src={memberPhoto2} className="w-full h-full object-cover transform rotate-3" />
+                        ) : (
+                          <Trophy className="w-7 h-7 text-gray-600" />
+                        )}
+                      </div>
+                      <div className="space-y-0.5 overflow-hidden">
+                        <span className="px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 text-[7.5px] font-black uppercase font-mono">
+                          APEX LEAD #2
+                        </span>
+                        <h3 className="text-xs font-black text-white uppercase tracking-wide truncate">{memberName2}</h3>
+                        <p className="text-[9px] font-semibold text-gray-300 truncate">{role2}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Middle Stats Ribbon */}
+                  <div className="bg-black/50 border border-white/10 p-2 rounded-xl flex items-center justify-between text-[9px] font-mono px-4">
+                    <span className="text-gray-300">DOMAIN: <span className="text-blue-400 font-bold">{website}</span></span>
+                    <span className="text-emerald-400 font-black">${orderPrice} USD</span>
+                    <span className="text-yellow-400 font-bold">5.0 ★ RATED</span>
+                  </div>
+
+                  {/* Deliverable Section */}
+                  <div className="mt-2 shrink-0">
+                    {useNativeLayout ? (
+                      <div className="p-3 rounded-xl bg-white text-black space-y-1.5 shadow-xl text-left">
+                        <div className="flex items-center justify-between text-[8px] text-gray-400 font-bold uppercase border-b border-gray-100 pb-1">
+                          <span>Client Evaluation</span>
+                          <span>@{clientName}</span>
+                        </div>
+                        <p className="text-[10px] text-gray-800 italic font-medium leading-relaxed">
+                          &quot;{reviewText}&quot;
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="w-full flex justify-center">
+                        {renderScreenshotBrowserFrame("max-h-[160px]")}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* STRUCTURE RENDERER 18: Minimalist Dark Monolith ('dual_minimal_zen') */}
+              {structure === 'dual_minimal_zen' && (
+                <div className="flex-1 flex flex-col justify-between h-full p-5 relative z-10 text-left bg-black text-white border border-gray-800 rounded-2xl">
+                  {/* Minimalist Top Tag */}
+                  <div className="flex items-center justify-between border-b border-gray-800 pb-2 text-[9px] font-mono text-gray-500 uppercase tracking-widest">
+                    <span>// CODE COMMANDOS MONOLITH</span>
+                    <span>{orderId}</span>
+                  </div>
+
+                  {/* Duo Members Minimal Cards */}
+                  <div className="grid grid-cols-2 gap-4 my-auto">
+                    <div className="p-3 rounded-xl bg-gray-900/60 border border-gray-800 flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-full overflow-hidden bg-gray-800 shrink-0 border border-gray-700">
+                        {memberPhoto ? (
+                          <img src={memberPhoto} className="w-full h-full object-cover" />
+                        ) : (
+                          <Trophy className="w-5 h-5 text-gray-600 m-auto mt-3" />
+                        )}
+                      </div>
+                      <div className="space-y-0.5 overflow-hidden">
+                        <span className="text-[7.5px] font-mono text-gray-400 uppercase tracking-wider block">CREW #01</span>
+                        <h3 className="text-xs font-extrabold text-white uppercase truncate">{memberName}</h3>
+                        <p className="text-[8.5px] text-gray-400 font-mono truncate">{role}</p>
+                      </div>
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-gray-900/60 border border-gray-800 flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-full overflow-hidden bg-gray-800 shrink-0 border border-gray-700">
+                        {memberPhoto2 ? (
+                          <img src={memberPhoto2} className="w-full h-full object-cover" />
+                        ) : (
+                          <Trophy className="w-5 h-5 text-gray-600 m-auto mt-3" />
+                        )}
+                      </div>
+                      <div className="space-y-0.5 overflow-hidden">
+                        <span className="text-[7.5px] font-mono text-gray-400 uppercase tracking-wider block">CREW #02</span>
+                        <h3 className="text-xs font-extrabold text-white uppercase truncate">{memberName2}</h3>
+                        <p className="text-[8.5px] text-gray-400 font-mono truncate">{role2}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Deliverable Review / Screenshot section */}
+                  <div className="mt-2 shrink-0">
+                    {useNativeLayout ? (
+                      <div className="p-3.5 rounded-xl bg-gray-900 border border-gray-800 space-y-2 text-left">
+                        <div className="flex items-center justify-between text-[8px] font-mono text-gray-500 border-b border-gray-800 pb-1">
+                          <span>CLIENT TESTIMONY</span>
+                          <span>@{clientName}</span>
+                        </div>
+                        <p className="text-[10px] text-gray-300 font-sans italic leading-relaxed">
+                          &quot;{reviewText}&quot;
+                        </p>
+                        <div className="flex items-center justify-between text-[8.5px] font-mono pt-1 text-gray-400">
+                          <div className="flex gap-0.5">{renderStars(ratingStars)}</div>
+                          <span className="text-white font-bold">${orderPrice} USD</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="w-full flex justify-center">
+                        {renderScreenshotBrowserFrame("max-h-[170px]")}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Footer specs */}
+                  <div className="w-full flex justify-between items-center text-[8px] font-mono text-gray-600 border-t border-gray-900 pt-1.5">
+                    <span>DELIVERED: {formatDate(completionDate)}</span>
                     <span>DOMAIN: {website}</span>
                   </div>
                 </div>
