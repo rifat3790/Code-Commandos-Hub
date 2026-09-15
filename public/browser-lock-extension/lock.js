@@ -17,20 +17,26 @@ document.addEventListener('DOMContentLoaded', async () => {
     const enteredPass = passwordInput.value.trim();
     if (!enteredPass) return;
 
-    const data = await getFromStorage(['password', 'savedSession']);
-    const currentPass = data.password || '1234';
+    const data = await getFromStorage(['password']);
+    const currentPass = (data.password || '1234').toString().trim();
 
     if (enteredPass === currentPass) {
       // Correct password
       errorMsg.textContent = '';
       
-      // Notify Hub server
+      // Notify Hub server of local unlock
       sendHeartbeat({
         event: 'local_unlock',
-        eventDetails: 'User entered correct password on lock screen'
+        eventDetails: 'User entered correct PIN on lock screen'
       }).catch(console.error);
 
-      await handleSuccessUnlock(true);
+      // Trigger background unlock routine
+      chrome.runtime.sendMessage({ action: 'LOCAL_UNLOCK' }, (response) => {
+        if (chrome.runtime.lastError) {
+          // Fallback if background worker was sleeping
+          handleSuccessUnlock(true);
+        }
+      });
     } else {
       // Incorrect password
       errorMsg.textContent = 'Incorrect PIN / Password. Try again.';
@@ -70,6 +76,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           } catch (e) {}
         }
       }
+      await saveToStorage({ savedSession: null });
     } else {
       try {
         chrome.windows.create({});

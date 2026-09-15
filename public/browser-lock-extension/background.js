@@ -23,6 +23,18 @@ async function init() {
 
 init();
 
+// Listen to messages from lock.js or popup.js
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg.action === 'LOCAL_UNLOCK') {
+    isLocked = false;
+    saveToStorage({ isLocked: false }).then(() => {
+      unlockRoutine();
+    });
+    sendResponse({ success: true });
+  }
+  return true;
+});
+
 // Explicit Chrome Startup listener (fires when PC reboots or Chrome opens)
 chrome.runtime.onStartup.addListener(async () => {
   const localData = await getFromStorage(['isLocked']);
@@ -74,6 +86,8 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
     isLocked = changes.isLocked.newValue;
     if (isLocked) {
       enforceLock();
+    } else {
+      unlockRoutine();
     }
   }
 });
@@ -156,10 +170,11 @@ async function unlockRoutine() {
 
   // Close the lock window if open
   if (lockWindowId) {
-    try {
-      chrome.windows.remove(lockWindowId);
-    } catch (e) {}
+    const winToClose = lockWindowId;
     lockWindowId = null;
+    try {
+      chrome.windows.remove(winToClose);
+    } catch (e) {}
   }
 }
 
@@ -175,14 +190,14 @@ chrome.windows.onCreated.addListener((window) => {
   }
 });
 
-// Re-enforce lock immediately if lock window was manually closed (e.g. Alt+F4)
-chrome.windows.onRemoved.addListener((windowId) => {
-  if (!isLocked) return;
-  if (lockEnforcementInProgress) return;
-
+// Re-enforce lock if lock window was manually closed without unlocking
+chrome.windows.onRemoved.addListener(async (windowId) => {
   if (windowId === lockWindowId) {
     lockWindowId = null;
-    enforceLock();
+    const data = await getFromStorage(['isLocked']);
+    if (data.isLocked && isLocked) {
+      enforceLock();
+    }
   }
 });
 
