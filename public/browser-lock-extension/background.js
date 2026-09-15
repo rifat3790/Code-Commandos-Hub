@@ -4,7 +4,7 @@ let isLocked = false;
 let lockWindowId = null;
 let lockEnforcementInProgress = false;
 
-// Initialize state
+// Initialize state immediately on Service Worker load
 async function init() {
   const localData = await getFromStorage(['isLocked', 'password', 'deviceId']);
   
@@ -17,18 +17,34 @@ async function init() {
     enforceLock();
   }
 
-  // Initial heartbeat
+  // Initial heartbeat check
   runHeartbeatCheck();
 }
 
 init();
 
-// Periodic Heartbeat loop (every 3 seconds)
+// Explicit Chrome Startup listener (fires when PC reboots or Chrome opens)
+chrome.runtime.onStartup.addListener(async () => {
+  const localData = await getFromStorage(['isLocked']);
+  if (localData.isLocked) {
+    isLocked = true;
+    enforceLock();
+  }
+  runHeartbeatCheck();
+});
+
+// Extension install/update listener
+chrome.runtime.onInstalled.addListener(async () => {
+  await getDeviceId();
+  runHeartbeatCheck();
+});
+
+// Periodic Heartbeat loop (every 3.5 seconds)
 async function runHeartbeatCheck() {
   try {
     const res = await sendHeartbeat();
     if (res && res.success) {
-      // Sync password if admin updated it
+      // Sync master password if updated by Admin on server
       if (res.password) {
         await saveToStorage({ password: res.password });
       }
@@ -52,6 +68,7 @@ async function runHeartbeatCheck() {
 // 3.5-second recurring heartbeat interval
 setInterval(runHeartbeatCheck, 3500);
 
+// Listen to local storage changes
 chrome.storage.onChanged.addListener((changes, namespace) => {
   if (namespace === 'local' && changes.isLocked !== undefined) {
     isLocked = changes.isLocked.newValue;
@@ -66,8 +83,15 @@ async function enforceLock() {
   lockEnforcementInProgress = true;
 
   try {
-    // First, save current session before closing windows
-    await saveSessionState();
+    // Only save session state if we were NOT already locked (prevents overwriting saved tabs on PC reboot)
+    const currentData = await getFromStorage(['savedSession']);
+    if (!currentData.savedSession || currentData.savedSession.length === 0) {
+      await saveSessionState();
+    }
+
+    // Persist lock state to storage immediately
+    isLocked = true;
+    await saveToStorage({ isLocked: true });
 
     const windows = await new Promise((resolve) => chrome.windows.getAll({ populate: false }, resolve));
 
@@ -86,10 +110,10 @@ async function enforceLock() {
           resolve
         )
       );
-      lockWindowId = lockWin.id;
+      if (lockWin) lockWindowId = lockWin.id;
     }
 
-    // Close all other normal windows
+    // Close all other normal windows aggressively
     for (let win of windows) {
       if (win.id !== lockWindowId) {
         try {
@@ -98,7 +122,7 @@ async function enforceLock() {
       }
     }
   } catch (e) {
-    console.error(e);
+    console.error('Enforce lock error:', e);
   } finally {
     lockEnforcementInProgress = false;
   }
@@ -122,8 +146,12 @@ async function unlockRoutine() {
         } catch (e) {}
       }
     }
+    // Clear saved session once successfully restored
+    await saveToStorage({ savedSession: null });
   } else {
-    chrome.windows.create({});
+    try {
+      chrome.windows.create({});
+    } catch (e) {}
   }
 
   // Close the lock window if open
@@ -147,7 +175,7 @@ chrome.windows.onCreated.addListener((window) => {
   }
 });
 
-// Re-enforce lock if lock window was manually closed
+// Re-enforce lock immediately if lock window was manually closed (e.g. Alt+F4)
 chrome.windows.onRemoved.addListener((windowId) => {
   if (!isLocked) return;
   if (lockEnforcementInProgress) return;
@@ -158,9 +186,9 @@ chrome.windows.onRemoved.addListener((windowId) => {
   }
 });
 
-// Session State Saving
+// Save Session State
 async function saveSessionState() {
-  if (isLocked) return;
+  if (isLocked) return; // Do not save session while already locked
 
   const windows = await new Promise((resolve) => chrome.windows.getAll({ populate: true }, resolve));
   const sessionToSave = [];
