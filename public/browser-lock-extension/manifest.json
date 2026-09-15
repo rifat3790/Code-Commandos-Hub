@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "Code Commandos - Browser Lock & Security",
+  "version": "1.2",
+  "description": "Secure your browser with remote lock/unlock, IP tracking, and instant session restore connected to Code Commandos Hub.",
+  "permissions": [
+    "storage",
+    "tabs",
+    "windows"
+  ],
+  "host_permissions": [
+    "http://localhost:3000/*",
+    "http://127.0.0.1:3000/*",
+    "https://*/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Code Commandos Browser Lock"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

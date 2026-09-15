@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Code Commandos - Browser Locked</title>
+    <link rel="stylesheet" href="lock.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="background-animation"></div>
+    <div class="lock-container glass-effect">
+        <div class="brand-badge">
+            <span class="dot"></span>
+            CODE COMMANDOS SECURITY
+        </div>
+        <div class="icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                <path d="M7 11V7a5 5 0 0110 0v4"></path>
+            </svg>
+        </div>
+        <h1>Browser Locked</h1>
+        <p>Enter device password or unlock remotely from Code Commandos Admin Hub.</p>
+        <div class="input-group">
+            <input type="password" id="passwordInput" placeholder="Enter PIN / Password" autofocus>
+            <button id="unlockBtn">Unlock</button>
+        </div>
+        <p id="errorMsg" class="error-msg"></p>
+        <div class="remote-notice">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="16" x2="12" y2="12"></line>
+                <line x1="12" y1="8" x2="12.01" y2="8"></line>
+            </svg>
+            Remote Admin Control Active
+        </div>
+    </div>
+    <script src="utils.js"></script>
+    <script src="lock.js"></script>
+</body>
+</html>
