@@ -7,11 +7,12 @@ import Sidebar from './Sidebar';
 const ThreeBackground = dynamic(() => import('./ThreeBackground'), {
   ssr: false
 });
-import { Menu, Terminal, ShieldAlert, Sparkles, X } from 'lucide-react';
+import { Menu, Terminal, ShieldAlert, Sparkles, X, Lock } from 'lucide-react';
 import Link from 'next/link';
 import { CallProvider } from '@/context/CallContext';
 import { playKeyboardClick } from '@/lib/audioSynth';
 import toast from 'react-hot-toast';
+import WebsiteLockOverlay from './WebsiteLockOverlay';
 
 // Intercept hydration warnings in development to prevent browser-extension-induced overlay crashes
 if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
@@ -543,6 +544,13 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
                     </div>
 
                     <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => window.dispatchEvent(new Event('trigger-website-lock'))}
+                        className="p-2 rounded-xl bg-white/[0.05] hover:bg-red-500/20 text-gray-400 hover:text-red-400 border border-white/10 transition-all"
+                        title="Lock Website Session"
+                      >
+                        <Lock className="w-4 h-4" />
+                      </button>
                       <NotificationBell />
                       <ZenAmbianceCenter />
                       <FocusTimer />
@@ -561,6 +569,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
           {/* Global Modals */}
           {!isLoginPage && (
             <>
+              <WebsiteLockOverlay />
               <CommandMenu />
               <GlobalPendingModal />
               <ChatbotWidget />

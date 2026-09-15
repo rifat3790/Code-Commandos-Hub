@@ -2,13 +2,14 @@
 
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { ShieldAlert, Check, X, Database, Phone, Video, Palette, Type, Square, Calendar, Sparkles, Trash2, Shield, User as UserIcon, Clock, UserCheck, UserX, AlertTriangle, Filter, KeyRound, Copy, Send, Bot, Layers } from 'lucide-react';
+import { ShieldAlert, Check, X, Database, Phone, Video, Palette, Type, Square, Calendar, Sparkles, Trash2, Shield, User as UserIcon, Clock, UserCheck, UserX, AlertTriangle, Filter, KeyRound, Copy, Send, Bot, Layers, Lock } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useWorkspaceStore } from '@/store/workspaceStore';
 import { useCall } from '@/context/CallContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import TelegramBotTab from '@/components/admin/TelegramBotTab';
+import BrowserLockTab from '@/components/admin/BrowserLockTab';
 
 const allAvailableMenus = [
   'Home', 'Workspace', 'Meetings', 'Order Tracker', 'Timeline', 'Monthly Target', 'Issues', 'Personal Projects', 'Message Helper', 'Templates', 'Schema Builder',
@@ -21,7 +22,7 @@ export default function AdminDashboard() {
   const { startCall } = useCall();
   const router = useRouter();
   
-  const [activeTab, setActiveTab] = useState<'user-approvals' | 'declined-approvals' | 'reset-codes' | 'pending' | 'shopify' | 'users' | 'menus' | 'storage' | 'active-users' | 'styles' | 'usage' | 'super-console' | 'telegram'>('user-approvals');
+  const [activeTab, setActiveTab] = useState<'user-approvals' | 'declined-approvals' | 'reset-codes' | 'pending' | 'shopify' | 'users' | 'menus' | 'storage' | 'active-users' | 'styles' | 'usage' | 'super-console' | 'telegram' | 'browser-lock'>('user-approvals');
   const [resetCodes, setResetCodes] = useState<any[]>([]);
   const [manualResetEmail, setManualResetEmail] = useState('');
   const [isGeneratingResetCode, setIsGeneratingResetCode] = useState(false);
@@ -628,6 +629,13 @@ export default function AdminDashboard() {
         >
           <Send className="w-3.5 h-3.5" />
           <span>Telegram Bot</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('browser-lock')}
+          className={`px-5 py-3 text-xs uppercase font-extrabold flex items-center gap-1.5 shrink-0 transition-all ${activeTab === 'browser-lock' ? 'text-cyan-400 border-b-2 border-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.15)]' : 'text-gray-500 hover:text-white'}`}
+        >
+          <Lock className="w-3.5 h-3.5" />
+          <span>Browser Lock</span>
         </button>
         {(dbUser.role === 'super_admin' || dbUser.email === 'refayethossenmd@gmail.com') && (
           <>
@@ -2767,6 +2775,8 @@ export default function AdminDashboard() {
         </div>
       ) : activeTab === 'telegram' ? (
         <TelegramBotTab />
+      ) : activeTab === 'browser-lock' ? (
+        <BrowserLockTab currentUserEmail={dbUser?.email || user?.email} />
       ) : null}
 
       {/* Usage History Modal – Premium Timeline */}
